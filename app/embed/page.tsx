@@ -25,7 +25,7 @@ export default async function EmbedPage() {
   return (
     <main className="mx-auto max-w-4xl px-4 py-4 bg-zinc-950 min-h-screen">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <TrendFeed items={items} />
+        <TrendFeed items={items} stats={{}} />
         <ProjectAdvisor initialIdeas={projectIdeas} />
       </div>
     </main>
