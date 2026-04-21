@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Pulse
+
+A personal AI tracking dashboard that aggregates news from across the AI ecosystem, tracks model releases, visualizes predictions about the future of AI, and uses Claude to generate weekly digests and project ideas.
+
+## Features
+
+- **Live Feed** — aggregates AI news from ArXiv, Hacker News, GitHub Trending, RSS blogs, and HuggingFace Papers
+- **Weekly Digest** — Claude summarizes the week's top developments into a structured briefing
+- **Models** — tracks AI model releases with benchmarks, costs, and capability comparisons
+- **Timeline** — interactive full-screen timeline of AI predictions from 2018 to 2055
+- **Tech Radar** — auto-classifies tools and frameworks into adopt / trial / assess / hold
+- **Project Advisor** — Claude suggests buildable project ideas based on what's trending
+- **Datasets & Repos** — surfaces notable HuggingFace datasets and trending GitHub repos
+
+## Stack
+
+- Next.js 14 App Router + TypeScript
+- Tailwind CSS (dark-mode)
+- SQLite via `better-sqlite3` (local) / Turso (production)
+- Anthropic Claude API for summarization and analysis
+- Deployed on Vercel
 
 ## Getting Started
 
-First, run the development server:
-
 ```bash
+npm install
+cp .env.example .env.local
+# fill in your keys in .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+See `.env.example` for all required variables.
 
-## Learn More
+| Variable | Description |
+|---|---|
+| `ANTHROPIC_API_KEY` | From console.anthropic.com |
+| `TURSO_DATABASE_URL` | Turso database URL (production only) |
+| `TURSO_AUTH_TOKEN` | Turso auth token (production only) |
+| `CRON_SECRET` | Random string to protect the cron endpoint |
 
-To learn more about Next.js, take a look at the following resources:
+## Deployment
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Deploys to Vercel. Connect your GitHub repo, add the environment variables in the Vercel dashboard, and push to deploy.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+For the production database, create a free Turso database and swap `lib/db.ts` to use `@libsql/client`.
