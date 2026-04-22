@@ -549,58 +549,38 @@ const FUTURE_PREDICTIONS: SeedPrediction[] = [
 
 const ALL_SEEDS = [...PAST_PREDICTIONS, ...FUTURE_PREDICTIONS]
 
-const insertOrIgnore = db.prepare(`
-  INSERT OR IGNORE INTO ai_predictions
-    (id, title, category, year_min, year_max, year_guess, month_guess, date_guess, confidence, description, rationale, evidence, status, created_at, updated_at)
-  VALUES
-    (@id, @title, @category, @year_min, @year_max, @year_guess, @month_guess, @date_guess, @confidence, @description, @rationale, @evidence, @status, @created_at, @updated_at)
-`)
-
-const fillMissingDate = db.prepare(`
-  UPDATE ai_predictions SET date_guess = @date_guess, month_guess = @month_guess
-  WHERE title = @title AND (date_guess IS NULL OR date_guess = '')
-`)
-
 export async function ensureAllPredictions(): Promise<void> {
   const now = new Date().toISOString()
-  const txn = db.transaction(() => {
-    for (const p of ALL_SEEDS) {
-      insertOrIgnore.run({
-        id: crypto.randomUUID(),
-        title: p.title,
-        category: p.category,
-        year_min: p.year_min,
-        year_max: p.year_max,
-        year_guess: p.year_guess,
-        month_guess: p.month_guess,
-        date_guess: p.date_guess,
-        confidence: p.confidence,
-        description: p.description,
-        rationale: p.rationale,
-        evidence: '[]',
-        status: p.status,
-        created_at: now,
-        updated_at: now,
-      })
-      // Fill date_guess for existing rows that predate this migration
-      fillMissingDate.run({ title: p.title, date_guess: p.date_guess, month_guess: p.month_guess })
-    }
-  })
-  txn()
+  for (const p of ALL_SEEDS) {
+    await db.execute({
+      sql: `INSERT OR IGNORE INTO ai_predictions
+        (id, title, category, year_min, year_max, year_guess, month_guess, date_guess, confidence, description, rationale, evidence, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        crypto.randomUUID(), p.title, p.category,
+        p.year_min, p.year_max, p.year_guess, p.month_guess, p.date_guess,
+        p.confidence, p.description, p.rationale, '[]', p.status, now, now,
+      ],
+    })
+    await db.execute({
+      sql: `UPDATE ai_predictions SET date_guess = ?, month_guess = ?
+            WHERE title = ? AND (date_guess IS NULL OR date_guess = '')`,
+      args: [p.date_guess, p.month_guess, p.title],
+    })
+  }
 }
 
 export async function refreshPredictionAnalysis(): Promise<void> {
-  const feedItems = db.prepare(`
-    SELECT id, title, url, source, summary, raw_content
-    FROM feed_items
-    ORDER BY velocity_score DESC, fetched_at DESC
-    LIMIT 30
-  `).all() as any[]
+  const { rows: feedItems } = await db.execute({
+    sql: `SELECT id, title, url, source, summary, raw_content
+          FROM feed_items ORDER BY velocity_score DESC, fetched_at DESC LIMIT 30`,
+    args: [],
+  }) as { rows: any[] }
 
-  const predictions = db.prepare(`
-    SELECT * FROM ai_predictions WHERE status != 'past'
-    ORDER BY year_guess ASC, month_guess ASC
-  `).all() as any[]
+  const { rows: predictions } = await db.execute({
+    sql: `SELECT * FROM ai_predictions WHERE status != 'past' ORDER BY year_guess ASC, month_guess ASC`,
+    args: [],
+  }) as { rows: any[] }
 
   const feedList = feedItems
     .map((item, i) => `${i + 1}. [${item.source}] "${item.title}" — ${(item.summary ?? item.raw_content ?? '').slice(0, 200)}`)
@@ -650,46 +630,33 @@ Return a JSON array only. No markdown fences. Include ALL predictions — return
   }
 
   const now = new Date().toISOString()
-  const updateStmt = db.prepare(`
-    UPDATE ai_predictions SET
-      rationale = @rationale,
-      year_min = @year_min,
-      year_max = @year_max,
-      year_guess = @year_guess,
-      month_guess = @month_guess,
-      date_guess = @date_guess,
-      confidence = @confidence,
-      evidence = @evidence,
-      updated_at = @updated_at
-    WHERE id = @id
-  `)
-
-  const txn = db.transaction(() => {
-    for (const u of updated) {
-      if (!u.id) continue
-      updateStmt.run({
-        id: u.id,
-        rationale: u.rationale ?? '',
-        year_min: u.year_min,
-        year_max: u.year_max,
-        year_guess: u.year_guess,
-        month_guess: u.month_guess ?? 6,
-        date_guess: u.date_guess ?? String(u.year_guess),
-        confidence: u.confidence,
-        evidence: JSON.stringify(Array.isArray(u.evidence) ? u.evidence : []),
-        updated_at: now,
-      })
-    }
-  })
-  txn()
+  for (const u of updated) {
+    if (!u.id) continue
+    await db.execute({
+      sql: `UPDATE ai_predictions SET
+              rationale = ?, year_min = ?, year_max = ?, year_guess = ?,
+              month_guess = ?, date_guess = ?, confidence = ?, evidence = ?, updated_at = ?
+            WHERE id = ?`,
+      args: [
+        u.rationale ?? '',
+        u.year_min, u.year_max, u.year_guess,
+        u.month_guess ?? 6,
+        u.date_guess ?? String(u.year_guess),
+        u.confidence,
+        JSON.stringify(Array.isArray(u.evidence) ? u.evidence : []),
+        now,
+        u.id,
+      ],
+    })
+  }
   console.log(`[predictions] refreshed ${updated.length} future prediction analyses`)
 }
 
-export function getAllPredictions(): AIPrediction[] {
-  const rows = db.prepare(`
-    SELECT * FROM ai_predictions
-    ORDER BY year_guess ASC, COALESCE(month_guess, 6) ASC
-  `).all() as any[]
+export async function getAllPredictions(): Promise<AIPrediction[]> {
+  const { rows } = await db.execute({
+    sql: `SELECT * FROM ai_predictions ORDER BY year_guess ASC, COALESCE(month_guess, 6) ASC`,
+    args: [],
+  }) as { rows: any[] }
   return rows.map(r => ({
     ...r,
     evidence: JSON.parse(r.evidence ?? '[]') as EvidenceLink[],

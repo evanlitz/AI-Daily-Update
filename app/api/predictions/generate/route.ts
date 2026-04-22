@@ -4,7 +4,7 @@ import { refreshPredictionAnalysis, getAllPredictions } from '@/lib/intelligence
 export async function POST() {
   try {
     await refreshPredictionAnalysis()
-    return NextResponse.json(getAllPredictions())
+    return NextResponse.json(await getAllPredictions())
   } catch (err) {
     console.error('[predictions/generate]', err)
     return NextResponse.json({ error: 'Refresh failed' }, { status: 500 })

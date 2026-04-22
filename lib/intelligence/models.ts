@@ -619,105 +619,48 @@ const MODEL_SEEDS: SeedModel[] = [
   },
 ]
 
-const insertOrIgnore = db.prepare(`
-  INSERT OR IGNORE INTO ai_models
-    (id, name, slug, lab, family, release_date, status, context_window,
-     input_cost_per_mtok, output_cost_per_mtok, knowledge_cutoff,
-     modalities, benchmarks, highlights, notes, feed_item_id, created_at, updated_at)
-  VALUES
-    (@id, @name, @slug, @lab, @family, @release_date, @status, @context_window,
-     @input_cost_per_mtok, @output_cost_per_mtok, @knowledge_cutoff,
-     @modalities, @benchmarks, @highlights, @notes, @feed_item_id, @created_at, @updated_at)
-`)
+const INSERT_MODEL_SQL = `INSERT OR IGNORE INTO ai_models (id, name, slug, lab, family, release_date, status, context_window, input_cost_per_mtok, output_cost_per_mtok, knowledge_cutoff, modalities, benchmarks, highlights, notes, feed_item_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
-export function ensureAllModels(): void {
+export async function ensureAllModels(): Promise<void> {
   const now = new Date().toISOString()
-  const txn = db.transaction(() => {
-    for (const m of MODEL_SEEDS) {
-      insertOrIgnore.run({
-        id: crypto.randomUUID(),
-        name: m.name,
-        slug: m.slug,
-        lab: m.lab,
-        family: m.family,
-        release_date: m.release_date,
-        status: m.status,
-        context_window: m.context_window ?? null,
-        input_cost_per_mtok: m.input_cost_per_mtok ?? null,
-        output_cost_per_mtok: m.output_cost_per_mtok ?? null,
-        knowledge_cutoff: m.knowledge_cutoff ?? null,
-        modalities: JSON.stringify(m.modalities),
-        benchmarks: JSON.stringify(m.benchmarks),
-        highlights: JSON.stringify(m.highlights),
-        notes: m.notes ?? null,
-        feed_item_id: null,
-        created_at: now,
-        updated_at: now,
-      })
-    }
-  })
-  txn()
+  for (const m of MODEL_SEEDS) {
+    await db.execute({
+      sql: INSERT_MODEL_SQL,
+      args: [crypto.randomUUID(), m.name, m.slug, m.lab, m.family, m.release_date, m.status, m.context_window ?? null, m.input_cost_per_mtok ?? null, m.output_cost_per_mtok ?? null, m.knowledge_cutoff ?? null, JSON.stringify(m.modalities), JSON.stringify(m.benchmarks), JSON.stringify(m.highlights), m.notes ?? null, null, now, now],
+    })
+  }
   console.log(`[models] seeded ${MODEL_SEEDS.length} models`)
 }
 
-// Keyword regex for model release announcements
 const MODEL_RELEASE_RE = /\b(GPT-[\d.]+|Claude\s[\d.]+|Gemini\s[\d.]+|Llama\s[\d.]+|Grok\s[\d.]+|DeepSeek[\s-][\w.]+|Mistral\s\w+|o\d[- ](?:mini|pro|preview)?|Mixtral|Codestral)\b/i
 
-export function detectNewModels(items: FeedItem[]): void {
-  const existingSlugs = new Set(
-    (db.prepare('SELECT slug FROM ai_models').all() as { slug: string }[]).map(r => r.slug)
-  )
-
+export async function detectNewModels(items: FeedItem[]): Promise<void> {
+  const { rows: slugRows } = await db.execute(`SELECT slug FROM ai_models`)
+  const existingSlugs = new Set((slugRows as any[]).map(r => r.slug))
   const now = new Date().toISOString()
   let detected = 0
 
   for (const item of items) {
     const match = MODEL_RELEASE_RE.exec(item.title)
     if (!match) continue
-
     const rawName = match[0].trim()
-    // Rough slug: lowercase, spaces→hyphens, strip special chars
     const slug = `detected-${rawName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${item.id.slice(0, 6)}`
-
     if (existingSlugs.has(slug)) continue
     existingSlugs.add(slug)
-
     try {
-      insertOrIgnore.run({
-        id: crypto.randomUUID(),
-        name: rawName,
-        slug,
-        lab: 'Unknown',
-        family: rawName,
-        release_date: item.published_at ?? now.slice(0, 10),
-        status: 'preview',
-        context_window: null,
-        input_cost_per_mtok: null,
-        output_cost_per_mtok: null,
-        knowledge_cutoff: null,
-        modalities: JSON.stringify(['text']),
-        benchmarks: JSON.stringify({}),
-        highlights: JSON.stringify([]),
-        notes: `Auto-detected from feed: "${item.title}" (${item.source})`,
-        feed_item_id: item.id,
-        created_at: now,
-        updated_at: now,
+      await db.execute({
+        sql: INSERT_MODEL_SQL,
+        args: [crypto.randomUUID(), rawName, slug, 'Unknown', rawName, item.published_at ?? now.slice(0, 10), 'preview', null, null, null, null, JSON.stringify(['text']), JSON.stringify({}), JSON.stringify([]), `Auto-detected from feed: "${item.title}" (${item.source})`, item.id, now, now],
       })
       detected++
-    } catch {
-      // duplicate slug edge case — fine to skip
-    }
+    } catch {}
   }
-
   if (detected > 0) console.log(`[models] detected ${detected} new model candidates from feed`)
 }
 
-export function getAllModels(): AIModel[] {
-  const rows = db.prepare(`
-    SELECT * FROM ai_models ORDER BY release_date DESC
-  `).all() as any[]
-
-  return rows.map(r => ({
+export async function getAllModels(): Promise<AIModel[]> {
+  const { rows } = await db.execute(`SELECT * FROM ai_models ORDER BY release_date DESC`)
+  return (rows as any[]).map(r => ({
     ...r,
     modalities: JSON.parse(r.modalities ?? '[]'),
     benchmarks: JSON.parse(r.benchmarks ?? '{}'),

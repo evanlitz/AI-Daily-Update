@@ -3,25 +3,17 @@ import db from '@/lib/db'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  const lang = searchParams.get('lang')
+  const lang  = searchParams.get('lang')
   const limit = Math.min(100, parseInt(searchParams.get('limit') ?? '25'))
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-  let query = `SELECT * FROM github_repos WHERE fetched_at >= ?`
-  const params: any[] = [since]
+  let sql  = `SELECT * FROM github_repos WHERE fetched_at >= ?`
+  const args: any[] = [since]
 
-  if (lang && lang !== 'all') {
-    query += ` AND LOWER(language) = LOWER(?)`
-    params.push(lang)
-  }
+  if (lang && lang !== 'all') { sql += ` AND LOWER(language) = LOWER(?)`; args.push(lang) }
+  sql += ` ORDER BY stars_today DESC LIMIT ?`
+  args.push(limit)
 
-  query += ` ORDER BY stars_today DESC LIMIT ?`
-  params.push(limit)
-
-  const repos = db.prepare(query).all(...params) as any[]
-  const parsed = repos.map(r => ({
-    ...r,
-    topics: JSON.parse(r.topics ?? '[]'),
-  }))
-  return NextResponse.json(parsed)
+  const { rows } = await db.execute({ sql, args })
+  return NextResponse.json(rows.map((r: any) => ({ ...r, topics: JSON.parse(r.topics ?? '[]') })))
 }

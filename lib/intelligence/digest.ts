@@ -63,10 +63,10 @@ function recencyBoost(publishedAt: string | null): number {
 export async function generateWeeklyDigest(): Promise<WeeklyDigest> {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  const raw = db.prepare(
-    `SELECT id, source, title, raw_content, summary, published_at, velocity_score, topic_tags
-     FROM feed_items WHERE fetched_at >= ? ORDER BY fetched_at DESC LIMIT 200`
-  ).all(weekAgo) as any[]
+  const { rows: raw } = await db.execute({
+    sql: `SELECT id, source, title, raw_content, summary, published_at, velocity_score, topic_tags FROM feed_items WHERE fetched_at >= ? ORDER BY fetched_at DESC LIMIT 200`,
+    args: [weekAgo],
+  }) as { rows: any[] }
 
   // Source diversity cap: max 8 per source
   const sourceCounts: Record<string, number> = {}
@@ -133,9 +133,10 @@ When an item is marked "covered by N sources", treat it as proportionally more s
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
 
-  db.prepare(
-    `INSERT OR REPLACE INTO weekly_digest (id, week_start, content_md, highlights, created_at) VALUES (?, ?, ?, ?, ?)`
-  ).run(id, weekStart, content, JSON.stringify(highlights), now)
+  await db.execute({
+    sql: `INSERT OR REPLACE INTO weekly_digest (id, week_start, content_md, highlights, created_at) VALUES (?, ?, ?, ?, ?)`,
+    args: [id, weekStart, content, JSON.stringify(highlights), now],
+  })
 
   return { id, week_start: weekStart, content_md: content, highlights, created_at: now }
 }

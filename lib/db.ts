@@ -1,16 +1,34 @@
-// For Vercel deployment, replace better-sqlite3 with @libsql/client (Turso).
-// Run `turso db create ai-pulse` and `turso db tokens create ai-pulse`,
-// then set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN env vars.
-import Database from 'better-sqlite3'
+import { createClient } from '@libsql/client'
 import path from 'path'
 import fs from 'fs'
 
-const dataDir = path.join(process.cwd(), 'data')
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir)
+// Local: file-based SQLite. Production: Turso cloud via libsql://
+const isLocal = !process.env.TURSO_DATABASE_URL
 
-const db = new Database(path.join(dataDir, 'pulse.db'))
+let url: string
+if (isLocal) {
+  const dataDir = path.join(process.cwd(), 'data')
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir)
+  url = `file:${path.join(dataDir, 'pulse.db')}`
+} else {
+  url = process.env.TURSO_DATABASE_URL!
+}
 
-db.exec(`
+export const db = createClient({
+  url,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+})
+
+// Helper: run multiple statements at startup
+async function exec(sql: string) {
+  const statements = sql.split(';').map(s => s.trim()).filter(Boolean)
+  for (const s of statements) {
+    await db.execute(s)
+  }
+}
+
+// Initialize schema
+await exec(`
 CREATE TABLE IF NOT EXISTS feed_items (
   id TEXT PRIMARY KEY,
   source TEXT NOT NULL,
@@ -35,7 +53,7 @@ CREATE TABLE IF NOT EXISTS weekly_digest (
 
 CREATE TABLE IF NOT EXISTS tech_radar (
   id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
+  name TEXT NOT NULL UNIQUE,
   category TEXT NOT NULL,
   quadrant TEXT NOT NULL,
   rationale TEXT,
@@ -50,6 +68,7 @@ CREATE TABLE IF NOT EXISTS project_ideas (
   skills_learned TEXT DEFAULT '[]',
   estimated_hours INTEGER,
   starter_checklist TEXT DEFAULT '[]',
+  tech_stack TEXT DEFAULT '[]',
   created_at TEXT NOT NULL
 );
 
@@ -83,11 +102,13 @@ CREATE TABLE IF NOT EXISTS datasets (
 
 CREATE TABLE IF NOT EXISTS ai_predictions (
   id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
+  title TEXT NOT NULL UNIQUE,
   category TEXT NOT NULL,
   year_min INTEGER NOT NULL,
   year_max INTEGER NOT NULL,
   year_guess INTEGER NOT NULL,
+  month_guess INTEGER DEFAULT 6,
+  date_guess TEXT,
   confidence TEXT NOT NULL,
   description TEXT,
   rationale TEXT,
@@ -96,9 +117,7 @@ CREATE TABLE IF NOT EXISTS ai_predictions (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-`)
 
-db.exec(`
 CREATE TABLE IF NOT EXISTS ai_models (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -118,15 +137,7 @@ CREATE TABLE IF NOT EXISTS ai_models (
   feed_item_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
-);
+)
 `)
-
-db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS tech_radar_name_idx ON tech_radar(name)`)
-db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ai_predictions_title_idx ON ai_predictions(title)`)
-// ai_models slug is UNIQUE in the column definition — no separate index needed
-// Safe migrations — ignored if columns already exist
-try { db.exec(`ALTER TABLE ai_predictions ADD COLUMN date_guess TEXT`) } catch {}
-try { db.exec(`ALTER TABLE ai_predictions ADD COLUMN month_guess INTEGER DEFAULT 6`) } catch {}
-try { db.exec(`ALTER TABLE project_ideas ADD COLUMN tech_stack TEXT DEFAULT '[]'`) } catch {}
 
 export default db

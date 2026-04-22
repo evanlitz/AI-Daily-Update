@@ -4,16 +4,11 @@ import db from '@/lib/db'
 export async function GET() {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  const countRow = db.prepare(
-    `SELECT COUNT(*) as count FROM feed_items WHERE fetched_at >= ?`
-  ).get(weekAgo) as any
-
-  const allItems = db.prepare(
-    `SELECT topic_tags, velocity_score FROM feed_items WHERE fetched_at >= ?`
-  ).all(weekAgo) as any[]
+  const { rows: countRows } = await db.execute({ sql: `SELECT COUNT(*) as count FROM feed_items WHERE fetched_at >= ?`, args: [weekAgo] })
+  const { rows: allItems }  = await db.execute({ sql: `SELECT topic_tags, velocity_score FROM feed_items WHERE fetched_at >= ?`, args: [weekAgo] })
 
   const tagVelocity: Record<string, number[]> = {}
-  for (const item of allItems) {
+  for (const item of allItems as any[]) {
     const tags: string[] = JSON.parse(item.topic_tags ?? '[]')
     for (const tag of tags) {
       if (!tagVelocity[tag]) tagVelocity[tag] = []
@@ -21,19 +16,17 @@ export async function GET() {
     }
   }
 
-  let topTopic = 'models'
-  let topAvg = -1
+  let topTopic = 'models', topAvg = -1
   for (const [tag, scores] of Object.entries(tagVelocity)) {
     const avg = scores.reduce((a, b) => a + b, 0) / scores.length
     if (avg > topAvg) { topAvg = avg; topTopic = tag }
   }
 
-  const topItem = db.prepare(
-    `SELECT title, velocity_score FROM feed_items ORDER BY velocity_score DESC LIMIT 1`
-  ).get() as any
+  const { rows: topRows } = await db.execute(`SELECT title, velocity_score FROM feed_items ORDER BY velocity_score DESC LIMIT 1`)
+  const topItem = topRows[0] as any
 
   return NextResponse.json({
-    itemsThisWeek: countRow?.count ?? 0,
+    itemsThisWeek: (countRows[0] as any)?.count ?? 0,
     topTopic,
     topVelocityItem: topItem ? { title: topItem.title, score: topItem.velocity_score } : null,
   })

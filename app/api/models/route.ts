@@ -7,7 +7,7 @@ export async function GET(req: Request) {
   const status = searchParams.get('status')
   const family = searchParams.get('family')
 
-  let models: AIModel[] = getAllModels()
+  let models: AIModel[] = await getAllModels()
 
   if (lab)    models = models.filter(m => m.lab.toLowerCase() === lab.toLowerCase())
   if (family) models = models.filter(m => m.family.toLowerCase() === family.toLowerCase())

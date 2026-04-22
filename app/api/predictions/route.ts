@@ -3,5 +3,5 @@ import { ensureAllPredictions, getAllPredictions } from '@/lib/intelligence/pred
 
 export async function GET() {
   await ensureAllPredictions()
-  return NextResponse.json(getAllPredictions())
+  return NextResponse.json(await getAllPredictions())
 }
