@@ -1,12 +1,19 @@
 import { ProjectAdvisor } from '@/components/ProjectAdvisor'
+import db from '@/lib/db'
 import type { ProjectIdea } from '@/lib/types'
 
 async function getIdeas(): Promise<ProjectIdea[]> {
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'
   try {
-    const res = await fetch(`${base}/api/advisor`, { cache: 'no-store' })
-    if (!res.ok) return []
-    return res.json()
+    const { rows } = await db.execute({
+      sql: `SELECT * FROM project_ideas ORDER BY created_at DESC LIMIT 3`,
+      args: [],
+    })
+    return (rows as any[]).map(r => ({
+      ...r,
+      skills_learned: JSON.parse(r.skills_learned ?? '[]'),
+      starter_checklist: JSON.parse(r.starter_checklist ?? '[]'),
+      tech_stack: JSON.parse(r.tech_stack ?? '[]'),
+    }))
   } catch { return [] }
 }
 

@@ -1,26 +1,19 @@
 import { TrendFeed } from '@/components/TrendFeed'
+import db from '@/lib/db'
 import type { FeedItem } from '@/lib/types'
 
 async function getFeed(): Promise<FeedItem[]> {
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'
   try {
-    const res = await fetch(`${base}/api/feed?page=1`, { cache: 'no-store' })
-    if (!res.ok) return []
-    return res.json()
+    const { rows } = await db.execute({
+      sql: `SELECT * FROM feed_items ORDER BY published_at DESC LIMIT 40`,
+      args: [],
+    })
+    return (rows as any[]).map(i => ({ ...i, topic_tags: JSON.parse(i.topic_tags ?? '[]') }))
   } catch { return [] }
 }
 
-async function getStats() {
-  const base = process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'
-  try {
-    const res = await fetch(`${base}/api/stats`, { cache: 'no-store' })
-    if (!res.ok) return null
-    return res.json()
-  } catch { return null }
-}
-
 export default async function Home() {
-  const [items, stats] = await Promise.all([getFeed(), getStats()])
+  const [items, stats] = await Promise.all([getFeed(), Promise.resolve(null)])
 
   return (
     <main className="mx-auto max-w-screen-xl px-5 py-8">
