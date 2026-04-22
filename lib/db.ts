@@ -2,16 +2,23 @@ import { createClient } from '@libsql/client'
 import path from 'path'
 import fs from 'fs'
 
-// Local: file-based SQLite. Production: Turso cloud via libsql://
-const isLocal = !process.env.TURSO_DATABASE_URL
+const tursoUrl = process.env.TURSO_DATABASE_URL
 
 let url: string
-if (isLocal) {
-  const dataDir = path.join(process.cwd(), 'data')
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir)
-  url = `file:${path.join(dataDir, 'pulse.db')}`
+if (tursoUrl) {
+  url = tursoUrl
 } else {
-  url = process.env.TURSO_DATABASE_URL!
+  // Local dev only — Vercel's filesystem is read-only
+  try {
+    const dataDir = path.join(process.cwd(), 'data')
+    if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir)
+    url = `file:${path.join(dataDir, 'pulse.db')}`
+  } catch {
+    throw new Error(
+      'TURSO_DATABASE_URL is not set and local filesystem is read-only. ' +
+      'Set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN in your Vercel environment variables.'
+    )
+  }
 }
 
 export const db = createClient({
