@@ -3,6 +3,49 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import type { AIPrediction } from '@/lib/types'
 
+// ── Boot screen ───────────────────────────────────────────────────────────────
+
+const BOOT_LINES = [
+  '> LOADING TIMELINE DATABASE...',
+  '> CALIBRATING PREDICTION ENGINE...',
+  '> MAPPING PAST MILESTONES...',
+  '> PROJECTING FUTURE TRAJECTORIES...',
+  '> TIMELINE READY',
+]
+
+function BootScreen({ onDone }: { onDone: () => void }) {
+  const [lines, setLines] = useState<string[]>([])
+  const [done, setDone] = useState(false)
+
+  useEffect(() => {
+    const timers = BOOT_LINES.map((line, i) =>
+      setTimeout(() => setLines(prev => [...prev, line]), i * 280 + 80)
+    )
+    const finish = setTimeout(() => { setDone(true); setTimeout(onDone, 350) }, BOOT_LINES.length * 280 + 300)
+    return () => { timers.forEach(clearTimeout); clearTimeout(finish) }
+  }, [onDone])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center flex-col"
+      style={{ background: '#030308', opacity: done ? 0 : 1, transition: 'opacity 0.35s ease', pointerEvents: done ? 'none' : 'auto' }}>
+      <div style={{ fontFamily: 'monospace', width: 440 }}>
+        <p style={{ color: '#7c6aff', fontSize: 13, fontWeight: 900, letterSpacing: '0.2em', marginBottom: 24 }}>
+          ■ AI PULSE · TIMELINE
+        </p>
+        {lines.map((line, i) => (
+          <p key={i} style={{
+            color: i === lines.length - 1 ? '#34d399' : '#9090c4',
+            fontSize: 14, letterSpacing: '0.05em', marginBottom: 7,
+          }}>{line}</p>
+        ))}
+        {lines.length < BOOT_LINES.length && (
+          <span style={{ color: '#a78bfa', fontSize: 14, animation: 'boot-blink 0.8s step-end infinite' }}>█</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Color maps ────────────────────────────────────────────────────────────────
 
 const CAT_COLOR: Record<string, string> = {
@@ -522,9 +565,22 @@ export default function TimelinePage() {
   const [activeIdx, setActiveIdx]     = useState(0)
   const [catFilter, setCatFilter]     = useState<string | null>(null)
   const [view, setView]               = useState<'story' | 'list'>('story')
+  const [booted, setBooted]           = useState(false)
+  const [pageVisible, setPageVisible] = useState(false)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const slideRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  useEffect(() => {
+    const already = typeof window !== 'undefined' && sessionStorage.getItem('timeline-booted')
+    if (already) { setBooted(true); setPageVisible(true) }
+  }, [])
+
+  const handleBootDone = useCallback(() => {
+    if (typeof window !== 'undefined') sessionStorage.setItem('timeline-booted', '1')
+    setBooted(true)
+    setTimeout(() => setPageVisible(true), 50)
+  }, [])
 
   useEffect(() => {
     fetch('/api/predictions')
@@ -591,6 +647,8 @@ export default function TimelinePage() {
   const STRIP_H    = 124
 
   return (
+    <>
+    {!booted && <BootScreen onDone={handleBootDone} />}
     <div style={{
       position: 'fixed',
       top: 0, left: SIDEBAR_W, right: 0, bottom: 0,
@@ -598,6 +656,8 @@ export default function TimelinePage() {
       display: 'flex', flexDirection: 'column',
       background: '#05050e',
       fontFamily: "'Inter', system-ui, sans-serif",
+      opacity: pageVisible ? 1 : 0,
+      transition: 'opacity 0.4s ease',
     }}>
       <style>{`
         .tl-scroll::-webkit-scrollbar { display: none; }
@@ -698,5 +758,6 @@ export default function TimelinePage() {
         <ListView events={sorted} onSelect={selectFromList} />
       )}
     </div>
+    </>
   )
 }
