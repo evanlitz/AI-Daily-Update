@@ -1,4 +1,4 @@
-import { getAllModels } from '@/lib/intelligence/models'
+import { getAllModels, ensureAllModels } from '@/lib/intelligence/models'
 import type { AIModel } from '@/lib/types'
 
 export async function GET(req: Request) {
@@ -7,6 +7,7 @@ export async function GET(req: Request) {
   const status = searchParams.get('status')
   const family = searchParams.get('family')
 
+  await ensureAllModels()
   let models: AIModel[] = await getAllModels()
 
   if (lab)    models = models.filter(m => m.lab.toLowerCase() === lab.toLowerCase())
