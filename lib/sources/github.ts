@@ -36,6 +36,7 @@ async function scrapePage(url: string): Promise<FeedItem[]> {
       title: he.decode(fullName),
       url: repoUrl,
       raw_content: description.slice(0, 800),
+      published_at: now,
       fetched_at: now,
       topic_tags: ['tools'],
       velocity_score: 0,
