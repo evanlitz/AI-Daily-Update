@@ -204,7 +204,7 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
       </div>
 
       {/* ── Console grid ─────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '218px 1fr', gap: 14, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '190px 1fr', gap: 14, alignItems: 'start' }}>
 
         {/* ── LEFT: Station panel ──────────────────────────── */}
         <div style={{
@@ -417,7 +417,7 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
           {/* Column header strip */}
           <div style={{
             display: 'grid',
-            gridTemplateColumns: '44px 54px 38px 82px 1fr 72px',
+            gridTemplateColumns: '38px 48px 32px 68px 1fr 60px',
             gap: 0,
             padding: '5px 14px',
             borderBottom: '1px solid rgba(255,255,255,0.04)',
@@ -461,7 +461,7 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
                       onClick={() => { setExpandedId(expanded ? null : item.id); markRead(item.id) }}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '44px 54px 38px 82px 1fr 72px',
+                        gridTemplateColumns: '38px 48px 32px 68px 1fr 60px',
                         alignItems: 'center',
                         padding: '13px 16px',
                         cursor: 'pointer',
@@ -542,7 +542,7 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
                         </div>
                         {item.hook && !isRead && (
                           <span style={{
-                            fontSize: 11, color: `rgba(${src.rgb},0.55)`,
+                            fontSize: 11, color: `rgba(${src.rgb},0.8)`,
                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                             letterSpacing: '0.01em', lineHeight: 1.3,
                           }}>
@@ -566,17 +566,11 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
                         <div style={{
                           background: 'rgba(0,0,0,0.35)',
                           border: '1px solid rgba(255,255,255,0.05)',
-                          borderRadius: 7, padding: '9px 13px',
+                          borderRadius: 7, padding: '11px 14px',
                         }}>
-                          <span style={{
-                            display: 'block', fontSize: 14, fontWeight: 900, letterSpacing: '0.2em',
-                            color: '#7070a8', marginBottom: 6, fontFamily: 'monospace',
-                          }}>
-                            ─── DECODED PAYLOAD ───────────────────────
-                          </span>
                           <p style={{
-                            fontSize: 14, color: '#4a4a6a', lineHeight: 1.75,
-                            fontFamily: 'monospace',
+                            fontSize: 13, color: '#b8b8d4', lineHeight: 1.8,
+                            margin: 0,
                           }}>
                             {item.raw_content.slice(0, 320)}{item.raw_content.length > 320 ? '…' : ''}
                           </p>
