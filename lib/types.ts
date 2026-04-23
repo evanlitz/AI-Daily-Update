@@ -10,6 +10,7 @@ export interface FeedItem {
   topic_tags: string[]
   velocity_score: number
   is_read: number
+  hook?: string
 }
 
 export interface WeeklyDigest {

@@ -507,35 +507,46 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
                         {tag ?? '——'}
                       </span>
 
-                      {/* Title */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-                        <a
-                          href={item.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={e => e.stopPropagation()}
-                          style={{
-                            fontSize: 12, fontWeight: 600, lineHeight: 1.35,
-                            color: isRead ? '#7070a8' : '#a8a8c8',
-                            textDecoration: isRead ? 'line-through' : 'none',
-                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            flex: 1, minWidth: 0,
-                            transition: 'color 0.15s',
-                          }}
-                          onMouseEnter={e => { if (!isRead) (e.target as HTMLElement).style.color = '#e8e8f0' }}
-                          onMouseLeave={e => { if (!isRead) (e.target as HTMLElement).style.color = '#a8a8c8' }}
-                        >
-                          {item.title}
-                        </a>
-                        {item.raw_content && (
+                      {/* Title + hook */}
+                      <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: 2 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            style={{
+                              fontSize: 12, fontWeight: 600, lineHeight: 1.35,
+                              color: isRead ? '#7070a8' : '#a8a8c8',
+                              textDecoration: isRead ? 'line-through' : 'none',
+                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                              flex: 1, minWidth: 0,
+                              transition: 'color 0.15s',
+                            }}
+                            onMouseEnter={e => { if (!isRead) (e.target as HTMLElement).style.color = '#e8e8f0' }}
+                            onMouseLeave={e => { if (!isRead) (e.target as HTMLElement).style.color = '#a8a8c8' }}
+                          >
+                            {item.title}
+                          </a>
+                          {item.raw_content && (
+                            <span style={{
+                              fontSize: 12, flexShrink: 0,
+                              color: expanded ? src.color : '#7070a8',
+                              display: 'inline-block',
+                              transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.2s, color 0.2s',
+                            }}>
+                              ▾
+                            </span>
+                          )}
+                        </div>
+                        {item.hook && !isRead && (
                           <span style={{
-                            fontSize: 12, flexShrink: 0,
-                            color: expanded ? src.color : '#7070a8',
-                            display: 'inline-block',
-                            transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                            transition: 'transform 0.2s, color 0.2s',
+                            fontSize: 11, color: `rgba(${src.rgb},0.55)`,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                            letterSpacing: '0.01em', lineHeight: 1.3,
                           }}>
-                            ▾
+                            {item.hook}
                           </span>
                         )}
                       </div>

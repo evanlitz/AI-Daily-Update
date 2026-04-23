@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS feed_items (
   fetched_at TEXT NOT NULL,
   topic_tags TEXT DEFAULT '[]',
   velocity_score REAL DEFAULT 0,
-  is_read INTEGER DEFAULT 0
+  is_read INTEGER DEFAULT 0,
+  hook TEXT
 );
 
 CREATE TABLE IF NOT EXISTS weekly_digest (
@@ -146,5 +147,8 @@ CREATE TABLE IF NOT EXISTS ai_models (
   updated_at TEXT NOT NULL
 )
 `)
+
+// Migrations for existing databases
+try { await db.execute(`ALTER TABLE feed_items ADD COLUMN hook TEXT`) } catch {}
 
 export default db

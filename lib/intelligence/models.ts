@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import db from '../db'
+import { anthropic, MODEL } from '../claude'
 import type { AIModel, FeedItem } from '../types'
 
 interface SeedModel {
@@ -619,43 +620,146 @@ const MODEL_SEEDS: SeedModel[] = [
   },
 ]
 
-const INSERT_MODEL_SQL = `INSERT OR IGNORE INTO ai_models (id, name, slug, lab, family, release_date, status, context_window, input_cost_per_mtok, output_cost_per_mtok, knowledge_cutoff, modalities, benchmarks, highlights, notes, feed_item_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+const UPSERT_MODEL_SQL = `
+  INSERT INTO ai_models (id, name, slug, lab, family, release_date, status, context_window, input_cost_per_mtok, output_cost_per_mtok, knowledge_cutoff, modalities, benchmarks, highlights, notes, feed_item_id, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ON CONFLICT(slug) DO UPDATE SET
+    status=excluded.status,
+    input_cost_per_mtok=excluded.input_cost_per_mtok,
+    output_cost_per_mtok=excluded.output_cost_per_mtok,
+    knowledge_cutoff=excluded.knowledge_cutoff,
+    benchmarks=excluded.benchmarks,
+    highlights=excluded.highlights,
+    notes=excluded.notes,
+    updated_at=excluded.updated_at
+`
 
 export async function ensureAllModels(): Promise<void> {
   const now = new Date().toISOString()
   for (const m of MODEL_SEEDS) {
     await db.execute({
-      sql: INSERT_MODEL_SQL,
+      sql: UPSERT_MODEL_SQL,
       args: [crypto.randomUUID(), m.name, m.slug, m.lab, m.family, m.release_date, m.status, m.context_window ?? null, m.input_cost_per_mtok ?? null, m.output_cost_per_mtok ?? null, m.knowledge_cutoff ?? null, JSON.stringify(m.modalities), JSON.stringify(m.benchmarks), JSON.stringify(m.highlights), m.notes ?? null, null, now, now],
     })
   }
-  console.log(`[models] seeded ${MODEL_SEEDS.length} models`)
+  console.log(`[models] seeded/updated ${MODEL_SEEDS.length} models`)
 }
 
-const MODEL_RELEASE_RE = /\b(GPT-[\d.]+|Claude\s[\d.]+|Gemini\s[\d.]+|Llama\s[\d.]+|Grok\s[\d.]+|DeepSeek[\s-][\w.]+|Mistral\s\w+|o\d[- ](?:mini|pro|preview)?|Mixtral|Codestral)\b/i
+const MODEL_RELEASE_RE = /\b(GPT-[\d.]+(?:\s+\w+)?|Claude\s+[\d.]+(?:\s+\w+)?|Gemini\s+[\d.]+(?:\s+\w+)?|Llama\s+[\d.]+(?:\s+\w+)?|Grok\s+[\d.]+(?:\s+\w+)?|DeepSeek[\s-][\w.]+|Mistral\s+\w+(?:\s+\d+)?|o\d+(?:[\s-](?:mini|pro|preview))?|Mixtral[\s-][\w.]+|Codestral|Phi-[\d.]+|Qwen[\s-][\w.]+|Command[\s-]\w+)\b/gi
 
-export async function detectNewModels(items: FeedItem[]): Promise<void> {
-  const { rows: slugRows } = await db.execute(`SELECT slug FROM ai_models`)
-  const existingSlugs = new Set((slugRows as any[]).map(r => r.slug))
-  const now = new Date().toISOString()
-  let detected = 0
+interface ExtractedModel {
+  name: string
+  lab: string
+  family: string
+  release_date: string
+  context_window: number | null
+  input_cost_per_mtok: number | null
+  output_cost_per_mtok: number | null
+  modalities: string[]
+  benchmarks: Record<string, number>
+  highlights: string[]
+  notes: string
+}
 
-  for (const item of items) {
-    const match = MODEL_RELEASE_RE.exec(item.title)
-    if (!match) continue
-    const rawName = match[0].trim()
-    const slug = `detected-${rawName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}-${item.id.slice(0, 6)}`
-    if (existingSlugs.has(slug)) continue
-    existingSlugs.add(slug)
-    try {
-      await db.execute({
-        sql: INSERT_MODEL_SQL,
-        args: [crypto.randomUUID(), rawName, slug, 'Unknown', rawName, item.published_at ?? now.slice(0, 10), 'preview', null, null, null, null, JSON.stringify(['text']), JSON.stringify({}), JSON.stringify([]), `Auto-detected from feed: "${item.title}" (${item.source})`, item.id, now, now],
-      })
-      detected++
-    } catch {}
+export async function refreshModelsFromFeed(items: FeedItem[]): Promise<void> {
+  // Only process items that plausibly discuss a model release
+  const candidates = items.filter(i =>
+    MODEL_RELEASE_RE.test(i.title) && /releas|launch|announc|introduc|debut|unveil/i.test(i.title)
+  ).slice(0, 10)
+  MODEL_RELEASE_RE.lastIndex = 0
+
+  // Also gather preview stubs that still need enrichment
+  const { rows: previewRows } = await db.execute({
+    sql: `SELECT id, slug, name FROM ai_models WHERE status = 'preview' LIMIT 8`,
+    args: [],
+  })
+  const previewNames = (previewRows as any[]).map(r => r.name as string)
+
+  if (candidates.length === 0 && previewNames.length === 0) return
+
+  const context = candidates.map(i =>
+    `SOURCE: ${i.source}\nHEADLINE: ${i.title}\nSNIPPET: ${(i.raw_content ?? i.summary ?? '').slice(0, 350)}`
+  ).join('\n\n---\n\n')
+
+  const previewHint = previewNames.length > 0
+    ? `\n\nAlso try to enrich data for these models already in the database that are missing details: ${previewNames.join(', ')}`
+    : ''
+
+  try {
+    const resp = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 2000,
+      system: [
+        {
+          type: 'text',
+          text: `You are an AI model database curator. Extract structured data about AI model releases from news snippets.
+Rules:
+- Only include models you can clearly identify from the text — no hallucination
+- Only populate fields you have evidence for — use null for unknowns
+- benchmarks keys: mmlu, humaneval, math, gpqa, swe_bench, arc_agi, aime (values 0–100)
+- modalities: array of "text", "vision", "audio", "code"
+- costs are per million tokens (e.g. "$3/M input" → 3.0)
+- highlights: 1–3 concrete facts, max 80 chars each
+- release_date: ISO date string YYYY-MM-DD, approximate from article date if needed
+- lab: one of Anthropic, OpenAI, Google, Meta, Mistral, DeepSeek, xAI, or the actual company name`,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      messages: [
+        {
+          role: 'user',
+          content: `Extract any AI model releases from these news items. Return ONLY a JSON array (empty array if nothing to extract):\n[{"name":"...","lab":"...","family":"...","release_date":"YYYY-MM-DD","context_window":null,"input_cost_per_mtok":null,"output_cost_per_mtok":null,"modalities":[],"benchmarks":{},"highlights":[],"notes":"..."}]\n\n${context}${previewHint}`,
+        },
+      ],
+    })
+
+    const text = resp.content[0].type === 'text' ? resp.content[0].text : ''
+    const match = text.match(/\[[\s\S]*\]/)
+    if (!match) return
+
+    const extracted: ExtractedModel[] = JSON.parse(match[0])
+    if (!Array.isArray(extracted) || extracted.length === 0) return
+
+    const now = new Date().toISOString()
+    let upserted = 0
+
+    for (const m of extracted) {
+      if (!m.name || !m.lab) continue
+      const slug = `detected-${m.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`
+      try {
+        await db.execute({
+          sql: `INSERT INTO ai_models (id, name, slug, lab, family, release_date, status, context_window, input_cost_per_mtok, output_cost_per_mtok, knowledge_cutoff, modalities, benchmarks, highlights, notes, feed_item_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, null, ?, ?, ?, ?, null, ?, ?)
+                ON CONFLICT(slug) DO UPDATE SET
+                  status = CASE WHEN excluded.status = 'active' THEN 'active' ELSE ai_models.status END,
+                  context_window = COALESCE(excluded.context_window, ai_models.context_window),
+                  input_cost_per_mtok = COALESCE(excluded.input_cost_per_mtok, ai_models.input_cost_per_mtok),
+                  output_cost_per_mtok = COALESCE(excluded.output_cost_per_mtok, ai_models.output_cost_per_mtok),
+                  benchmarks = CASE WHEN excluded.benchmarks != '{}' THEN excluded.benchmarks ELSE ai_models.benchmarks END,
+                  highlights = CASE WHEN excluded.highlights != '[]' THEN excluded.highlights ELSE ai_models.highlights END,
+                  notes = CASE WHEN excluded.notes != '' THEN excluded.notes ELSE ai_models.notes END,
+                  updated_at = excluded.updated_at`,
+          args: [
+            crypto.randomUUID(), m.name, slug, m.lab, m.family ?? m.name,
+            m.release_date ?? now.slice(0, 10),
+            m.context_window ?? null,
+            m.input_cost_per_mtok ?? null,
+            m.output_cost_per_mtok ?? null,
+            JSON.stringify(m.modalities ?? ['text']),
+            JSON.stringify(m.benchmarks ?? {}),
+            JSON.stringify(m.highlights ?? []),
+            m.notes ?? '',
+            now, now,
+          ],
+        })
+        upserted++
+      } catch {}
+    }
+
+    if (upserted > 0) console.log(`[models] Claude enriched/inserted ${upserted} models from feed`)
+  } catch (err) {
+    console.error('[models] error enriching from feed:', err)
   }
-  if (detected > 0) console.log(`[models] detected ${detected} new model candidates from feed`)
 }
 
 export async function getAllModels(): Promise<AIModel[]> {

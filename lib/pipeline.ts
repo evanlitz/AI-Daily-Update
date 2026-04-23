@@ -11,7 +11,8 @@ import { fetchKaggleDatasets } from './sources/kaggle'
 import type { Dataset, FeedItem, GithubRepo } from './types'
 import { updateVelocityScores } from './intelligence/velocity'
 import { classifyForRadar, seedRadarIfEmpty } from './intelligence/radar'
-import { ensureAllModels, detectNewModels } from './intelligence/models'
+import { ensureAllModels, refreshModelsFromFeed } from './intelligence/models'
+import { generateHooks } from './intelligence/hooks'
 
 async function insertItems(items: FeedItem[]): Promise<number> {
   let inserted = 0
@@ -63,9 +64,12 @@ export async function fetchAll(): Promise<number> {
 
   await updateVelocityScores()
   await ensureAllModels()
-  await detectNewModels(allFeedItems)
+  generateHooks().catch(console.error)
+  if (allFeedItems.length > 0) {
+    refreshModelsFromFeed(allFeedItems).catch(console.error)
+    classifyForRadar(allFeedItems).catch(console.error)
+  }
   seedRadarIfEmpty().catch(console.error)
-  if (allFeedItems.length > 0) classifyForRadar(allFeedItems).catch(console.error)
 
   return newItemCount
 }
