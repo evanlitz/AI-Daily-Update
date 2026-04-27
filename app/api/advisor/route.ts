@@ -25,7 +25,9 @@ export async function GET() {
   return NextResponse.json(stored)
 }
 
-export async function POST() {
-  try { return NextResponse.json(await generateProjectIdeas()) }
+export async function POST(req: Request) {
+  let context: any = undefined
+  try { context = await req.json() } catch {}
+  try { return NextResponse.json(await generateProjectIdeas(context)) }
   catch (err) { console.error('[advisor POST]', err); return NextResponse.json({ error: 'Failed' }, { status: 500 }) }
 }

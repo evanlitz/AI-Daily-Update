@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import db from '../db'
 import { anthropic, MODEL } from '../claude'
 import type { AIModel, FeedItem } from '../types'
+import { safeJSON } from '../utils'
 
 interface SeedModel {
   name: string
@@ -38,7 +39,7 @@ const MODEL_SEEDS: SeedModel[] = [
     output_cost_per_mtok: 75.00,
     knowledge_cutoff: 'Early 2025',
     modalities: ['text', 'vision', 'code'],
-    benchmarks: { swe_bench: 82.0 },
+    benchmarks: { swe_bench: 72.5 },
     highlights: [
       'Top SWE-Bench score at release',
       'Powers Claude Code CLI for autonomous coding',
@@ -157,7 +158,7 @@ const MODEL_SEEDS: SeedModel[] = [
     output_cost_per_mtok: 40.00,
     knowledge_cutoff: 'Early 2025',
     modalities: ['text', 'vision', 'code'],
-    benchmarks: { arc_agi: 87.5, gpqa: 87.7, aime: 96.7 },
+    benchmarks: { swe_bench: 71.7, arc_agi: 87.5, gpqa: 87.7, aime: 96.7 },
     highlights: [
       '87.5% on ARC-AGI — crossed the 85% threshold Chollet set as meaningful',
       '96.7% on AIME 2025 math olympiad',
@@ -234,7 +235,7 @@ const MODEL_SEEDS: SeedModel[] = [
     output_cost_per_mtok: 60.00,
     knowledge_cutoff: 'October 2023',
     modalities: ['text', 'vision', 'code'],
-    benchmarks: { gpqa: 78.3, aime: 83.3 },
+    benchmarks: { swe_bench: 48.9, gpqa: 78.3, aime: 83.3 },
     highlights: [
       'First production reasoning model — chain-of-thought via RL',
       '89th percentile on AMC/AIME math olympiad at launch',
@@ -254,7 +255,7 @@ const MODEL_SEEDS: SeedModel[] = [
     output_cost_per_mtok: 10.00,
     knowledge_cutoff: 'October 2023',
     modalities: ['text', 'vision', 'audio', 'code'],
-    benchmarks: { mmlu: 88.7, humaneval: 90.2, math: 76.6, gpqa: 53.6 },
+    benchmarks: { swe_bench: 33.2, mmlu: 88.7, humaneval: 90.2, math: 76.6, gpqa: 53.6 },
     highlights: [
       'First single model for text, vision, and real-time audio',
       'Sub-300ms spoken response latency',
@@ -552,7 +553,7 @@ const MODEL_SEEDS: SeedModel[] = [
     output_cost_per_mtok: 1.10,
     knowledge_cutoff: 'July 2024',
     modalities: ['text', 'code'],
-    benchmarks: { mmlu: 88.5, humaneval: 91.6 },
+    benchmarks: { mmlu: 88.5, humaneval: 82.6 },
     highlights: [
       'Non-reasoning model that outperforms GPT-4o on coding',
       'Trained for ~$6M total — 50x cheaper than comparable US models',
@@ -717,7 +718,7 @@ Rules:
     const match = text.match(/\[[\s\S]*\]/)
     if (!match) return
 
-    const extracted: ExtractedModel[] = JSON.parse(match[0])
+    const extracted: ExtractedModel[] = safeJSON(match[0])
     if (!Array.isArray(extracted) || extracted.length === 0) return
 
     const now = new Date().toISOString()

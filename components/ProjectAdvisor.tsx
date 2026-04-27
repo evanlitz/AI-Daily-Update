@@ -1,7 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { ProjectIdea } from '@/lib/types'
+
+interface AdvisorProfile {
+  level: 'beginner' | 'intermediate' | 'advanced'
+  interests: string[]
+  hoursPerWeek: number
+}
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -113,16 +119,40 @@ function TechFlow({ techs }: { techs: string[] }) {
 
 // ── Main component ─────────────────────────────────────────────────────────
 
+const INTERESTS = ['models', 'tools', 'research', 'safety', 'infra']
+
 export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }) {
   const [ideas,     setIdeas]     = useState(initialIdeas)
   const [activeIdx, setActiveIdx] = useState(0)
   const [checked,   setChecked]   = useState<Record<string, boolean>>({})
   const [loading,   setLoading]   = useState(false)
+  const [profile,   setProfile]   = useState<AdvisorProfile>({ level: 'beginner', interests: [], hoursPerWeek: 5 })
+
+  useEffect(() => {
+    const saved = localStorage.getItem('advisor-profile')
+    if (saved) try { setProfile(JSON.parse(saved)) } catch {}
+  }, [])
+
+  function saveProfile(next: AdvisorProfile) {
+    setProfile(next)
+    localStorage.setItem('advisor-profile', JSON.stringify(next))
+  }
+
+  function toggleInterest(t: string) {
+    saveProfile({
+      ...profile,
+      interests: profile.interests.includes(t) ? profile.interests.filter(i => i !== t) : [...profile.interests, t],
+    })
+  }
 
   async function regenerate() {
     setLoading(true)
     try {
-      const res = await fetch('/api/advisor', { method: 'POST' })
+      const res = await fetch('/api/advisor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile),
+      })
       if (res.ok) { setIdeas(await res.json()); setActiveIdx(0); setChecked({}) }
     } finally { setLoading(false) }
   }
@@ -159,6 +189,76 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
 
       {/* ── LEFT: Mission selector ──────────────────────────────────── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+        {/* Profile panel */}
+        <div style={{
+          background: 'rgba(255,255,255,0.018)',
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: 12, padding: '13px 14px 12px',
+        }}>
+          <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.18em', color: '#7878a8', textTransform: 'uppercase', marginBottom: 11 }}>Your Profile</p>
+
+          {/* Level */}
+          <div style={{ marginBottom: 10 }}>
+            <p style={{ fontSize: 11, color: '#5a5a7a', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Level</p>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['beginner', 'intermediate', 'advanced'] as const).map(lvl => {
+                const active = profile.level === lvl
+                return (
+                  <button key={lvl} onClick={() => saveProfile({ ...profile, level: lvl })} style={{
+                    flex: 1, fontSize: 10, fontWeight: 700, padding: '5px 2px', borderRadius: 6,
+                    background: active ? 'rgba(124,106,255,0.16)' : 'transparent',
+                    color: active ? '#a78bfa' : '#5a5a7a',
+                    border: `1px solid ${active ? 'rgba(124,106,255,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                    cursor: 'pointer', transition: 'all 0.15s', textTransform: 'capitalize',
+                    letterSpacing: '0.02em',
+                  }}>
+                    {lvl}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Interests */}
+          <div style={{ marginBottom: 10 }}>
+            <p style={{ fontSize: 11, color: '#5a5a7a', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Focus</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+              {INTERESTS.map(t => {
+                const active = profile.interests.includes(t)
+                return (
+                  <button key={t} onClick={() => toggleInterest(t)} style={{
+                    fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 5,
+                    background: active ? 'rgba(167,139,250,0.12)' : 'transparent',
+                    color: active ? '#a78bfa' : '#5a5a7a',
+                    border: `1px solid ${active ? 'rgba(167,139,250,0.26)' : 'rgba(255,255,255,0.06)'}`,
+                    cursor: 'pointer', textTransform: 'capitalize', transition: 'all 0.15s',
+                  }}>{t}</button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Hours */}
+          <div>
+            <p style={{ fontSize: 11, color: '#5a5a7a', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Hrs/week</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="number" min={1} max={40} value={profile.hoursPerWeek}
+                onChange={e => saveProfile({ ...profile, hoursPerWeek: Math.max(1, Math.min(40, parseInt(e.target.value) || 5)) })}
+                style={{
+                  width: 60, background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 6, padding: '4px 8px',
+                  color: '#a78bfa', fontSize: 13, fontWeight: 700, outline: 'none',
+                  MozAppearance: 'textfield',
+                } as React.CSSProperties}
+              />
+              <span style={{ fontSize: 12, color: '#5a5a7a' }}>hours</span>
+            </div>
+          </div>
+        </div>
+
         {ideas.map((m, i) => {
           const mm      = MISSION_META[i] ?? MISSION_META[0]
           const active  = activeIdx === i

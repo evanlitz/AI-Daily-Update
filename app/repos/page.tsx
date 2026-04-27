@@ -25,7 +25,10 @@ export default function ReposPage() {
     : repos.filter(r => r.language?.toLowerCase() === activeLang.toLowerCase())
 
   return (
-    <main className="mx-auto max-w-screen-xl px-5 py-8">
+    <main className="mx-auto max-w-screen-xl px-5 py-8" style={{
+      backgroundImage: 'radial-gradient(rgba(255,255,255,0.022) 1px, transparent 1px)',
+      backgroundSize: '28px 28px',
+    }}>
       <div className="mb-8">
         <p className="eyebrow mb-2">Trending Signals</p>
         <h1
@@ -40,7 +43,7 @@ export default function ReposPage() {
         >
           Top AI Repos
         </h1>
-        <p style={{ color: '#9090c0', fontSize: 15 }}>
+        <p style={{ color: '#8080b0', fontSize: 14 }}>
           Ranked by stars gained in the last 24 hours · {repos.length} repos tracked
         </p>
       </div>
@@ -92,7 +95,7 @@ export default function ReposPage() {
         </div>
       )}
 
-      <p className="mt-10 text-center" style={{ color: '#7878a8', fontSize: 15, letterSpacing: '0.06em' }}>
+      <p className="mt-10 text-center" style={{ color: '#5a5a7a', fontSize: 11, fontWeight: 700, letterSpacing: '0.12em' }}>
         DATA FROM GITHUB TRENDING · REFRESHED EVERY 6 HOURS
       </p>
     </main>

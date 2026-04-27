@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
-import type { WeeklyDigest } from '@/lib/types'
+import type { WeeklyDigest, DigestChange } from '@/lib/types'
 
 // ── Section palette — cycles through for each H2 ──────────────────────────
 
@@ -401,6 +401,43 @@ export default function DigestPage() {
                 </div>
               )}
 
+              {/* Changes from last week */}
+              {digest.changes?.length > 0 && (
+                <div style={{
+                  background: 'rgba(255,255,255,0.018)',
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: 12, padding: '11px 13px',
+                }}>
+                  <span className="eyebrow" style={{ display: 'block', marginBottom: 10 }}>vs Last Week</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {digest.changes.map((c: DigestChange, i: number) => {
+                      const meta = {
+                        escalated: { label: '↑ Escalated', color: '#f87171', rgb: '248,113,113' },
+                        resolved:  { label: '✓ Resolved',  color: '#34d399', rgb: '52,211,153'  },
+                        new:       { label: '★ New',        color: '#a78bfa', rgb: '167,139,250' },
+                      }[c.type] ?? { label: c.type, color: '#7070a8', rgb: '112,112,168' }
+                      return (
+                        <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          <span style={{
+                            fontSize: 9, fontWeight: 900, letterSpacing: '0.12em',
+                            color: meta.color,
+                            background: `rgba(${meta.rgb},0.1)`,
+                            border: `1px solid rgba(${meta.rgb},0.22)`,
+                            borderRadius: 3, padding: '1px 6px',
+                            textTransform: 'uppercase', alignSelf: 'flex-start',
+                          }}>
+                            {meta.label}
+                          </span>
+                          <p style={{ fontSize: 12, color: '#5a5a80', lineHeight: 1.6, margin: 0 }}>
+                            {c.text}
+                          </p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Section index */}
               {sections.length > 0 && (
                 <div style={{
@@ -423,7 +460,7 @@ export default function DigestPage() {
                           }}>
                             §{String(i + 1).padStart(2, '0')}
                           </span>
-                          <span style={{ fontSize: 13, color: '#2a2a3e', lineHeight: 1.3 }}>
+                          <span style={{ fontSize: 13, color: '#a0a0c8', lineHeight: 1.3 }}>
                             {title}
                           </span>
                         </div>

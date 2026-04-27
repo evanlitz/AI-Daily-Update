@@ -1,7 +1,11 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { AIModel } from '@/lib/types'
+
+// ── Benchmark history types ───────────────────────────────────────────────────
+
+type HistSeries = { slug: string; name: string; lab: string; values: { date: string; value: number }[] }
 
 const LAB: Record<string, { color: string; rgb: string; short: string; bg: string }> = {
   Anthropic: { color: '#f97316', rgb: '249,115,22',  short: 'ANT', bg: 'rgba(249,115,22,0.04)'  },
@@ -195,206 +199,169 @@ function ScannerHeader({ models, visibleCount }: { models: AIModel[]; visibleCou
   )
 }
 
-// ── Capability matrix ─────────────────────────────────────────────────────────
+// ── Metric chart ──────────────────────────────────────────────────────────────
 
-function CapabilityMatrix({ models, onHover }: { models: AIModel[]; onHover: (id: string | null) => void }) {
-  const [mounted, setMounted] = useState(false)
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; model: AIModel } | null>(null)
-  const svgRef = useRef<SVGSVGElement>(null)
+const CHART_METRICS = [
+  { key: 'coding',    label: 'Coding',    desc: 'SWE-bench · HumanEval fallback'                     },
+  { key: 'reasoning', label: 'Reasoning', desc: 'ARC-AGI · GPQA fallback'                            },
+  { key: 'context',   label: 'Context',   desc: 'Context window in thousands of tokens'               },
+  { key: 'price',     label: 'Price',     desc: 'Input $/MTok · longer bar = better value · open-weight = free' },
+] as const
+type ChartMetricKey = typeof CHART_METRICS[number]['key']
 
-  useEffect(() => { setTimeout(() => setMounted(true), 100) }, [])
+function getMetricVal(model: AIModel, metric: ChartMetricKey): number | null {
+  if (metric === 'coding')    return model.benchmarks.swe_bench ?? model.benchmarks.humaneval ?? null
+  if (metric === 'reasoning') return model.benchmarks.arc_agi   ?? model.benchmarks.gpqa      ?? null
+  if (metric === 'context')   return model.context_window != null ? Math.round(model.context_window / 1000) : null
+  return model.input_cost_per_mtok
+}
 
-  const plot = models.filter(m => m.status === 'active' && Object.keys(m.benchmarks).length > 0)
-  if (plot.length < 3) return null
-
-  const W = 1000, H = 310
-  const PAD = { l: 58, r: 36, t: 36, b: 52 }
-
-  const dates = plot.map(m => new Date(m.release_date).getTime())
-  const dMin = Math.min(...dates), dMax = Math.max(...dates)
-  const ctxs = plot.map(m => m.context_window ?? 8000)
-  const cMin = Math.min(...ctxs), cMax = Math.max(...ctxs)
-
-  function px(dateStr: string) {
-    const t = new Date(dateStr).getTime()
-    if (dMax === dMin) return (W - PAD.l - PAD.r) / 2 + PAD.l
-    return PAD.l + ((t - dMin) / (dMax - dMin)) * (W - PAD.l - PAD.r)
+function fmtMetric(val: number | null, metric: ChartMetricKey, isOpen: boolean): string {
+  if (metric === 'price') {
+    if (isOpen)    return 'FREE'
+    if (val == null) return '—'
+    return `$${val % 1 === 0 ? val.toFixed(0) : val.toFixed(2)}`
   }
-  function py(score: number) {
-    return H - PAD.b - (score / 100) * (H - PAD.t - PAD.b)
-  }
-  function pr(ctx: number | null) {
-    if (!ctx) return 6
-    const pct = (Math.log(ctx) - Math.log(cMin)) / (Math.log(cMax / cMin) || 1)
-    return 5 + pct * 13
+  if (val == null) return '—'
+  return metric === 'context' ? `${val}K` : `${val}%`
+}
+
+function MetricChart({ models }: { models: AIModel[] }) {
+  const [metric, setMetric] = useState<ChartMetricKey>('coding')
+  const [show,   setShow]   = useState(false)
+
+  useEffect(() => {
+    setShow(false)
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => setShow(true)))
+    return () => cancelAnimationFrame(id)
+  }, [metric])
+
+  const rows = useMemo(() => {
+    const base = models.map(m => {
+      const isOpen = m.input_cost_per_mtok == null && m.output_cost_per_mtok == null
+      const val    = getMetricVal(m, metric)
+      return { model: m, val, isOpen }
+    })
+    if (metric === 'price') {
+      const free    = base.filter(r => r.isOpen)
+      const priced  = base.filter(r => !r.isOpen && r.val != null).sort((a, b) => (a.val ?? 0) - (b.val ?? 0))
+      const unknown = base.filter(r => !r.isOpen && r.val == null)
+      return [...free, ...priced, ...unknown]
+    }
+    return [
+      ...base.filter(r => r.val != null).sort((a, b) => (b.val ?? 0) - (a.val ?? 0)),
+      ...base.filter(r => r.val == null),
+    ]
+  }, [models, metric])
+
+  const maxVal = useMemo(() => {
+    if (metric === 'price') {
+      const prices = rows.filter(r => !r.isOpen && r.val != null).map(r => r.val as number)
+      return Math.max(...prices, 0.1)
+    }
+    return Math.max(...rows.filter(r => r.val != null).map(r => r.val as number), 1)
+  }, [rows, metric])
+
+  function barPct(r: typeof rows[0]): number {
+    if (r.isOpen && metric === 'price') return 1
+    if (r.val == null) return 0
+    if (metric === 'price') return 1 - r.val / maxVal
+    return r.val / maxVal
   }
 
-  const years = new Set(plot.map(m => m.release_date.slice(0, 4)))
-
-  // Top 7 models by benchmark — labeled on chart
-  const labelSet = new Set(
-    [...plot]
-      .map(m => ({ m, b: topBench(m.benchmarks) }))
-      .filter(x => x.b)
-      .sort((a, b) => b.b!.v - a.b!.v)
-      .slice(0, 7)
-      .map(x => x.m.id)
-  )
-
-  // Constellation lines per lab
-  const labGroups: Record<string, AIModel[]> = {}
-  for (const m of plot) {
-    if (!labGroups[m.lab]) labGroups[m.lab] = []
-    labGroups[m.lab].push(m)
-  }
-  for (const k of Object.keys(labGroups)) {
-    labGroups[k].sort((a, b) => a.release_date.localeCompare(b.release_date))
-  }
+  const activeMeta = CHART_METRICS.find(m => m.key === metric)!
 
   return (
     <div className="relative mb-10 rounded-2xl overflow-hidden"
       style={{ background: 'rgba(4,4,18,0.88)', border: '1px solid rgba(255,255,255,0.09)' }}>
 
-      <div className="flex items-start justify-between px-6 pt-5 pb-2">
+      {/* Header + tabs */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        flexWrap: 'wrap', gap: 12, padding: '18px 24px 14px',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
         <div>
-          <p style={{ color: '#d0d0e8', fontSize: 14, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
-            Capability Matrix
+          <p style={{ color: '#d0d0e8', fontSize: 14, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 2 }}>
+            Capability Benchmark
           </p>
-          <p style={{ color: '#9090c0', fontSize: 13, marginTop: 3 }}>
-            Release date × benchmark score · bubble size = context window · lines connect same-lab models
-          </p>
+          <p style={{ color: '#6060a0', fontSize: 12 }}>{activeMeta.desc} · active models only</p>
         </div>
-        <p style={{ color: '#8080b0', fontSize: 11, fontFamily: 'monospace', flexShrink: 0, paddingTop: 2 }}>
-          active models only
-        </p>
+        <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 3 }}>
+          {CHART_METRICS.map(cm => (
+            <button key={cm.key} onClick={() => setMetric(cm.key)} style={{
+              padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer',
+              fontSize: 13, fontWeight: 700, letterSpacing: '0.03em',
+              background: metric === cm.key ? 'rgba(124,106,255,0.22)' : 'transparent',
+              color:      metric === cm.key ? '#a78bfa' : '#6060a0',
+              transition: 'all 0.15s',
+            }}>
+              {cm.label}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: H, display: 'block' }}>
-        <defs>
-          <linearGradient id="plotBg" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgba(124,106,255,0.04)" />
-            <stop offset="100%" stopColor="rgba(0,0,0,0)" />
-          </linearGradient>
-        </defs>
-        <rect x={PAD.l} y={PAD.t} width={W - PAD.l - PAD.r} height={H - PAD.t - PAD.b} fill="url(#plotBg)" />
+      {/* Bars */}
+      <div style={{ padding: '18px 24px 20px' }}>
+        {rows.map((r, i) => {
+          const meta    = LAB[r.model.lab] ?? { color: '#7c6aff', rgb: '124,106,255', short: '???' }
+          const p       = barPct(r)
+          const hasData = r.val != null || (r.isOpen && metric === 'price')
+          const label   = fmtMetric(r.val, metric, r.isOpen)
+          const isTop   = i === 0 && hasData
 
-        {/* Y-axis grid + labels */}
-        {[0, 25, 50, 75, 100].map(y => (
-          <g key={y}>
-            <line x1={PAD.l} x2={W - PAD.r} y1={py(y)} y2={py(y)}
-              stroke={y === 0 ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.06)'}
-              strokeWidth={y === 0 ? 1.5 : 1} strokeDasharray={y === 0 ? '' : '3,5'} />
-            <text x={PAD.l - 8} y={py(y) + 4} textAnchor="end" fill="#9090c4" fontSize={11} fontFamily="monospace">{y}%</text>
-          </g>
-        ))}
-
-        {/* Y-axis title */}
-        <text x={13} y={H / 2} textAnchor="middle" fill="#8080b0" fontSize={10} fontFamily="monospace"
-          transform={`rotate(-90, 13, ${H / 2})`}>BENCHMARK %</text>
-
-        {/* X-axis baseline */}
-        <line x1={PAD.l} x2={W - PAD.r} y1={H - PAD.b} y2={H - PAD.b} stroke="rgba(255,255,255,0.1)" strokeWidth={1.5} />
-
-        {/* Year ticks */}
-        {Array.from(years).sort().map(yr => {
-          const t = new Date(`${yr}-07-01`).getTime()
-          const x = PAD.l + ((t - dMin) / (dMax - dMin || 1)) * (W - PAD.l - PAD.r)
           return (
-            <g key={yr}>
-              <line x1={x} x2={x} y1={H - PAD.b} y2={H - PAD.b + 6} stroke="rgba(255,255,255,0.18)" strokeWidth={1} />
-              <text x={x} y={H - PAD.b + 20} textAnchor="middle" fill="#a0a0c8" fontSize={12} fontFamily="monospace">{yr}</text>
-            </g>
+            <div key={r.model.id} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+
+              {/* Name + lab badge */}
+              <div style={{ width: 140, flexShrink: 0, textAlign: 'right', paddingRight: 4 }}>
+                <span style={{
+                  display: 'block', fontSize: 12, fontWeight: isTop ? 800 : 600,
+                  color: !hasData ? '#3a3a5a' : isTop ? '#e8e8f0' : '#9090c0',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                }}>
+                  {r.model.name}
+                </span>
+                <span style={{ fontSize: 10, color: meta.color, opacity: 0.65, fontWeight: 700, letterSpacing: '0.06em' }}>
+                  {meta.short}
+                </span>
+              </div>
+
+              {/* Bar track */}
+              <div style={{
+                flex: 1, height: 24, background: 'rgba(255,255,255,0.04)',
+                borderRadius: 5, overflow: 'hidden',
+              }}>
+                {hasData && (
+                  <div style={{
+                    height: '100%',
+                    width: show ? `${Math.round(p * 100)}%` : '0%',
+                    background: r.isOpen && metric === 'price'
+                      ? 'linear-gradient(to right, rgba(52,211,153,0.8), rgba(52,211,153,0.25))'
+                      : `linear-gradient(to right, rgba(${meta.rgb},0.9), rgba(${meta.rgb},0.25))`,
+                    borderRadius: 5,
+                    transition: `width 0.65s cubic-bezier(0.22,1,0.36,1) ${i * 28}ms`,
+                    boxShadow: isTop ? `0 0 18px rgba(${meta.rgb},0.5)` : 'none',
+                  }} />
+                )}
+              </div>
+
+              {/* Value label */}
+              <div style={{ width: 52, flexShrink: 0, textAlign: 'right' }}>
+                <span style={{
+                  fontSize: 12, fontWeight: 700,
+                  color: !hasData ? '#3a3a5a'
+                    : r.isOpen && metric === 'price' ? '#34d399'
+                    : isTop ? meta.color : '#6868a0',
+                }}>
+                  {label}
+                </span>
+              </div>
+
+            </div>
           )
         })}
-
-        {/* Constellation lines */}
-        {mounted && Object.entries(labGroups).map(([lab, lms]) => {
-          if (lms.length < 2) return null
-          const meta = LAB[lab] ?? { rgb: '124,106,255' }
-          return lms.slice(0, -1).map((m, i) => {
-            const next = lms[i + 1]
-            const b1 = topBench(m.benchmarks), b2 = topBench(next.benchmarks)
-            if (!b1 || !b2) return null
-            return (
-              <line key={`${m.id}-${next.id}`}
-                x1={px(m.release_date)} y1={py(b1.v)}
-                x2={px(next.release_date)} y2={py(b2.v)}
-                stroke={`rgba(${meta.rgb},0.2)`} strokeWidth={1.5} strokeDasharray="4,5" />
-            )
-          })
-        })}
-
-        {/* Glow halos */}
-        {mounted && plot.map((m, i) => {
-          const b = topBench(m.benchmarks)
-          if (!b) return null
-          const meta = LAB[m.lab] ?? { color: '#7c6aff', rgb: '124,106,255' }
-          const x = px(m.release_date), y = py(b.v), r = pr(m.context_window)
-          return (
-            <circle key={`halo-${m.id}`} cx={x} cy={y} r={r + 9}
-              fill={`rgba(${meta.rgb},0.12)`}
-              style={{ transition: `all 0.6s cubic-bezier(0.34,1.56,0.64,1) ${i * 30}ms`, opacity: mounted ? 1 : 0 }} />
-          )
-        })}
-
-        {/* Bubbles */}
-        {plot.map((m, i) => {
-          const b = topBench(m.benchmarks)
-          if (!b) return null
-          const meta = LAB[m.lab] ?? { color: '#7c6aff', rgb: '124,106,255' }
-          const x = px(m.release_date), y = py(b.v), r = pr(m.context_window)
-          return (
-            <g key={m.id} style={{ cursor: 'pointer' }}
-              onMouseEnter={(e) => {
-                const rect = svgRef.current?.getBoundingClientRect()
-                const svgX = rect ? (e.clientX - rect.left) / rect.width * W : x
-                setTooltip({ x: svgX, y, model: m }); onHover(m.id)
-              }}
-              onMouseLeave={() => { setTooltip(null); onHover(null) }}>
-              <circle cx={x} cy={y} r={mounted ? r : 0}
-                fill={`rgba(${meta.rgb},0.82)`} stroke={meta.color} strokeWidth={2}
-                style={{ transition: `r 0.55s cubic-bezier(0.34,1.56,0.64,1) ${i * 35}ms` }} />
-              {/* Name label for top models */}
-              {mounted && labelSet.has(m.id) && (
-                <text x={x} y={y - r - 7} textAnchor="middle"
-                  fill="#d0d0e8" fontSize={9.5} fontWeight="700" fontFamily="system-ui"
-                  style={{ pointerEvents: 'none' }}>
-                  {m.name.length > 18 ? m.name.split(' ').slice(0, 2).join(' ') : m.name}
-                </text>
-              )}
-            </g>
-          )
-        })}
-
-        {/* SVG tooltip */}
-        {tooltip && (() => {
-          const m = tooltip.model
-          const b = topBench(m.benchmarks)
-          const meta = LAB[m.lab] ?? { color: '#7c6aff', rgb: '124,106,255' }
-          const tx = Math.min(Math.max(tooltip.x, 105), W - 105)
-          const ty = tooltip.y < H / 2 ? tooltip.y + 24 : tooltip.y - 62
-          return (
-            <g>
-              <rect x={tx - 100} y={ty} width={200} height={54} rx={8}
-                fill="rgba(6,6,22,0.97)" stroke={`rgba(${meta.rgb},0.55)`} strokeWidth={1.5} />
-              <text x={tx} y={ty + 17} textAnchor="middle" fill="#e8e8f0" fontSize={13} fontWeight="bold">{m.name}</text>
-              <text x={tx} y={ty + 32} textAnchor="middle" fill={meta.color} fontSize={12}>{BENCH_LABEL[b?.k ?? ''] ?? b?.k}: {b?.v}%</text>
-              <text x={tx} y={ty + 47} textAnchor="middle" fill="#a0a0c8" fontSize={11} fontFamily="monospace">
-                CTX {fmtCtx(m.context_window)} · {m.lab}
-              </text>
-            </g>
-          )
-        })()}
-      </svg>
-
-      {/* Legend */}
-      <div className="flex flex-wrap gap-5 px-6 pb-5 pt-2">
-        {ALL_LABS.filter(l => plot.some(m => m.lab === l)).map(l => (
-          <div key={l} className="flex items-center gap-2">
-            <div style={{ width: 11, height: 11, borderRadius: '50%', background: LAB[l].color, boxShadow: `0 0 8px ${LAB[l].color}` }} />
-            <span style={{ color: '#c0c0d8', fontSize: 13, fontWeight: 600 }}>{l}</span>
-          </div>
-        ))}
       </div>
     </div>
   )
@@ -721,6 +688,214 @@ function ComparePanel({ models, onClose, onRemove }: {
   )
 }
 
+// ── Benchmark history chart ───────────────────────────────────────────────────
+
+const HIST_METRICS = [
+  { key: 'swe_bench', label: 'SWE-Bench' },
+  { key: 'humaneval', label: 'HumanEval' },
+  { key: 'arc_agi',   label: 'ARC-AGI'   },
+  { key: 'gpqa',      label: 'GPQA'       },
+  { key: 'mmlu',      label: 'MMLU'       },
+  { key: 'aime',      label: 'AIME'       },
+]
+
+type Tip = { x: number; y: number; name: string; lab: string; value: number; date: string }
+
+function BenchmarkHistory() {
+  const [metric,  setMetric]  = useState('swe_bench')
+  const [series,  setSeries]  = useState<HistSeries[]>([])
+  const [loading, setLoading] = useState(true)
+  const [tip,     setTip]     = useState<Tip | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setLoading(true); setTip(null)
+    fetch(`/api/benchmarks/history?metric=${metric}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(setSeries)
+      .finally(() => setLoading(false))
+  }, [metric])
+
+  // ── SVG geometry ──────────────────────────────────────────────────────────
+  const VW = 800, VH = 220
+  const ML = 44, MR = 16, MT = 14, MB = 30
+  const CW = VW - ML - MR, CH = VH - MT - MB
+
+  const allVals  = series.flatMap(s => s.values.map(v => v.value))
+  const allTimes = series.flatMap(s => s.values.map(v => new Date(v.date).getTime()))
+  const minT  = allTimes.length ? Math.min(...allTimes) : Date.now() - 86400000
+  const maxT  = allTimes.length ? Math.max(...allTimes) : Date.now()
+  const tSpan = maxT - minT || 86400000
+  const rawMin = allVals.length ? Math.min(...allVals) : 0
+  const rawMax = allVals.length ? Math.max(...allVals) : 100
+  const minV  = Math.max(0,   rawMin - Math.max((rawMax - rawMin) * 0.12, 5))
+  const maxV  = Math.min(100, rawMax + Math.max((rawMax - rawMin) * 0.12, 5))
+  const vSpan = maxV - minV || 1
+
+  const px = (d: string) => ML + ((new Date(d).getTime() - minT) / tSpan) * CW
+  const py = (v: number) => MT + CH - ((v - minV) / vSpan) * CH
+
+  const yTicks = Array.from({ length: 5 }, (_, i) => Math.round(minV + (vSpan / 4) * i))
+  const xTicks = Array.from({ length: tSpan < 86400001 ? 1 : 5 }, (_, i) =>
+    new Date(minT + (tSpan / Math.max(tSpan < 86400001 ? 1 : 4, 1)) * i)
+  )
+
+  function fmtD(t: number) {
+    return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  function onDotEnter(e: React.MouseEvent, s: HistSeries, v: { date: string; value: number }) {
+    const box = containerRef.current?.getBoundingClientRect()
+    if (!box) return
+    setTip({ x: e.clientX - box.left, y: e.clientY - box.top, name: s.name, lab: s.lab, value: v.value, date: v.date })
+  }
+
+  const isBaseline = series.length > 0 &&
+    new Set(series.flatMap(s => s.values.map(v => v.date.slice(0, 10)))).size <= 1
+
+  return (
+    <div className="relative mb-10 rounded-2xl overflow-hidden"
+      style={{ background: 'rgba(4,4,18,0.88)', border: '1px solid rgba(255,255,255,0.09)' }}>
+
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        flexWrap: 'wrap', gap: 12, padding: '18px 24px 14px',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        <div>
+          <p style={{ color: '#d0d0e8', fontSize: 14, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 2 }}>
+            Benchmark History
+          </p>
+          <p style={{ color: '#6060a0', fontSize: 12 }}>
+            {isBaseline
+              ? 'Baseline snapshot · sync benchmarks to track changes over time'
+              : 'Score progression over time · hover dots for details'}
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 3 }}>
+          {HIST_METRICS.map(m => (
+            <button key={m.key} onClick={() => setMetric(m.key)} style={{
+              padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer',
+              fontSize: 13, fontWeight: 700,
+              background: metric === m.key ? 'rgba(124,106,255,0.22)' : 'transparent',
+              color:      metric === m.key ? '#a78bfa' : '#6060a0',
+              transition: 'all 0.15s',
+            }}>{m.label}</button>
+          ))}
+        </div>
+      </div>
+
+      {/* Chart body */}
+      <div ref={containerRef} style={{ padding: '12px 24px 20px', position: 'relative' }}
+        onMouseLeave={() => setTip(null)}>
+
+        {loading ? (
+          <div style={{ height: VH, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span className="inline-block h-6 w-6 rounded-full border border-violet-500 border-t-transparent animate-spin" />
+          </div>
+        ) : series.length === 0 ? (
+          <div style={{ height: VH, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <p style={{ color: '#5a5a8a', fontSize: 13 }}>No {HIST_METRICS.find(m => m.key === metric)?.label} data</p>
+            <p style={{ color: '#4a4a6a', fontSize: 12 }}>Add this benchmark to model data or sync from external sources</p>
+          </div>
+        ) : (
+          <>
+            <svg viewBox={`0 0 ${VW} ${VH}`} width="100%" style={{ display: 'block', overflow: 'visible' }}>
+
+              {/* Y grid + labels */}
+              {yTicks.map(t => (
+                <g key={t}>
+                  <line x1={ML} y1={py(t)} x2={ML + CW} y2={py(t)}
+                    stroke="rgba(255,255,255,0.045)" strokeWidth={1} />
+                  <text x={ML - 7} y={py(t)} textAnchor="end" dominantBaseline="middle"
+                    fill="#4a4a6a" fontSize={10} fontFamily="monospace">{t}%</text>
+                </g>
+              ))}
+
+              {/* X axis baseline */}
+              <line x1={ML} y1={MT + CH} x2={ML + CW} y2={MT + CH}
+                stroke="rgba(255,255,255,0.07)" strokeWidth={1} />
+
+              {/* X labels */}
+              {xTicks.map((d, i) => (
+                <text key={i}
+                  x={ML + (tSpan < 86400001 ? CW / 2 : (CW / 4) * i)}
+                  y={VH - 6}
+                  textAnchor="middle" fill="#4a4a6a" fontSize={10} fontFamily="monospace">
+                  {fmtD(d.getTime())}
+                </text>
+              ))}
+
+              {/* Series: lines + dots */}
+              {series.map(s => {
+                const color = LAB[s.lab]?.color ?? '#7c6aff'
+                const rgb   = LAB[s.lab]?.rgb   ?? '124,106,255'
+                const pts   = s.values.map(v => ({ x: px(v.date), y: py(v.value), ...v }))
+                const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
+                return (
+                  <g key={s.slug}>
+                    {pts.length > 1 && (
+                      <path d={pathD} fill="none" stroke={color} strokeWidth={2.5} strokeOpacity={0.65}
+                        strokeLinejoin="round" strokeLinecap="round" />
+                    )}
+                    {pts.map((pt, i) => (
+                      <g key={i} style={{ cursor: 'pointer' }} onMouseEnter={e => onDotEnter(e, s, pt)}>
+                        <circle cx={pt.x} cy={pt.y} r={9} fill="transparent" />
+                        <circle cx={pt.x} cy={pt.y} r={4.5} fill={color}
+                          stroke={`rgba(${rgb},0.3)`} strokeWidth={2} />
+                      </g>
+                    ))}
+                  </g>
+                )
+              })}
+            </svg>
+
+            {/* Tooltip */}
+            {tip && (
+              <div style={{
+                position: 'absolute',
+                left: tip.x + 14, top: tip.y - 52,
+                background: 'rgba(6,6,20,0.97)',
+                border: '1px solid rgba(255,255,255,0.11)',
+                borderRadius: 8, padding: '8px 13px',
+                pointerEvents: 'none', zIndex: 20,
+                minWidth: 130,
+              }}>
+                <p style={{ color: LAB[tip.lab]?.color ?? '#a78bfa', fontSize: 11, fontWeight: 900, letterSpacing: '0.1em', marginBottom: 2 }}>
+                  {LAB[tip.lab]?.short ?? tip.lab}
+                </p>
+                <p style={{ color: '#e0e0f0', fontSize: 13, fontWeight: 700, marginBottom: 3 }}>{tip.name}</p>
+                <p style={{ color: LAB[tip.lab]?.color ?? '#a78bfa', fontSize: 16, fontWeight: 900, fontFamily: 'monospace', marginBottom: 2 }}>
+                  {tip.value}%
+                </p>
+                <p style={{ color: '#5a5a8a', fontSize: 11 }}>{fmtD(new Date(tip.date).getTime())}</p>
+              </div>
+            )}
+
+            {/* Legend */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px 20px', marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+              {series.map(s => {
+                const color = LAB[s.lab]?.color ?? '#7c6aff'
+                const latest = s.values.at(-1)
+                return (
+                  <div key={s.slug} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <div style={{ width: 12, height: 3, borderRadius: 2, background: color, opacity: 0.8 }} />
+                    <span style={{ color: '#9090c0', fontSize: 12 }}>{s.name}</span>
+                    <span style={{ color, fontSize: 12, fontWeight: 700, fontFamily: 'monospace' }}>
+                      {latest?.value}%
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ModelsPage() {
@@ -734,6 +909,8 @@ export default function ModelsPage() {
   const [compareMode, setCompareMode]       = useState(false)
   const [compareIds, setCompareIds]         = useState<string[]>([])
   const [hoveredId, setHoveredId]           = useState<string | null>(null)
+  const [syncing,   setSyncing]             = useState(false)
+  const [syncMsg,   setSyncMsg]             = useState<string | null>(null)
 
   useEffect(() => {
     const already = typeof window !== 'undefined' && sessionStorage.getItem('arsenal-booted')
@@ -770,6 +947,24 @@ export default function ModelsPage() {
   }, [])
 
   const clearCompare = () => { setCompareMode(false); setCompareIds([]) }
+
+  async function syncBenchmarks() {
+    setSyncing(true); setSyncMsg(null)
+    try {
+      const r = await fetch('/api/benchmarks', { method: 'POST' })
+      if (r.ok) {
+        const data = await r.json()
+        const msg = data.updated > 0
+          ? `${data.updated} scores updated from ${data.sources.join(', ')}`
+          : data.sources.length > 0 ? `No new scores (${data.sources.join(', ')} checked)` : 'No sources reachable'
+        setSyncMsg(msg)
+        if (data.updated > 0) {
+          const fresh = await fetch('/api/models'); if (fresh.ok) setModels(await fresh.json())
+        }
+      }
+    } catch { setSyncMsg('Sync failed') }
+    finally { setSyncing(false) }
+  }
   const hasFilters = activeLab !== 'All' || activePreset !== null || showDeprecated
 
   let filtered = models.filter(m => {
@@ -804,7 +999,8 @@ export default function ModelsPage() {
 
         <ScannerHeader models={models} visibleCount={displayList.length} />
 
-        {!loading && <CapabilityMatrix models={models.filter(m => m.status === 'active')} onHover={setHoveredId} />}
+        {!loading && <MetricChart models={models.filter(m => m.status === 'active')} />}
+        {!loading && <BenchmarkHistory />}
 
         {/* Preset filters */}
         <div className="flex flex-wrap items-center gap-2 mb-3">
@@ -923,9 +1119,28 @@ export default function ModelsPage() {
           ))
         )}
 
-        <p className="mt-16 text-center" style={{ color: '#7070a8', fontSize: 12, letterSpacing: '0.1em', fontFamily: 'monospace' }}>
-          ■ PRICING APPROXIMATE · BENCHMARKS FROM PUBLIC SOURCES · DATA SNAPSHOT 2025 ■
-        </p>
+        <div className="mt-16 flex flex-col items-center gap-3">
+          <button
+            onClick={syncBenchmarks}
+            disabled={syncing}
+            style={{
+              background: 'transparent', color: syncing ? '#4a4a6a' : '#7070a8',
+              border: '1px solid rgba(255,255,255,0.07)',
+              borderRadius: 8, padding: '7px 18px',
+              fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+              cursor: syncing ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', gap: 7,
+              opacity: syncing ? 0.5 : 1, transition: 'all 0.15s',
+            }}
+          >
+            {syncing && <span className="inline-block h-3 w-3 rounded-full border border-violet-500 border-t-transparent animate-spin" />}
+            {syncing ? 'Syncing…' : '⟳ Sync Benchmarks'}
+          </button>
+          {syncMsg && <p style={{ color: '#5a5a8a', fontSize: 12, fontFamily: 'monospace' }}>{syncMsg}</p>}
+          <p style={{ color: '#7070a8', fontSize: 12, letterSpacing: '0.1em', fontFamily: 'monospace' }}>
+            ■ PRICING APPROXIMATE · BENCHMARKS FROM PUBLIC SOURCES · DATA SNAPSHOT 2025 ■
+          </p>
+        </div>
       </main>
 
       {compareMode && compareModels.length >= 2 && (

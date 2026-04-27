@@ -3,7 +3,13 @@ import db from '../db'
 import { anthropic, MODEL } from '../claude'
 import type { ProjectIdea } from '../types'
 
-export async function generateProjectIdeas(): Promise<ProjectIdea[]> {
+export interface AdvisorContext {
+  level?: 'beginner' | 'intermediate' | 'advanced'
+  interests?: string[]
+  hoursPerWeek?: number
+}
+
+export async function generateProjectIdeas(context?: AdvisorContext): Promise<ProjectIdea[]> {
   const day14 = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
   const day30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
@@ -13,9 +19,17 @@ export async function generateProjectIdeas(): Promise<ProjectIdea[]> {
   const itemSummary    = (recentItems as any[]).map(i => `- ${i.title}`).join('\n')
   const existingTitles = (existingIdeas as any[]).map(i => i.title).join(', ')
 
+  const contextLines = [
+    context?.level ? `Experience level: ${context.level}.` : '',
+    context?.interests?.length ? `Interested in: ${context.interests.join(', ')}.` : '',
+    context?.hoursPerWeek ? `Available ~${context.hoursPerWeek} hours per week — calibrate project scope accordingly.` : '',
+  ].filter(Boolean).join(' ')
+
+  const systemText = `You are a senior developer mentoring a self-taught developer learning AI/ML. ${contextLines} Suggest realistic, achievable projects that: (1) can be built solo in 1-20 hours, (2) use cutting-edge AI tools to look impressive, (3) teach real skills, (4) have a clear "wow factor". The developer knows basic Python and JavaScript and is comfortable with APIs.`
+
   const response = await anthropic.messages.create({
     model: MODEL, max_tokens: 2500,
-    system: [{ type: 'text', text: 'You are a senior developer mentoring a self-taught developer learning AI/ML. Suggest realistic, achievable projects that: (1) can be built solo in 1-20 hours, (2) use cutting-edge AI tools to look impressive, (3) teach real skills, (4) have a clear "wow factor". The developer knows basic Python and JavaScript and is comfortable with APIs.', cache_control: { type: 'ephemeral' } }],
+    system: [{ type: 'text', text: systemText, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: `Based on these recent AI developments:\n${itemSummary}\n\n${existingTitles ? `Avoid repeating: ${existingTitles}\n\n` : ''}Suggest exactly 3 project ideas as a JSON array (no markdown fences):\n[{"title": "...", "description": "2-3 sentences", "difficulty": 1-5, "skills_learned": ["skill1"], "estimated_hours": 5, "tech_stack": ["React", "Claude API"], "starter_checklist": ["step 1", "step 2", "step 3", "step 4"]}]` }],
   })
 

@@ -56,6 +56,45 @@ body {
   max-width: 180px;
 }
 
+/* ── Mobile bottom nav ─────────────────────────────────── */
+.mobile-nav {
+  display: none;
+}
+
+@media (max-width: 580px) {
+  .sidebar { display: none; }
+  .main-content {
+    margin-left: 0 !important;
+    padding-bottom: 68px;
+  }
+  .mobile-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: rgba(5,5,14,0.96);
+    border-top: 1px solid rgba(255,255,255,0.06);
+    backdrop-filter: blur(20px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .mobile-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 4px 8px;
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .mobile-nav-item svg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
 /* ── Glass card ────────────────────────────────────────── */
 .card {
   background: rgba(255,255,255,0.025);

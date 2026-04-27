@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import type { TechRadarItem, FeedItem } from '@/lib/types'
+import { relTime } from '@/lib/utils'
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -75,8 +76,14 @@ export default function RadarPage() {
   const [scanning,   setScanning]  = useState(false)
   const [scanMsg,    setScanMsg]   = useState<string | null>(null)
   const [loading,    setLoading]   = useState(true)
+  const [scannedAt,  setScannedAt] = useState<string | null>(null)
+  const [removing,   setRemoving]  = useState(false)
+  const [confirmId,  setConfirmId] = useState<string | null>(null)
+  const [tableRing,  setTableRing]  = useState('all')
+  const [tableSearch, setTableSearch] = useState('')
 
   useEffect(() => {
+    setScannedAt(localStorage.getItem('radar-scanned-at'))
     Promise.all([
       fetch('/api/radar').then(r => r.json()),
       fetch('/api/feed?page=1&sort=velocity').then(r => r.json()),
@@ -98,6 +105,20 @@ export default function RadarPage() {
     return null
   }, [selectedId, grouped])
 
+  const allSignals = useMemo(() =>
+    RINGS.flatMap(ring => (grouped[ring.key] ?? []).map(item => ({ ...item, ringMeta: ring }))),
+    [grouped]
+  )
+
+  const tableItems = useMemo(() => {
+    const q = tableSearch.toLowerCase()
+    return allSignals.filter(item =>
+      (tableRing === 'all' || item.ringMeta.key === tableRing) &&
+      (activeCat === 'all' || item.category === activeCat) &&
+      (q === '' || item.name.toLowerCase().includes(q) || (item.rationale ?? '').toLowerCase().includes(q))
+    )
+  }, [allSignals, tableRing, activeCat, tableSearch])
+
   const velData = useMemo(() => {
     const agg: Record<string, number[]> = {}
     for (const item of feedItems) {
@@ -114,6 +135,22 @@ export default function RadarPage() {
     return rows.map(r => ({ ...r, pct: r.v / maxV }))
   }, [feedItems])
 
+  async function removeSignal(id: string) {
+    if (confirmId !== id) { setConfirmId(id); setTimeout(() => setConfirmId(null), 3000); return }
+    setConfirmId(null)
+    setRemoving(true)
+    try {
+      await fetch('/api/radar', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+      setSelectedId(null)
+      const fresh = await fetch('/api/radar')
+      if (fresh.ok) {
+        const data = await fresh.json()
+        setGrouped(data.grouped)
+        setTotal(data.total)
+      }
+    } finally { setRemoving(false) }
+  }
+
   async function scan() {
     setScanning(true); setScanMsg(null)
     try {
@@ -122,6 +159,9 @@ export default function RadarPage() {
         const data = await res.json()
         setScanMsg(`${data.total} signals classified`)
         setTotal(data.total)
+        const now = new Date().toISOString()
+        localStorage.setItem('radar-scanned-at', now)
+        setScannedAt(now)
         const fresh = await fetch('/api/radar')
         if (fresh.ok) setGrouped((await fresh.json()).grouped)
       }
@@ -307,6 +347,9 @@ export default function RadarPage() {
                 )}
               </p>
               {scanMsg && <p style={{ fontSize: 13, color: '#34d399', marginTop: 4 }}>{scanMsg}</p>}
+              {scannedAt && !scanMsg && (
+                <p style={{ fontSize: 12, color: '#5a5a8a', marginTop: 4 }}>Last scanned {relTime(scannedAt)}</p>
+              )}
             </div>
             <button
               onClick={scan}
@@ -415,16 +458,61 @@ export default function RadarPage() {
                     </p>
                   )}
 
-                  <button
-                    onClick={() => setSelectedId(null)}
-                    style={{
-                      marginTop: 16, fontSize: 14, fontWeight: 700, letterSpacing: '0.1em',
-                      textTransform: 'uppercase', color: '#8080b0',
-                      background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                    }}
-                  >
-                    ← deselect
-                  </button>
+                  {/* Ring journey */}
+                  {selected.item.ring_history && selected.item.ring_history.length > 0 && (
+                    <div style={{ marginTop: 16 }}>
+                      <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.14em', color: '#5a5a8a', textTransform: 'uppercase', marginBottom: 8 }}>
+                        Ring Journey
+                      </p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                        {selected.item.ring_history.map((h, i) => {
+                          const fromRing = RINGS.find(r => r.key === h.from)
+                          const toRing   = RINGS.find(r => r.key === h.to)
+                          return (
+                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}>
+                              <span style={{ color: fromRing?.color ?? '#5a5a8a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h.from}</span>
+                              <span style={{ color: '#3a3a5a' }}>→</span>
+                              <span style={{ color: toRing?.color ?? '#5a5a8a', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h.to}</span>
+                              <span style={{ color: '#4a4a6a', fontSize: 11 }}>({relTime(h.date)})</span>
+                              {i < selected.item.ring_history!.length - 1 && (
+                                <span style={{ color: '#2a2a4a', margin: '0 2px' }}>·</span>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 16 }}>
+                    <button
+                      onClick={() => setSelectedId(null)}
+                      style={{
+                        fontSize: 14, fontWeight: 700, letterSpacing: '0.1em',
+                        textTransform: 'uppercase', color: '#8080b0',
+                        background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                      }}
+                    >
+                      ← deselect
+                    </button>
+                    <button
+                      onClick={() => removeSignal(selected.item.id)}
+                      disabled={removing}
+                      style={{
+                        fontSize: 12, fontWeight: 700, letterSpacing: '0.1em',
+                        textTransform: 'uppercase',
+                        color: confirmId === selected.item.id ? '#fbbf24' : '#f87171',
+                        background: confirmId === selected.item.id ? 'rgba(251,191,36,0.08)' : 'rgba(248,113,113,0.07)',
+                        border: `1px solid ${confirmId === selected.item.id ? 'rgba(251,191,36,0.25)' : 'rgba(248,113,113,0.2)'}`,
+                        borderRadius: 7, padding: '4px 12px',
+                        cursor: removing ? 'not-allowed' : 'pointer',
+                        opacity: removing ? 0.5 : 1,
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      {removing ? 'removing…' : confirmId === selected.item.id ? 'confirm?' : '✕ remove'}
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -480,6 +568,140 @@ export default function RadarPage() {
           )}
         </div>
       </div>
+
+      {/* ── Signal Index Table ──────────────────────────────────────────── */}
+      {!loading && total > 0 && (
+        <div style={{ marginTop: 52 }}>
+
+          {/* Controls */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 18 }}>
+            <div>
+              <p className="eyebrow" style={{ marginBottom: 4 }}>Signal Index</p>
+              <p style={{ fontSize: 13, color: '#5a5a8a' }}>
+                {tableItems.length} signal{tableItems.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              {/* Ring filter */}
+              <button
+                onClick={() => setTableRing('all')}
+                style={{
+                  background: tableRing === 'all' ? 'rgba(124,106,255,0.13)' : 'transparent',
+                  color: tableRing === 'all' ? '#7c6aff' : '#9090c0',
+                  border: `1px solid ${tableRing === 'all' ? 'rgba(124,106,255,0.32)' : 'rgba(255,255,255,0.06)'}`,
+                  borderRadius: 8, padding: '6px 14px',
+                  fontSize: 11, fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase',
+                  cursor: 'pointer', transition: 'all 0.15s',
+                }}
+              >
+                All
+              </button>
+              {RINGS.map(ring => (
+                <button
+                  key={ring.key}
+                  onClick={() => setTableRing(ring.key)}
+                  style={{
+                    background: tableRing === ring.key ? `rgba(${ring.rgb},0.13)` : 'transparent',
+                    color: tableRing === ring.key ? ring.color : '#9090c0',
+                    border: `1px solid ${tableRing === ring.key ? `rgba(${ring.rgb},0.32)` : 'rgba(255,255,255,0.06)'}`,
+                    borderRadius: 8, padding: '6px 14px',
+                    fontSize: 11, fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                  }}
+                >
+                  {ring.label}
+                </button>
+              ))}
+              <input
+                value={tableSearch}
+                onChange={e => setTableSearch(e.target.value)}
+                placeholder="Search signals…"
+                style={{
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.09)',
+                  borderRadius: 8, padding: '7px 14px',
+                  fontSize: 13, color: '#c0c0e0',
+                  outline: 'none', width: 210,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Table */}
+          <div style={{
+            background: 'rgba(255,255,255,0.018)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: 16, overflow: 'hidden',
+          }}>
+            {/* Header */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '90px 90px 200px 1fr',
+              padding: '10px 20px',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              background: 'rgba(255,255,255,0.025)',
+            }}>
+              {['Ring', 'Type', 'Signal', 'Rationale'].map(h => (
+                <span key={h} style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#5a5a8a' }}>
+                  {h}
+                </span>
+              ))}
+            </div>
+
+            {/* Rows */}
+            {tableItems.length === 0 ? (
+              <div style={{ padding: '36px 20px', textAlign: 'center', color: '#5a5a8a', fontSize: 14 }}>
+                No signals match filters
+              </div>
+            ) : (
+              tableItems.map(item => {
+                const isSel    = selectedId === item.id
+                const catColor = CAT_COLORS[item.category] ?? '#7c6aff'
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      setSelectedId(item.id)
+                      window.scrollTo({ top: 0, behavior: 'smooth' })
+                    }}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '90px 90px 200px 1fr',
+                      padding: '13px 20px',
+                      cursor: 'pointer',
+                      borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      borderLeft: isSel ? `3px solid ${item.ringMeta.color}` : '3px solid transparent',
+                      background: isSel ? `rgba(${item.ringMeta.rgb},0.07)` : undefined,
+                      transition: 'background 0.15s',
+                    }}
+                  >
+                    <span style={{
+                      fontSize: 11, fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase',
+                      color: item.ringMeta.color, alignSelf: 'center',
+                    }}>
+                      {item.ringMeta.label}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'center' }}>
+                      <div style={{ width: 7, height: 7, borderRadius: '50%', background: catColor, flexShrink: 0 }} />
+                      <span style={{ fontSize: 12, color: '#9090c0', textTransform: 'capitalize' }}>{item.category}</span>
+                    </div>
+                    <span style={{
+                      fontSize: 14, fontWeight: 700,
+                      color: isSel ? '#e8e8f0' : '#c8c8e0',
+                      alignSelf: 'center', paddingRight: 20,
+                    }}>
+                      {item.name}
+                    </span>
+                    <span style={{ fontSize: 13, color: '#7070a0', lineHeight: 1.65, alignSelf: 'center' }}>
+                      {item.rationale ?? '—'}
+                    </span>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
     </main>
   )
 }

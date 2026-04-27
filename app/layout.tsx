@@ -21,6 +21,16 @@ function Icon({ d, ...props }: { d: string | React.ReactNode } & React.SVGProps<
 const NAV = [
   {
     href: '/',
+    label: 'Home',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
+        <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z" strokeWidth="1.75" />
+        <path d="M9 21V12h6v9" strokeWidth="1.75" />
+      </svg>
+    ),
+  },
+  {
+    href: '/feed',
     label: 'Feed',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" width={22} height={22}>
@@ -35,6 +45,16 @@ const NAV = [
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
         <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8L14 2z" strokeWidth="1.75" />
         <path d="M14 2v6h6M8 13h8M8 17h5" strokeWidth="1.75" />
+      </svg>
+    ),
+  },
+  {
+    href: '/stories',
+    label: 'Stories',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
+        <path d="M12 20h9" strokeWidth="1.75" />
+        <path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" strokeWidth="1.75" />
       </svg>
     ),
   },
@@ -97,6 +117,16 @@ const NAV = [
     ),
   },
   {
+    href: '/predictions',
+    label: 'Predictions',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
+        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeWidth="1.75" />
+        <circle cx="12" cy="12" r="3" strokeWidth="1.75" />
+      </svg>
+    ),
+  },
+  {
     href: '/timeline',
     label: 'Timeline',
     icon: (
@@ -106,6 +136,20 @@ const NAV = [
         <circle cx="12" cy="12" r="2.5" strokeWidth="1.75" />
         <circle cx="12" cy="17" r="2.5" strokeWidth="1.75" />
         <path d="M12 7h4M12 12h5M12 17h3" strokeWidth="1.75" />
+      </svg>
+    ),
+  },
+  {
+    href: '/entities',
+    label: 'Entities',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
+        <circle cx="12" cy="12" r="3" strokeWidth="1.75" />
+        <circle cx="4"  cy="6"  r="2" strokeWidth="1.75" />
+        <circle cx="20" cy="6"  r="2" strokeWidth="1.75" />
+        <circle cx="4"  cy="18" r="2" strokeWidth="1.75" />
+        <circle cx="20" cy="18" r="2" strokeWidth="1.75" />
+        <path d="M6 7l4 4M18 7l-4 4M6 17l4-4M18 17l-4-4" strokeWidth="1.5" />
       </svg>
     ),
   },
@@ -136,7 +180,7 @@ function Sidebar() {
           <span style={{ color: '#fff', fontSize: 13, fontWeight: 900, letterSpacing: '-0.02em' }}>AI</span>
         </div>
         <span className="sidebar-label font-black tracking-tight" style={{ color: '#e8e8f0', fontSize: 16 }}>
-          Pulse
+          Daily Update
         </span>
       </div>
 
@@ -195,18 +239,52 @@ function Sidebar() {
   )
 }
 
+function MobileNav() {
+  const pathname = usePathname()
+  const primary = NAV.slice(0, 6)
+  return (
+    <nav className="mobile-nav">
+      {primary.map(({ href, label, icon }) => {
+        const active = href === '/' ? pathname === '/' : pathname.startsWith(href)
+        return (
+          <Link
+            key={href}
+            href={href}
+            className="mobile-nav-item"
+            style={{ color: active ? '#a78bfa' : '#4a4a6a' }}
+          >
+            {icon}
+            <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginTop: 3 }}>
+              {label}
+            </span>
+          </Link>
+        )
+      })}
+    </nav>
+  )
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
-        <title>AI Pulse</title>
-        <meta name="description" content="Personal AI tracking dashboard" />
+        <title>AI Daily Update</title>
+        <meta name="description" content="Personal AI tracking dashboard — feed, radar, models, digest" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#7c6aff" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="AI Daily Update" />
+        <link rel="apple-touch-icon" href="/icon.svg" />
+        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
       </head>
       <body className={inter.variable}>
         <Sidebar />
-        <div style={{ marginLeft: 72 }}>
+        <div className="main-content" style={{ marginLeft: 72 }}>
           {children}
         </div>
+        <MobileNav />
       </body>
     </html>
   )

@@ -13,12 +13,24 @@ export interface FeedItem {
   hook?: string
 }
 
+export interface DigestChange {
+  type: 'escalated' | 'resolved' | 'new'
+  text: string
+}
+
 export interface WeeklyDigest {
   id: string
   week_start: string
   content_md: string
   highlights: string[]
+  changes: DigestChange[]
   created_at: string
+}
+
+export interface RadarRingEvent {
+  from: string
+  to: string
+  date: string
 }
 
 export interface TechRadarItem {
@@ -28,6 +40,7 @@ export interface TechRadarItem {
   quadrant: 'adopt' | 'trial' | 'assess' | 'hold'
   rationale?: string
   last_updated: string
+  ring_history?: RadarRingEvent[]
 }
 
 export interface ProjectIdea {

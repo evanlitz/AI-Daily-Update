@@ -2,15 +2,7 @@ import crypto from 'crypto'
 import db from '../db'
 import { anthropic, MODEL } from '../claude'
 import type { WeeklyDigest } from '../types'
-
-function getMondayISO(): string {
-  const now = new Date()
-  const diff = now.getDay() === 0 ? -6 : 1 - now.getDay()
-  const monday = new Date(now)
-  monday.setDate(now.getDate() + diff)
-  monday.setHours(0, 0, 0, 0)
-  return monday.toISOString()
-}
+import { getMondayISO } from '../utils'
 
 // Extract meaningful words from a title for overlap comparison
 function titleTokens(title: string): Set<string> {
@@ -60,13 +52,62 @@ function recencyBoost(publishedAt: string | null): number {
   return 0
 }
 
+async function getStoryContext(): Promise<string> {
+  try {
+    const { rows: threads } = await db.execute(
+      `SELECT st.id, st.title, st.current_summary, st.watch_for,
+              se.update_text, se.week, se.significance
+       FROM story_threads st
+       LEFT JOIN story_events se ON se.thread_id = st.id
+         AND se.created_at = (SELECT MAX(created_at) FROM story_events WHERE thread_id = st.id)
+       WHERE st.status = 'active'
+       ORDER BY st.last_updated DESC
+       LIMIT 12`
+    )
+    if (!(threads as any[]).length) return ''
+    const lines = (threads as any[]).map(t =>
+      `- **${t.title}**: ${t.current_summary ?? ''}${t.update_text ? ` | Latest: ${t.update_text}` : ''} | Watch for: ${t.watch_for ?? '?'}`
+    )
+    return `\n\nOngoing story threads you've been tracking:\n${lines.join('\n')}`
+  } catch { return '' }
+}
+
+async function getAffinityContext(): Promise<string> {
+  try {
+    const { rows } = await db.execute(
+      `SELECT category, source, read_count FROM user_affinity ORDER BY read_count DESC LIMIT 3`
+    )
+    if (!(rows as any[]).length) return ''
+    const pairs = (rows as any[]).map((r: any) => `${r.category}/${r.source} (read ${r.read_count}×)`)
+    return `\n\nUser's top engagement areas: ${pairs.join(', ')}. Prioritize these categories in highlights where relevant.`
+  } catch { return '' }
+}
+
+async function getPreviousDigest(currentWeekStart: string): Promise<{ week_start: string; highlights: string[] } | null> {
+  try {
+    const { rows } = await db.execute({
+      sql: `SELECT week_start, highlights FROM weekly_digest WHERE week_start < ? ORDER BY week_start DESC LIMIT 1`,
+      args: [currentWeekStart],
+    })
+    const row = rows[0] as any
+    if (!row) return null
+    return { week_start: row.week_start, highlights: JSON.parse(row.highlights ?? '[]') }
+  } catch { return null }
+}
+
 export async function generateWeeklyDigest(): Promise<WeeklyDigest> {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const weekStart = getMondayISO()
 
-  const { rows: raw } = await db.execute({
-    sql: `SELECT id, source, title, raw_content, summary, published_at, velocity_score, topic_tags FROM feed_items WHERE fetched_at >= ? ORDER BY fetched_at DESC LIMIT 200`,
-    args: [weekAgo],
-  }) as { rows: any[] }
+  const [{ rows: raw }, storyContext, prevDigest, affinityContext] = await Promise.all([
+    db.execute({
+      sql: `SELECT id, source, title, raw_content, summary, published_at, velocity_score, topic_tags FROM feed_items WHERE fetched_at >= ? ORDER BY fetched_at DESC LIMIT 200`,
+      args: [weekAgo],
+    }),
+    getStoryContext(),
+    getPreviousDigest(weekStart),
+    getAffinityContext(),
+  ]) as [{ rows: any[] }, string, { week_start: string; highlights: string[] } | null, string]
 
   // Source diversity cap: max 8 per source
   const sourceCounts: Record<string, number> = {}
@@ -101,9 +142,13 @@ export async function generateWeeklyDigest(): Promise<WeeklyDigest> {
     return `${i + 1}.${sourceNote}\n   Title: ${item.title}\n   ${content}`
   }).join('\n\n')
 
+  const prevContext = prevDigest
+    ? `\n\nPREVIOUS WEEK (week of ${prevDigest.week_start}):\n${prevDigest.highlights.map(h => `- ${h}`).join('\n')}\n\nUse this to identify what escalated, what resolved, and what is genuinely new this week.`
+    : ''
+
   const response = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 2500,
+    max_tokens: 2800,
     system: [
       {
         type: 'text',
@@ -116,7 +161,7 @@ When an item is marked "covered by N sources", treat it as proportionally more s
     messages: [
       {
         role: 'user',
-        content: `Here are this week's top AI developments (ranked by recency + momentum, multi-source stories flagged):\n\n${itemList}\n\nWrite a weekly digest with these sections:\n## The Big Moves\n2-3 most important model/company developments. If any story was covered by multiple sources, lead with those.\n## Tools Worth Your Time\nNew dev tools or frameworks worth trying. Be specific about what they do and why a developer should care.\n## Research That Matters\n1-2 papers explained in plain English. What can developers actually do with this?\n## What This Means For You\n3-4 concrete, actionable takeaways for someone learning AI development. No generic advice.\n\nEnd with this exact JSON block on its own line:\n{"highlights": ["one short sentence", "one short sentence", "one short sentence"]}`,
+        content: `Here are this week's top AI developments (ranked by recency + momentum, multi-source stories flagged):\n\n${itemList}${storyContext}${affinityContext}${prevContext}\n\nWrite a weekly digest with these sections:\n## The Big Moves\n2-3 most important model/company developments. If any story was covered by multiple sources, lead with those. Reference how ongoing story threads have progressed where relevant.${prevDigest ? ' Note if anything from last week escalated or resolved.' : ''}\n## Tools Worth Your Time\nNew dev tools or frameworks worth trying. Be specific about what they do and why a developer should care.\n## Research That Matters\n1-2 papers explained in plain English. What can developers actually do with this?\n## Hot Takes\n2-3 surprising, contrarian, or uncomfortable observations from this week. Not the headline — the implication most people are missing, the bold call that challenges consensus, or the thing the hype cycle is getting wrong.\n## What This Means For You\n3-4 concrete, actionable takeaways for someone learning AI development. No generic advice.\n\nEnd with this exact JSON block on its own line:\n{"highlights":["sentence","sentence","sentence"],"changes":[{"type":"escalated","text":"something from last week that got bigger"},{"type":"resolved","text":"something that concluded"},{"type":"new","text":"something with no prior coverage"}]}${prevDigest ? '\nOnly include changes entries that are genuinely meaningful. Omit the changes array if there is no previous week to compare against.' : '\nOmit the changes array — no previous week to compare against.'}`,
       },
     ],
   })
@@ -124,19 +169,24 @@ When an item is marked "covered by N sources", treat it as proportionally more s
   const content = response.content[0].type === 'text' ? response.content[0].text : ''
 
   let highlights: string[] = []
+  let changes: { type: 'escalated' | 'resolved' | 'new'; text: string }[] = []
   try {
-    const match = content.match(/\{"highlights":\s*\[[^\]]+\]/)
-    if (match) highlights = JSON.parse(match[0] + '}').highlights ?? []
+    // Match the last JSON object in the response (the trailing metadata block)
+    const match = content.match(/(\{"highlights":[\s\S]*?\})(?:\s*)$/)
+    if (match) {
+      const parsed = JSON.parse(match[1])
+      highlights = parsed.highlights ?? []
+      changes    = parsed.changes    ?? []
+    }
   } catch { highlights = [] }
 
-  const weekStart = getMondayISO()
-  const id = crypto.randomUUID()
+  const id  = crypto.randomUUID()
   const now = new Date().toISOString()
 
   await db.execute({
-    sql: `INSERT OR REPLACE INTO weekly_digest (id, week_start, content_md, highlights, created_at) VALUES (?, ?, ?, ?, ?)`,
-    args: [id, weekStart, content, JSON.stringify(highlights), now],
+    sql: `INSERT OR REPLACE INTO weekly_digest (id, week_start, content_md, highlights, changes, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [id, weekStart, content, JSON.stringify(highlights), JSON.stringify(changes), now],
   })
 
-  return { id, week_start: weekStart, content_md: content, highlights, created_at: now }
+  return { id, week_start: weekStart, content_md: content, highlights, changes, created_at: now }
 }

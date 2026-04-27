@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import db from '../db'
 import { anthropic, MODEL } from '../claude'
 import type { AIPrediction, EvidenceLink } from '../types'
+import { safeJSON } from '../utils'
 
 interface SeedPrediction {
   title: string
@@ -623,7 +624,7 @@ Return a JSON array only. No markdown fences. Include ALL predictions — return
   let updated: any[] = []
   try {
     const match = text.match(/\[[\s\S]*\]/)
-    if (match) updated = JSON.parse(match[0])
+    if (match) updated = safeJSON(match[0])
   } catch {
     console.error('[predictions] failed to parse Claude response')
     return
@@ -650,6 +651,165 @@ Return a JSON array only. No markdown fences. Include ALL predictions — return
     })
   }
   console.log(`[predictions] refreshed ${updated.length} future prediction analyses`)
+}
+
+// ── Phase 3: Story-event evidence linking ─────────────────────────────────────
+
+const CONFIDENCE_LADDER: AIPrediction['confidence'][] = ['speculative', 'low', 'medium', 'high', 'confirmed']
+
+function nudgeUp(c: AIPrediction['confidence']): AIPrediction['confidence'] {
+  const idx = CONFIDENCE_LADDER.indexOf(c)
+  // Never auto-set to 'confirmed' — that requires human judgement
+  return idx >= 0 && idx < CONFIDENCE_LADDER.length - 2 ? CONFIDENCE_LADDER[idx + 1] : c
+}
+
+const EVID_STOP = new Set([
+  'with','that','this','from','have','been','will','more','over','into','about',
+  'when','what','where','which','their','there','model','models','system','systems',
+  'using','could','would','should','also','well','some','many','most','very','just',
+  'like','make','made','work','works','working','used','uses','data','based','large',
+  'small','high','both','other','these','those','only','first','last','such','even',
+  'than','then','were','they','them','your','each','week','through','after','before',
+  'artificial','intelligence',
+])
+
+function extractKeywords(text: string, cap = 15): Set<string> {
+  return new Set(
+    text.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 4 && !EVID_STOP.has(w))
+      .slice(0, cap)
+  )
+}
+
+function sharedWords(a: Set<string>, b: Set<string>): string[] {
+  return [...a].filter(w => b.has(w))
+}
+
+export interface StoryEventRef {
+  threadTitle: string
+  category: string
+  eventText: string
+}
+
+export async function applyStoryEvidence(
+  events: StoryEventRef[],
+  opts?: { skipNudge?: boolean }
+): Promise<void> {
+  if (!events.length) return
+
+  // Only consider predictions not nudged in the last 7 days
+  const cutoff = new Date(Date.now() - 7 * 24 * 3600_000).toISOString()
+  const { rows: predRows } = await db.execute({
+    sql: `SELECT id, title, category, confidence, evidence, description, status, last_nudged_at
+          FROM ai_predictions
+          WHERE confidence != 'confirmed'
+            AND status != 'past'
+            AND (last_nudged_at IS NULL OR last_nudged_at < ?)`,
+    args: [cutoff],
+  }) as { rows: any[] }
+  if (!predRows.length) return
+
+  const predKws = predRows.map(p => extractKeywords(`${p.title} ${p.description ?? ''}`))
+  const eventKws = events.map(e => extractKeywords(`${e.threadTitle} ${e.eventText}`))
+
+  // Pre-filter: any pair sharing >= 2 keywords
+  const candidates: { ei: number; pi: number; shared: string[] }[] = []
+  for (let ei = 0; ei < events.length; ei++) {
+    for (let pi = 0; pi < predRows.length; pi++) {
+      const shared = sharedWords(eventKws[ei], predKws[pi])
+      if (shared.length >= 2) candidates.push({ ei, pi, shared })
+    }
+  }
+  if (!candidates.length) return
+
+  const prompt = candidates
+    .map((c, n) =>
+      `${n + 1}. Event: "${events[c.ei].threadTitle}" — ${events[c.ei].eventText}\n   Prediction: "${predRows[c.pi].title}" (confidence: ${predRows[c.pi].confidence})`
+    )
+    .join('\n\n')
+
+  let results: { n: number; is_evidence: boolean; nudge: boolean }[] = []
+  try {
+    const resp = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 600,
+      system: [{
+        type: 'text',
+        text: `You assess whether recent AI news events are meaningful evidence for specific AI predictions.
+is_evidence: true only if the event directly informs the prediction's likelihood or timeline.
+nudge: true only if the event concretely strengthens confidence — a real milestone, not adjacent noise. Never nudge predictions already at 'high'.`,
+        cache_control: { type: 'ephemeral' },
+      }],
+      messages: [{
+        role: 'user',
+        content: `Return ONLY a JSON array:\n[{"n":1,"is_evidence":true,"nudge":false},...]\n\n${prompt}`,
+      }],
+    })
+    const text = resp.content[0].type === 'text' ? resp.content[0].text : '[]'
+    const match = text.match(/\[[\s\S]*\]/)
+    if (match) results = safeJSON(match[0])
+  } catch (err) {
+    console.error('[predictions] applyStoryEvidence Claude call failed:', err)
+    return
+  }
+
+  const now = new Date().toISOString()
+  let evidenceCount = 0, nudgeCount = 0
+
+  for (const r of results) {
+    if (!r.is_evidence) continue
+    const c = candidates[r.n - 1]
+    if (!c) continue
+    const pred = predRows[c.pi]
+    const ev = events[c.ei]
+
+    const evidence: EvidenceLink[] = JSON.parse(pred.evidence ?? '[]')
+    // One entry per thread per prediction — avoid duplicate signals
+    if (evidence.some(e => e.title.startsWith(`[${ev.threadTitle}]`))) continue
+    if (evidence.length >= 5) evidence.shift()
+    evidence.push({
+      title: `[${ev.threadTitle}] ${ev.eventText.slice(0, 120)}`,
+      url: '',
+      source: 'story_thread',
+    })
+
+    const doNudge = r.nudge && !opts?.skipNudge && pred.confidence !== 'high'
+    const newConfidence = doNudge ? nudgeUp(pred.confidence) : pred.confidence
+
+    await db.execute({
+      sql: `UPDATE ai_predictions
+            SET evidence = ?, confidence = ?, updated_at = ?${doNudge ? ', last_nudged_at = ?' : ''}
+            WHERE id = ?`,
+      args: doNudge
+        ? [JSON.stringify(evidence), newConfidence, now, now, pred.id]
+        : [JSON.stringify(evidence), newConfidence, now, pred.id],
+    })
+    evidenceCount++
+    if (doNudge && newConfidence !== pred.confidence) nudgeCount++
+  }
+
+  console.log(`[predictions] applyStoryEvidence: ${evidenceCount} evidence links added, ${nudgeCount} confidence nudges`)
+}
+
+export async function backfillPredictionEvidence(): Promise<void> {
+  const { rows } = await db.execute(`
+    SELECT se.update_text, st.title AS thread_title, st.category
+    FROM story_events se
+    JOIN story_threads st ON st.id = se.thread_id
+    WHERE se.significance = 'high'
+    ORDER BY se.created_at DESC
+    LIMIT 60
+  `) as { rows: any[] }
+  if (!rows.length) return
+  const events: StoryEventRef[] = rows.map(r => ({
+    threadTitle: r.thread_title,
+    category: r.category,
+    eventText: r.update_text,
+  }))
+  await applyStoryEvidence(events, { skipNudge: true })
+  console.log(`[predictions] backfilled evidence from ${rows.length} high-significance events`)
 }
 
 export async function getAllPredictions(): Promise<AIPrediction[]> {

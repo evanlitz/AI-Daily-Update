@@ -166,8 +166,8 @@ function EventSlide({
             )
           })}
           <div style={{ flex: 1 }} />
-          <span style={{ fontSize: 13, color: '#2e2e50' }}>
-            {idx + 1} <span style={{ color: '#1e1e38' }}>/</span> {total}
+          <span style={{ fontSize: 13, color: '#5a5a8a' }}>
+            {idx + 1} <span style={{ color: '#4a4a6a' }}>/</span> {total}
           </span>
         </div>
 
@@ -352,7 +352,7 @@ function TimelineStrip({
         {CATS.map(cat => (
           <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: CAT_COLOR[cat], flexShrink: 0 }} />
-            <span style={{ fontSize: 9, fontWeight: 700, color: '#2e2e50', letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: '#5a5a8a', letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
               {cat.slice(0, 5)}
             </span>
           </div>
@@ -480,7 +480,7 @@ function TimelineStrip({
               }}>
                 <div style={{ width: 1, height: 8, background: 'rgba(255,255,255,0.1)' }} />
                 <span style={{
-                  fontSize: 12, fontWeight: 600, color: '#3a3a58',
+                  fontSize: 12, fontWeight: 600, color: '#5a5a8a',
                   transform: 'translateX(-50%)', marginTop: 4, whiteSpace: 'nowrap',
                 }}>{y}</span>
               </div>
@@ -511,7 +511,7 @@ function ListView({ events, onSelect }: { events: AIPrediction[]; onSelect: (i: 
             <div key={p.id}>
               {prevYear !== p.year_guess && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: i === 0 ? '4px 0 10px' : '28px 0 10px' }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: '#3a3a58', letterSpacing: '0.06em' }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: '#5a5a8a', letterSpacing: '0.06em' }}>
                     {p.year_guess}
                   </span>
                   <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.05)' }} />
@@ -545,7 +545,7 @@ function ListView({ events, onSelect }: { events: AIPrediction[]; onSelect: (i: 
                 <span style={{ fontSize: 13, fontWeight: 700, color: conf.color, flexShrink: 0 }}>
                   {conf.label.split(' ')[0]}
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: isPast ? '#34d399' : '#3a3a5a', flexShrink: 0, minWidth: 62, textAlign: 'right' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: isPast ? '#34d399' : '#5a5a8a', flexShrink: 0, minWidth: 62, textAlign: 'right' }}>
                   {isPast ? '✓ past' : 'upcoming'}
                 </span>
                 <span style={{ color: isHov ? color : '#2e2e50', fontSize: 18, flexShrink: 0, transition: 'color 0.15s' }}>›</span>
@@ -676,14 +676,14 @@ export default function TimelinePage() {
         zIndex: 5,
       }}>
         <span style={{ fontSize: 16, fontWeight: 800, color: '#e8e8f0', letterSpacing: '-0.02em' }}>
-          AI Pulse <span style={{ color: '#2e2e50', fontWeight: 400 }}>·</span>{' '}
+          AI Daily Update <span style={{ color: '#2e2e50', fontWeight: 400 }}>·</span>{' '}
           <span style={{ color: '#7c6aff' }}>Timeline</span>
         </span>
 
         <div style={{ flex: 1 }} />
 
         {view === 'story' && sorted.length > 0 && (
-          <span style={{ fontSize: 13, color: '#2e2e50' }}>
+          <span style={{ fontSize: 13, color: '#5a5a8a' }}>
             {sorted[activeIdx]?.year_guess} · {activeIdx + 1} / {sorted.length}
           </span>
         )}

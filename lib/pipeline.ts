@@ -12,18 +12,21 @@ import type { Dataset, FeedItem, GithubRepo } from './types'
 import { updateVelocityScores } from './intelligence/velocity'
 import { classifyForRadar, seedRadarIfEmpty } from './intelligence/radar'
 import { ensureAllModels, refreshModelsFromFeed } from './intelligence/models'
-import { generateHooks } from './intelligence/hooks'
+import { screenAndHook, generateHooks } from './intelligence/hooks'
+import { updateStoryThreads, linkThreads } from './intelligence/stories'
+import { backfillPredictionEvidence } from './intelligence/predictions'
+import { saveEntityMentions, backfillEntities } from './intelligence/entities'
 
-async function insertItems(items: FeedItem[]): Promise<number> {
-  let inserted = 0
+async function insertItems(items: FeedItem[]): Promise<{ count: number; newItems: FeedItem[] }> {
+  const newItems: FeedItem[] = []
   for (const item of items) {
     const result = await db.execute({
-      sql: `INSERT OR IGNORE INTO feed_items (id, source, title, url, summary, raw_content, published_at, fetched_at, topic_tags, velocity_score, is_read) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [item.id, item.source, item.title, item.url, item.summary ?? null, item.raw_content ?? null, item.published_at ?? null, item.fetched_at, JSON.stringify(item.topic_tags), item.velocity_score, item.is_read],
+      sql: `INSERT OR IGNORE INTO feed_items (id, source, title, url, summary, raw_content, published_at, fetched_at, topic_tags, velocity_score, is_read, hook) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      args: [item.id, item.source, item.title, item.url, item.summary ?? null, item.raw_content ?? null, item.published_at ?? null, item.fetched_at, JSON.stringify(item.topic_tags), item.velocity_score, item.is_read, item.hook ?? null],
     })
-    if (result.rowsAffected > 0) inserted++
+    if (result.rowsAffected > 0) newItems.push(item)
   }
-  return inserted
+  return { count: newItems.length, newItems }
 }
 
 async function insertRepos(repos: GithubRepo[]): Promise<void> {
@@ -56,7 +59,11 @@ export async function fetchAll(): Promise<number> {
   for (const d of kaggleDatasets) { if (!seenDatasets.has(d.full_name)) { seenDatasets.add(d.full_name); allDatasets.push(d) } }
 
   const allFeedItems = [...arxiv, ...hn, ...rss, ...github, ...huggingface]
-  const newItemCount = await insertItems(allFeedItems)
+  console.log(`[pipeline] screening ${allFeedItems.length} candidates...`)
+  const { items: screened, entityMap } = await screenAndHook(allFeedItems)
+  console.log(`[pipeline] ${screened.length}/${allFeedItems.length} passed relevance screen`)
+
+  const { count: newItemCount, newItems } = await insertItems(screened)
   await insertRepos(githubTop)
   await insertDatasets(allDatasets)
 
@@ -64,20 +71,27 @@ export async function fetchAll(): Promise<number> {
 
   await updateVelocityScores()
   await ensureAllModels()
-  generateHooks().catch(console.error)
+  generateHooks().catch(console.error) // backfill any items without hooks
   if (allFeedItems.length > 0) {
     refreshModelsFromFeed(allFeedItems).catch(console.error)
     classifyForRadar(allFeedItems).catch(console.error)
   }
+  if (newItems.length > 0) {
+    updateStoryThreads(newItems).catch(console.error)
+    saveEntityMentions(newItems, entityMap).catch(console.error)
+  }
+  linkThreads().catch(console.error)
+  backfillPredictionEvidence().catch(console.error)
+  backfillEntities().catch(console.error)
   seedRadarIfEmpty().catch(console.error)
 
   return newItemCount
 }
 
 export function startCron(): void {
-  cron.schedule('0 8 * * *', () => {
-    console.log('[pipeline] cron: running daily fetch')
+  cron.schedule('0 */6 * * *', () => {
+    console.log('[pipeline] cron: running fetch')
     fetchAll().catch(console.error)
   })
-  console.log('[pipeline] cron scheduled (daily at 8am)')
+  console.log('[pipeline] cron scheduled (every 6 hours)')
 }
