@@ -241,6 +241,18 @@ try { await db.execute(`
   )
 `) } catch {}
 
+try { await db.execute(`ALTER TABLE story_events ADD COLUMN source TEXT NOT NULL DEFAULT 'pipeline'`) } catch {}
+try { await db.execute(`ALTER TABLE story_events ADD COLUMN source_url TEXT`) } catch {}
+try {
+  await db.execute(`DROP INDEX IF EXISTS idx_story_events_thread_week_sig`)
+  await db.execute(`
+    DELETE FROM story_events WHERE rowid NOT IN (
+      SELECT MAX(rowid) FROM story_events GROUP BY thread_id, week, significance, source
+    )
+  `)
+  await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_story_events_thread_week_sig_src ON story_events (thread_id, week, significance, source)`)
+} catch {}
+
 // FTS5 full-text search — clean drop+rebuild every startup to prevent corrupt vtab state.
 // Triggers use UPDATE OF so velocity_score updates never touch the vtab.
 try {

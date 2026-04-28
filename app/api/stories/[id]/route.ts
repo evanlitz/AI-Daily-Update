@@ -62,6 +62,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   })
 }
 
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const { watch_for } = await req.json()
+  if (typeof watch_for !== 'string') return NextResponse.json({ error: 'watch_for required' }, { status: 400 })
+  await db.execute({
+    sql: `UPDATE story_threads SET watch_for = ? WHERE id = ?`,
+    args: [watch_for.trim(), id],
+  })
+  return NextResponse.json({ ok: true })
+}
+
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   await deleteStoryThread(id)

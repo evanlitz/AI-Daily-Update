@@ -57,20 +57,37 @@ function loadThreads() {
   )
 }
 
-async function loadRecentEvents(): Promise<Map<string, { week: string; text: string }[]>> {
+async function loadRecentEvents(): Promise<Map<string, { week: string; text: string; source: string }[]>> {
   const { rows } = await db.execute(`
     WITH ranked AS (
-      SELECT thread_id, update_text, week,
+      SELECT thread_id, update_text, week, COALESCE(source, 'pipeline') as source,
              ROW_NUMBER() OVER (PARTITION BY thread_id ORDER BY created_at DESC) AS rn
       FROM story_events
     )
-    SELECT thread_id, update_text, week FROM ranked WHERE rn <= 2
+    SELECT thread_id, update_text, week, source FROM ranked WHERE rn <= 2
   `)
-  const map = new Map<string, { week: string; text: string }[]>()
+  const map = new Map<string, { week: string; text: string; source: string }[]>()
   for (const e of rows as any[]) {
     const list = map.get(e.thread_id) ?? []
-    list.push({ week: e.week, text: (e.update_text as string).slice(0, 150) })
+    list.push({ week: e.week, text: (e.update_text as string).slice(0, 150), source: e.source as string })
     map.set(e.thread_id, list)
+  }
+  return map
+}
+
+async function loadManualNotes(): Promise<Map<string, string>> {
+  const cutoff = new Date(Date.now() - 14 * 24 * 3600_000).toISOString()
+  const { rows } = await db.execute({
+    sql: `SELECT thread_id, update_text FROM story_events
+          WHERE source = 'manual' AND created_at >= ?
+          ORDER BY created_at DESC`,
+    args: [cutoff],
+  })
+  const map = new Map<string, string>()
+  for (const e of rows as any[]) {
+    if (!map.has(e.thread_id as string)) {
+      map.set(e.thread_id as string, (e.update_text as string).slice(0, 200))
+    }
   }
   return map
 }
@@ -122,9 +139,10 @@ export async function updateStoryThreads(
 ): Promise<void> {
   await seedPinnedStories()
 
-  const [{ rows: threadRows }, recentEvents] = await Promise.all([
+  const [{ rows: threadRows }, recentEvents, manualNotes] = await Promise.all([
     loadThreads(),
     loadRecentEvents(),
+    loadManualNotes(),
   ])
   const threads = threadRows as any[]
   const threadTitles = threads.map(t => t.title as string)
@@ -145,6 +163,7 @@ export async function updateStoryThreads(
     summary: (t.current_summary ?? '').slice(0, 250),
     watch_for: (t.watch_for ?? '').slice(0, 150),
     recent_events: recentEvents.get(t.id) ?? [],
+    manual_note: manualNotes.get(t.id) ?? null,
   }))
   // item.id never used by Claude (it returns item_idxs integers) — drop it
   const itemContext = relevant.map((item, i) => ({
@@ -160,7 +179,7 @@ export async function updateStoryThreads(
 
 Be selective: not every item deserves a thread. A story needs multiple future developments to be worth tracking. A single product announcement is an event, not a story. A competitive dynamic, an ongoing safety debate, a technology adoption curve — those are stories.`
 
-  const userPrompt = `Current story threads (ref = integer index to use in output; recent_events = last 1-2 weekly updates for narrative continuity):
+  const userPrompt = `Current story threads (ref = integer index; recent_events = last 1-2 weekly updates; manual_note = human curator annotation, treat as high-priority signal):
 ${JSON.stringify(threadContext, null, 2)}
 
 New feed items (idx = integer index to use in output):
@@ -171,7 +190,7 @@ Output a JSON object with this exact shape:
   "thread_updates": [
     {
       "thread_ref": 0,
-      "update_text": "One to two sentences describing what happened this week relevant to this thread. Reference prior developments from recent_events when the new item is a continuation or reversal.",
+      "update_text": "One to two sentences describing what happened this week relevant to this thread. Reference prior developments from recent_events when the new item is a continuation or reversal. If manual_note exists, prioritize coverage that addresses it.",
       "significance": "low|medium|high",
       "item_idxs": [0, 3, 7],
       "new_summary": "Updated one-paragraph synthesis of where this story stands now.",
@@ -223,9 +242,9 @@ Rules:
     const itemIds = (upd.item_idxs ?? []).map((i: number) => relevant[i]?.id).filter(Boolean)
     // Upsert: if this thread already has an event for this week, replace it with the latest analysis
     await db.execute({
-      sql: `INSERT INTO story_events (id, thread_id, week, update_text, significance, feed_item_ids, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(thread_id, week, significance) DO UPDATE SET
+      sql: `INSERT INTO story_events (id, thread_id, week, update_text, significance, feed_item_ids, source, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'pipeline', ?)
+            ON CONFLICT(thread_id, week, significance, source) DO UPDATE SET
               update_text    = excluded.update_text,
               feed_item_ids  = excluded.feed_item_ids,
               created_at     = excluded.created_at`,
@@ -267,8 +286,8 @@ Rules:
     })
     const itemIds = (nt.item_idxs ?? []).map((i: number) => relevant[i]?.id).filter(Boolean)
     await db.execute({
-      sql: `INSERT INTO story_events (id, thread_id, week, update_text, significance, feed_item_ids, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO story_events (id, thread_id, week, update_text, significance, feed_item_ids, source, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'pipeline', ?)`,
       args: [crypto.randomUUID(), id, week, nt.update_text ?? '', nt.significance ?? 'medium', JSON.stringify(itemIds), now],
     })
     activeCount++

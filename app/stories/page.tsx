@@ -28,6 +28,8 @@ interface StoryEvent {
   update_text: string
   significance: string
   feed_item_ids: string[]
+  source: string
+  source_url: string | null
   created_at: string
 }
 
@@ -295,6 +297,7 @@ function StoryDetailView({
   onResolve,
   onDelete,
   onSelectThread,
+  onRefresh,
 }: {
   detail: StoryDetail
   relatedThreads: RelatedThread[]
@@ -302,8 +305,18 @@ function StoryDetailView({
   onResolve: () => void
   onDelete: () => void
   onSelectThread: (id: string, category?: string) => void
+  onRefresh: () => void
 }) {
-  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmDelete,   setConfirmDelete]   = useState(false)
+  const [editingWatch,    setEditingWatch]    = useState(false)
+  const [watchDraft,      setWatchDraft]      = useState(detail.watch_for ?? '')
+  const [savingWatch,     setSavingWatch]     = useState(false)
+  const [showLogForm,     setShowLogForm]     = useState(false)
+  const [logText,         setLogText]         = useState('')
+  const [logSig,          setLogSig]          = useState('medium')
+  const [logDate,         setLogDate]         = useState('')
+  const [logUrl,          setLogUrl]          = useState('')
+  const [submittingLog,   setSubmittingLog]   = useState(false)
   const cat = CAT_META[detail.category] ?? DEFAULT_CAT
 
   useEffect(() => {
@@ -311,6 +324,40 @@ function StoryDetailView({
     const t = setTimeout(() => setConfirmDelete(false), 3000)
     return () => clearTimeout(t)
   }, [confirmDelete])
+
+  async function saveWatchFor() {
+    setSavingWatch(true)
+    await fetch(`/api/stories/${detail.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ watch_for: watchDraft }),
+    })
+    setSavingWatch(false)
+    setEditingWatch(false)
+    onRefresh()
+  }
+
+  async function submitLogEvent() {
+    if (!logText.trim()) return
+    setSubmittingLog(true)
+    await fetch(`/api/stories/${detail.id}/events`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        update_text: logText,
+        significance: logSig,
+        event_date: logDate || undefined,
+        source_url: logUrl || undefined,
+      }),
+    })
+    setLogText('')
+    setLogSig('medium')
+    setLogDate('')
+    setLogUrl('')
+    setShowLogForm(false)
+    setSubmittingLog(false)
+    onRefresh()
+  }
 
   return (
     <div className="story-detail-anim">
@@ -427,25 +474,82 @@ function StoryDetailView({
           </p>
         )}
 
-        {detail.watch_for && (
-          <div style={{
-            marginTop: 18, padding: '12px 16px',
-            background: `rgba(${cat.rgb},0.08)`,
-            border: `1px solid rgba(${cat.rgb},0.2)`,
-            borderRadius: 10, display: 'flex', gap: 14, alignItems: 'flex-start',
-          }}>
+        <div style={{
+          marginTop: 18, padding: '12px 16px',
+          background: `rgba(${cat.rgb},0.08)`,
+          border: `1px solid rgba(${cat.rgb},0.2)`,
+          borderRadius: 10,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: editingWatch ? 10 : 0 }}>
             <span style={{
               fontSize: 9, fontWeight: 900, letterSpacing: '0.14em',
-              color: cat.color, textTransform: 'uppercase',
-              marginTop: 3, flexShrink: 0,
+              color: cat.color, textTransform: 'uppercase', flexShrink: 0,
             }}>
               Watch for
             </span>
-            <p style={{ fontSize: 14, color: '#8888c0', lineHeight: 1.65 }}>
-              {detail.watch_for}
-            </p>
+            {!editingWatch && (
+              <button
+                onClick={() => { setWatchDraft(detail.watch_for ?? ''); setEditingWatch(true) }}
+                style={{
+                  marginLeft: 'auto', fontSize: 10, fontWeight: 700,
+                  color: '#5a5a8a', background: 'transparent', border: 'none',
+                  cursor: 'pointer', padding: '2px 6px',
+                  borderRadius: 4, transition: 'color 0.15s',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = cat.color }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#5a5a8a' }}
+              >
+                Edit
+              </button>
+            )}
           </div>
-        )}
+
+          {editingWatch ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <textarea
+                value={watchDraft}
+                onChange={e => setWatchDraft(e.target.value)}
+                rows={3}
+                style={{
+                  width: '100%', background: 'rgba(0,0,0,0.3)',
+                  border: `1px solid rgba(${cat.rgb},0.3)`,
+                  borderRadius: 7, padding: '9px 12px',
+                  fontSize: 13, color: '#c0c0e0', lineHeight: 1.65,
+                  resize: 'vertical', outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setEditingWatch(false)}
+                  style={{
+                    fontSize: 12, fontWeight: 700, color: '#5a5a8a',
+                    background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 6, padding: '5px 14px', cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveWatchFor}
+                  disabled={savingWatch}
+                  style={{
+                    fontSize: 12, fontWeight: 700,
+                    color: savingWatch ? '#5a5a8a' : cat.color,
+                    background: `rgba(${cat.rgb},0.12)`,
+                    border: `1px solid rgba(${cat.rgb},0.3)`,
+                    borderRadius: 6, padding: '5px 14px', cursor: 'pointer',
+                  }}
+                >
+                  {savingWatch ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p style={{ fontSize: 14, color: '#8888c0', lineHeight: 1.65, marginTop: 6 }}>
+              {detail.watch_for || <span style={{ color: '#4a4a6a', fontStyle: 'italic' }}>Not set — click Edit to add a curation signal for the pipeline.</span>}
+            </p>
+          )}
+        </div>
 
         {/* Stats row */}
         <div style={{
@@ -603,12 +707,101 @@ function StoryDetailView({
           border: '1px solid rgba(255,255,255,0.07)',
           borderRadius: 16, padding: '24px 26px',
         }}>
-          <p style={{
-            fontSize: 10, fontWeight: 900, letterSpacing: '0.18em',
-            color: '#5a5a7a', textTransform: 'uppercase', marginBottom: 24,
-          }}>
-            Timeline · {detail.events.length} update{detail.events.length !== 1 ? 's' : ''}
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+            <p style={{
+              fontSize: 10, fontWeight: 900, letterSpacing: '0.18em',
+              color: '#5a5a7a', textTransform: 'uppercase',
+            }}>
+              Timeline · {detail.events.length} update{detail.events.length !== 1 ? 's' : ''}
+            </p>
+            <button
+              onClick={() => setShowLogForm(v => !v)}
+              style={{
+                marginLeft: 'auto', fontSize: 11, fontWeight: 700,
+                color: showLogForm ? cat.color : '#5a5a8a',
+                background: showLogForm ? `rgba(${cat.rgb},0.1)` : 'transparent',
+                border: `1px solid ${showLogForm ? `rgba(${cat.rgb},0.3)` : 'rgba(255,255,255,0.1)'}`,
+                borderRadius: 6, padding: '4px 12px', cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              + Log observation
+            </button>
+          </div>
+
+          {showLogForm && (
+            <div style={{
+              marginBottom: 24, padding: '16px 18px',
+              background: `rgba(${cat.rgb},0.05)`,
+              border: `1px solid rgba(${cat.rgb},0.2)`,
+              borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 10,
+            }}>
+              <textarea
+                placeholder="What did you notice or want the pipeline to know about this story?"
+                value={logText}
+                onChange={e => setLogText(e.target.value)}
+                rows={3}
+                style={{
+                  width: '100%', background: 'rgba(0,0,0,0.3)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 7, padding: '9px 12px',
+                  fontSize: 13, color: '#c0c0e0', lineHeight: 1.65,
+                  resize: 'vertical', outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <select
+                  value={logSig}
+                  onChange={e => setLogSig(e.target.value)}
+                  style={{
+                    background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 6, padding: '5px 10px',
+                    fontSize: 12, color: '#9090c0', cursor: 'pointer', outline: 'none',
+                  }}
+                >
+                  <option value="low">Low significance</option>
+                  <option value="medium">Medium significance</option>
+                  <option value="high">High significance</option>
+                </select>
+                <input
+                  type="date"
+                  value={logDate}
+                  onChange={e => setLogDate(e.target.value)}
+                  placeholder="Date (optional)"
+                  style={{
+                    background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 6, padding: '5px 10px',
+                    fontSize: 12, color: '#9090c0', outline: 'none', flex: 1, minWidth: 140,
+                  }}
+                />
+                <input
+                  type="url"
+                  value={logUrl}
+                  onChange={e => setLogUrl(e.target.value)}
+                  placeholder="Source URL (optional)"
+                  style={{
+                    background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 6, padding: '5px 10px',
+                    fontSize: 12, color: '#9090c0', outline: 'none', flex: 2, minWidth: 160,
+                  }}
+                />
+                <button
+                  onClick={submitLogEvent}
+                  disabled={submittingLog || !logText.trim()}
+                  style={{
+                    fontSize: 12, fontWeight: 700,
+                    color: (submittingLog || !logText.trim()) ? '#5a5a8a' : cat.color,
+                    background: `rgba(${cat.rgb},0.12)`,
+                    border: `1px solid rgba(${cat.rgb},0.3)`,
+                    borderRadius: 6, padding: '5px 16px',
+                    cursor: (submittingLog || !logText.trim()) ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {submittingLog ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {detail.events.length === 0 ? (
             <p style={{ fontSize: 13, color: '#4a4a6a', fontStyle: 'italic', lineHeight: 1.6 }}>
@@ -617,7 +810,9 @@ function StoryDetailView({
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {detail.events.map((event, i) => {
-                const sigColor = SIG_COLOR[event.significance] ?? '#5a5a8a'
+                const isManual = event.source === 'manual'
+                const sigColor = isManual ? '#a78bfa' : (SIG_COLOR[event.significance] ?? '#5a5a8a')
+                const dotColor = isManual ? '#a78bfa' : (i === 0 ? cat.color : sigColor)
                 const isLatest = i === 0
                 const isLast   = i === detail.events.length - 1
                 return (
@@ -630,17 +825,17 @@ function StoryDetailView({
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: 18 }}>
                       <div style={{
                         width: isLatest ? 12 : 9, height: isLatest ? 12 : 9,
-                        borderRadius: '50%',
-                        background: isLatest ? cat.color : sigColor,
-                        border: isLatest ? `2px solid rgba(${cat.rgb},0.4)` : '2px solid rgba(255,255,255,0.07)',
+                        borderRadius: isManual ? 3 : '50%',
+                        background: dotColor,
+                        border: isLatest && !isManual ? `2px solid rgba(${cat.rgb},0.4)` : `2px solid ${dotColor}40`,
                         marginTop: 4, flexShrink: 0,
-                        boxShadow: isLatest ? `0 0 10px rgba(${cat.rgb},0.5)` : 'none',
+                        boxShadow: isManual ? `0 0 8px rgba(167,139,250,0.4)` : isLatest ? `0 0 10px rgba(${cat.rgb},0.5)` : 'none',
                         transition: 'transform 0.15s',
                       }} />
                       {!isLast && (
                         <div style={{
                           width: 1, flex: 1, minHeight: 28,
-                          background: isLatest
+                          background: isLatest && !isManual
                             ? `linear-gradient(to bottom, rgba(${cat.rgb},0.3), rgba(255,255,255,0.05))`
                             : 'rgba(255,255,255,0.07)',
                         }} />
@@ -656,16 +851,29 @@ function StoryDetailView({
                         }}>
                           {weekLabel(event.week)}
                         </span>
-                        <span style={{
-                          fontSize: 9, fontWeight: 900, letterSpacing: '0.1em',
-                          color: sigColor,
-                          background: `${sigColor}18`,
-                          border: `1px solid ${sigColor}30`,
-                          borderRadius: 3, padding: '1px 6px',
-                          textTransform: 'uppercase',
-                        }}>
-                          {SIG_LABEL[event.significance] ?? event.significance}
-                        </span>
+                        {isManual ? (
+                          <span style={{
+                            fontSize: 9, fontWeight: 900, letterSpacing: '0.1em',
+                            color: '#a78bfa',
+                            background: 'rgba(167,139,250,0.12)',
+                            border: '1px solid rgba(167,139,250,0.28)',
+                            borderRadius: 3, padding: '1px 6px',
+                            textTransform: 'uppercase',
+                          }}>
+                            Manual
+                          </span>
+                        ) : (
+                          <span style={{
+                            fontSize: 9, fontWeight: 900, letterSpacing: '0.1em',
+                            color: sigColor,
+                            background: `${sigColor}18`,
+                            border: `1px solid ${sigColor}30`,
+                            borderRadius: 3, padding: '1px 6px',
+                            textTransform: 'uppercase',
+                          }}>
+                            {SIG_LABEL[event.significance] ?? event.significance}
+                          </span>
+                        )}
                         {isLatest && (
                           <span style={{
                             fontSize: 9, fontWeight: 900, letterSpacing: '0.1em',
@@ -681,6 +889,20 @@ function StoryDetailView({
                       }}>
                         {event.update_text}
                       </p>
+                      {isManual && event.source_url && (
+                        <a
+                          href={event.source_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'inline-block', marginTop: 4,
+                            fontSize: 11, color: '#a78bfa', opacity: 0.75,
+                            textDecoration: 'underline', textDecorationColor: 'rgba(167,139,250,0.3)',
+                          }}
+                        >
+                          Source →
+                        </a>
+                      )}
                     </div>
                   </div>
                 )
@@ -1130,6 +1352,12 @@ export default function StoriesPage() {
     goBack()
   }
 
+  async function refreshDetail() {
+    if (!selectedId) return
+    const r = await fetch(`/api/stories/${selectedId}`)
+    if (r.ok) setDetail(await r.json())
+  }
+
   async function handleUpdate() {
     setUpdating(true)
     await fetch('/api/stories/generate', { method: 'POST' })
@@ -1223,6 +1451,7 @@ export default function StoriesPage() {
               onResolve={() => handleResolve(detail.id)}
               onDelete={() => handleDelete(detail.id)}
               onSelectThread={selectStory}
+              onRefresh={refreshDetail}
             />
           )}
         </>
