@@ -39,13 +39,18 @@ export async function updateVelocityScores(): Promise<void> {
     }
   }
 
-  for (const item of items) {
-    const scores = keywords(item.title).map(kw => kwVel[kw] ?? 0).sort((a, b) => b - a).slice(0, 2)
-    const vel    = scores.length ? scores.reduce((s, v) => s + v, 0) / scores.length : 0
-    await db.execute({ sql: `UPDATE feed_items SET velocity_score = ? WHERE id = ?`, args: [Math.round(vel * 100) / 100, item.id] })
-  }
+  const scored = items.map(item => {
+    const top2 = keywords(item.title).map(kw => kwVel[kw] ?? 0).sort((a, b) => b - a).slice(0, 2)
+    const vel   = top2.length ? top2.reduce((s, v) => s + v, 0) / top2.length : 0
+    return { id: item.id, vel: Math.round(vel * 100) / 100 }
+  })
+
+  await db.batch(scored.map(({ id, vel }) => ({
+    sql: `UPDATE feed_items SET velocity_score = ? WHERE id = ?`,
+    args: [vel, id],
+  })))
   await db.execute({ sql: `UPDATE feed_items SET velocity_score = 0 WHERE fetched_at < ?`, args: [cut30] })
 
-  const allScores = items.map(i => { const top2 = keywords(i.title).map(kw => kwVel[kw] ?? 0).sort((a, b) => b - a).slice(0, 2); return top2.length ? top2.reduce((s, v) => s + v, 0) / top2.length : 0 })
-  console.log(`[velocity] ${freshMode ? 'fresh' : 'mature'} · ${items.length} items · max ${Math.max(...allScores).toFixed(2)} · avg ${(allScores.reduce((s, v) => s + v, 0) / allScores.length).toFixed(2)}`)
+  const allVels = scored.map(s => s.vel)
+  console.log(`[velocity] ${freshMode ? 'fresh' : 'mature'} · ${items.length} items · max ${Math.max(...allVels).toFixed(2)} · avg ${(allVels.reduce((s, v) => s + v, 0) / allVels.length).toFixed(2)}`)
 }

@@ -3,14 +3,15 @@ import db from '@/lib/db'
 import { generateWeeklyDigest } from '@/lib/intelligence/digest'
 import { getMondayISO } from '@/lib/utils'
 
-export const maxDuration = 60
+export const maxDuration = 300
 
 export async function GET(req: Request) {
-  const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secret = process.env.CRON_SECRET
+  if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return new Response('Unauthorized', { status: 401 })
   }
 
+  // Only generate once per week — safe to run daily
   const weekStart = getMondayISO()
   const { rows } = await db.execute({
     sql: `SELECT id FROM weekly_digest WHERE week_start = ? LIMIT 1`,

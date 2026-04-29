@@ -1,4 +1,3 @@
-import cron from 'node-cron'
 import db from './db'
 import { fetchArxiv } from './sources/arxiv'
 import { fetchHackerNews } from './sources/hackernews'
@@ -18,33 +17,46 @@ import { backfillPredictionEvidence } from './intelligence/predictions'
 import { saveEntityMentions, backfillEntities } from './intelligence/entities'
 
 async function insertItems(items: FeedItem[]): Promise<{ count: number; newItems: FeedItem[] }> {
-  const newItems: FeedItem[] = []
-  for (const item of items) {
-    const result = await db.execute({
+  if (!items.length) return { count: 0, newItems: [] }
+  const results = await db.batch(
+    items.map(item => ({
       sql: `INSERT OR IGNORE INTO feed_items (id, source, title, url, summary, raw_content, published_at, fetched_at, topic_tags, velocity_score, is_read, hook) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [item.id, item.source, item.title, item.url, item.summary ?? null, item.raw_content ?? null, item.published_at ?? null, item.fetched_at, JSON.stringify(item.topic_tags), item.velocity_score, item.is_read, item.hook ?? null],
-    })
-    if (result.rowsAffected > 0) newItems.push(item)
-  }
+    }))
+  )
+  const newItems = items.filter((_, i) => results[i].rowsAffected > 0)
   return { count: newItems.length, newItems }
 }
 
 async function insertRepos(repos: GithubRepo[]): Promise<void> {
-  for (const repo of repos) {
-    await db.execute({
-      sql: `INSERT INTO github_repos (id, name, full_name, url, description, language, stars_total, stars_today, topics, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(url) DO UPDATE SET stars_total=excluded.stars_total, stars_today=excluded.stars_today, fetched_at=excluded.fetched_at`,
-      args: [repo.id, repo.name, repo.full_name, repo.url, repo.description ?? null, repo.language ?? null, repo.stars_total, repo.stars_today, JSON.stringify(repo.topics), repo.fetched_at],
-    })
-  }
+  if (!repos.length) return
+  await db.batch(repos.map(repo => ({
+    sql: `INSERT INTO github_repos (id, name, full_name, url, description, language, stars_total, stars_today, topics, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(url) DO UPDATE SET stars_total=excluded.stars_total, stars_today=excluded.stars_today, fetched_at=excluded.fetched_at`,
+    args: [repo.id, repo.name, repo.full_name, repo.url, repo.description ?? null, repo.language ?? null, repo.stars_total, repo.stars_today, JSON.stringify(repo.topics), repo.fetched_at],
+  })))
 }
 
 async function insertDatasets(datasets: Dataset[]): Promise<void> {
-  for (const d of datasets) {
-    await db.execute({
-      sql: `INSERT INTO datasets (id, full_name, url, description, task_categories, modalities, size_category, license, downloads, likes, last_modified, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(full_name) DO UPDATE SET downloads=excluded.downloads, likes=excluded.likes, last_modified=excluded.last_modified, fetched_at=excluded.fetched_at`,
-      args: [d.id, d.full_name, d.url, d.description ?? null, JSON.stringify(d.task_categories), JSON.stringify(d.modalities), d.size_category ?? null, d.license ?? null, d.downloads, d.likes, d.last_modified ?? null, d.fetched_at],
-    })
-  }
+  if (!datasets.length) return
+  await db.batch(datasets.map(d => ({
+    sql: `INSERT INTO datasets (id, full_name, url, description, task_categories, modalities, size_category, license, downloads, likes, last_modified, fetched_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(full_name) DO UPDATE SET downloads=excluded.downloads, likes=excluded.likes, last_modified=excluded.last_modified, fetched_at=excluded.fetched_at`,
+    args: [d.id, d.full_name, d.url, d.description ?? null, JSON.stringify(d.task_categories), JSON.stringify(d.modalities), d.size_category ?? null, d.license ?? null, d.downloads, d.likes, d.last_modified ?? null, d.fetched_at],
+  })))
+}
+
+// Delete feed items older than 90 days that aren't linked to any story event.
+async function pruneOldFeedItems(): Promise<void> {
+  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+  const { rowsAffected } = await db.execute({
+    sql: `DELETE FROM feed_items
+          WHERE fetched_at < ?
+            AND id NOT IN (
+              SELECT DISTINCT j.value
+              FROM story_events se, json_each(se.feed_item_ids) j
+            )`,
+    args: [cutoff],
+  })
+  if (rowsAffected > 0) console.log(`[pipeline] pruned ${rowsAffected} old feed items`)
 }
 
 export async function fetchAll(): Promise<number> {
@@ -64,34 +76,33 @@ export async function fetchAll(): Promise<number> {
   console.log(`[pipeline] ${screened.length}/${allFeedItems.length} passed relevance screen`)
 
   const { count: newItemCount, newItems } = await insertItems(screened)
-  await insertRepos(githubTop)
-  await insertDatasets(allDatasets)
+  await Promise.all([insertRepos(githubTop), insertDatasets(allDatasets)])
 
   console.log(`[pipeline] inserted ${newItemCount} feed items, ${githubTop.length} repos, ${allDatasets.length} datasets`)
 
   await updateVelocityScores()
   await ensureAllModels()
-  generateHooks().catch(console.error) // backfill any items without hooks
+
+  // Phase 1: parallel intelligence tasks — all awaited so Vercel doesn't kill them early
+  const phase1: Promise<void>[] = [generateHooks()]
   if (allFeedItems.length > 0) {
-    refreshModelsFromFeed(allFeedItems).catch(console.error)
-    classifyForRadar(allFeedItems).catch(console.error)
+    phase1.push(refreshModelsFromFeed(allFeedItems))
+    phase1.push(classifyForRadar(allFeedItems))
   }
   if (newItems.length > 0) {
-    updateStoryThreads(newItems).catch(console.error)
-    saveEntityMentions(newItems, entityMap).catch(console.error)
+    phase1.push(updateStoryThreads(newItems))
+    phase1.push(saveEntityMentions(newItems, entityMap))
   }
-  linkThreads().catch(console.error)
-  backfillPredictionEvidence().catch(console.error)
-  backfillEntities().catch(console.error)
-  seedRadarIfEmpty().catch(console.error)
+  await Promise.all(phase1.map(p => p.catch(console.error)))
+
+  // Phase 2: tasks that benefit from phase 1 completing (linkThreads needs updated story state)
+  await Promise.all([
+    linkThreads(),
+    backfillPredictionEvidence(),
+    backfillEntities(),
+    seedRadarIfEmpty(),
+    pruneOldFeedItems(),
+  ].map(p => p.catch(console.error)))
 
   return newItemCount
-}
-
-export function startCron(): void {
-  cron.schedule('0 */6 * * *', () => {
-    console.log('[pipeline] cron: running fetch')
-    fetchAll().catch(console.error)
-  })
-  console.log('[pipeline] cron scheduled (every 6 hours)')
 }
