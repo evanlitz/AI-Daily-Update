@@ -114,9 +114,9 @@ export async function saveEntityMentions(
 }
 
 const BACKFILL_SYSTEM = `Extract key named entities from AI news items. Only extract:
-- Companies: "Anthropic", "OpenAI", "Google DeepMind", "Meta", "Microsoft"
-- AI Models: "Claude 4", "GPT-4o", "Gemini 2.5 Pro", "Llama 4", "Mistral"
-- Researchers: "Sam Altman", "Dario Amodei", "Yann LeCun"
+- Companies: "Anthropic", "OpenAI", "Google DeepMind", "Meta", "Microsoft", "xAI", "Mistral", "DeepSeek", "Cohere"
+- AI Models: "Claude 3.5 Sonnet", "GPT-4o", "Gemini 2.5 Pro", "Llama 4", "Grok 3", "DeepSeek R1"
+- Researchers: "Sam Altman", "Dario Amodei", "Yann LeCun", "Demis Hassabis", "Ilya Sutskever"
 - Papers: use the short official name only
 
 Canonical form only — "GPT-4o" not "gpt 4o", "Anthropic" not "ANTHROPIC".

@@ -38,6 +38,10 @@ const FEEDS = [
   { url: 'https://simonwillison.net/atom/everything/', source: 'rss:simon-willison', tags: ['tools'] },
   { url: 'https://sebastianraschka.com/rss_feed.xml', source: 'rss:raschka', tags: ['research'] },
   { url: 'https://www.interconnects.ai/feed', source: 'rss:interconnects', tags: ['research'] },
+  { url: 'https://openai.com/blog/rss.xml', source: 'rss:openai', tags: ['models', 'industry'] },
+  { url: 'https://huggingface.co/blog/feed.xml', source: 'rss:huggingface-blog', tags: ['tools', 'models'] },
+  { url: 'https://thegradient.pub/rss/', source: 'rss:the-gradient', tags: ['research'] },
+  { url: 'https://newsletter.theaiedge.io/feed', source: 'rss:ai-edge', tags: ['research', 'tools'] },
 ]
 
 function timeout(ms: number): Promise<never> {

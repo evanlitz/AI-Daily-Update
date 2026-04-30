@@ -215,7 +215,8 @@ Rules:
 - Only propose new_threads for genuinely emerging multi-week narratives, not one-off events.
 - Limit new_threads to 3 maximum per run.
 - thread_ref and item_idxs must be valid integers from the lists above.
-- Output valid JSON only, no markdown fences.`
+- Output valid JSON only, no markdown fences.
+- significance: high = milestone or reversal (model launch, policy decision, benchmark shock, leadership change); medium = meaningful development that advances the story; low = incremental or confirmatory.`
 
   let parsed: { thread_updates?: any[]; new_threads?: any[] } = {}
   try {

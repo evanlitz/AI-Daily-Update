@@ -11,6 +11,8 @@ Relevance: mark relevant=true only if the item is meaningfully about AI, ML, LLM
 Hook (only for relevant items): one sentence, max 100 chars, concrete practical relevance for a self-taught developer, no hype or hedging.
 Good: "First open-weight model to beat GPT-4o on coding benchmarks"
 Bad: "This is significant for the AI community"
+Bad: "This could change everything for developers"
+Bad: "Researchers have achieved a new milestone in AI"
 
 Entities (all items, including irrelevant): up to 4 key named entities — companies, AI models, or researchers. Canonical form only: "GPT-4o" not "gpt 4o", "Anthropic" not "anthropic". Type must be "company", "model", "researcher", or "paper". Generic terms like "AI" or "LLM" are NOT entities. Omit entities array if none.`
 

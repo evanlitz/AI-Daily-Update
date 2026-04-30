@@ -608,7 +608,7 @@ For each future prediction, return:
 - confidence: "speculative" | "low" | "medium" | "high"
 - evidence: array of up to 3 objects {title, url, source} from the provided feed items most relevant to this prediction.
 
-Return a JSON array only. No markdown fences. Include ALL predictions — return unchanged if feed data provides no new signal.`,
+Return a JSON array only. No markdown fences. Only include predictions where the feed provides new or materially relevant signal. For predictions with no relevant signal, return only {"id":"...","unchanged":true} — do not regenerate rationale.`,
         cache_control: { type: 'ephemeral' },
       },
     ],
@@ -633,6 +633,7 @@ Return a JSON array only. No markdown fences. Include ALL predictions — return
   const now = new Date().toISOString()
   for (const u of updated) {
     if (!u.id) continue
+    if (u.unchanged) continue
     await db.execute({
       sql: `UPDATE ai_predictions SET
               rationale = ?, year_min = ?, year_max = ?, year_guess = ?,
@@ -739,7 +740,8 @@ export async function applyStoryEvidence(
         type: 'text',
         text: `You assess whether recent AI news events are meaningful evidence for specific AI predictions.
 is_evidence: true only if the event directly informs the prediction's likelihood or timeline.
-nudge: true only if the event concretely strengthens confidence — a real milestone, not adjacent noise. Never nudge predictions already at 'high'.`,
+nudge: true only if the event concretely strengthens confidence — a real milestone, not adjacent noise. Never nudge predictions already at 'high'.
+Example: event "o3 scores 87% on ARC-AGI" → nudge=true for "AI near-human on novel reasoning". Event "OpenAI blog discusses reasoning" → nudge=false for same prediction.`,
         cache_control: { type: 'ephemeral' },
       }],
       messages: [{

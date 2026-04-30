@@ -9,7 +9,7 @@ import { fetchDatasets } from './sources/datasets'
 import { fetchKaggleDatasets } from './sources/kaggle'
 import type { Dataset, FeedItem, GithubRepo } from './types'
 import { updateVelocityScores } from './intelligence/velocity'
-import { classifyForRadar, seedRadarIfEmpty } from './intelligence/radar'
+import { classifyForRadar, seedRadarIfEmpty, reclassifyStaleTools } from './intelligence/radar'
 import { ensureAllModels, refreshModelsFromFeed } from './intelligence/models'
 import { screenAndHook, generateHooks } from './intelligence/hooks'
 import { updateStoryThreads, linkThreads } from './intelligence/stories'
@@ -101,6 +101,7 @@ export async function fetchAll(): Promise<number> {
     backfillPredictionEvidence(),
     backfillEntities(),
     seedRadarIfEmpty(),
+    reclassifyStaleTools(),
     pruneOldFeedItems(),
   ].map(p => p.catch(console.error)))
 

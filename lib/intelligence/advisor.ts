@@ -69,11 +69,15 @@ export async function generateProjectIdeas(context?: AdvisorContext): Promise<Pr
   const day14 = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
   const day30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
-  const { rows: recentItems }  = await db.execute({ sql: `SELECT title, raw_content FROM feed_items WHERE fetched_at >= ? AND velocity_score > 0 ORDER BY velocity_score DESC LIMIT 10`, args: [day14] })
-  const { rows: existingIdeas } = await db.execute({ sql: `SELECT title FROM project_ideas WHERE created_at >= ?`, args: [day30] })
+  const [{ rows: recentItems }, { rows: existingIdeas }, { rows: radarRows }] = await Promise.all([
+    db.execute({ sql: `SELECT title FROM feed_items WHERE fetched_at >= ? AND velocity_score > 0 ORDER BY velocity_score DESC LIMIT 10`, args: [day14] }),
+    db.execute({ sql: `SELECT title FROM project_ideas WHERE created_at >= ?`, args: [day30] }),
+    db.execute(`SELECT name, category, quadrant FROM tech_radar WHERE quadrant IN ('adopt', 'trial') ORDER BY quadrant ASC, name ASC`),
+  ])
 
   const itemSummary    = (recentItems as any[]).map(i => `- ${i.title}`).join('\n')
   const existingTitles = (existingIdeas as any[]).map(i => i.title).join(', ')
+  const radarContext   = (radarRows as any[]).map(r => `- ${r.name} (${r.category}, ${r.quadrant})`).join('\n') || 'No radar data available.'
 
   const contextLines = [
     context?.level ? `Experience level: ${context.level}.` : '',
@@ -81,7 +85,10 @@ export async function generateProjectIdeas(context?: AdvisorContext): Promise<Pr
     context?.hoursPerWeek ? `Available ~${context.hoursPerWeek} hours per week — calibrate project scope accordingly.` : '',
   ].filter(Boolean).join(' ')
 
-  const systemText = `You are a senior developer mentoring a self-taught developer learning AI/ML. ${contextLines} Suggest realistic, achievable projects that: (1) can be built solo in 1-20 hours, (2) use cutting-edge AI tools to look impressive, (3) teach real skills, (4) have a clear "wow factor". The developer knows basic Python and JavaScript and is comfortable with APIs.`
+  const systemText = `You are a senior developer mentoring a self-taught developer learning AI/ML. ${contextLines} Suggest realistic, achievable projects that: (1) can be built solo in 1-20 hours, (2) use current AI tools from the list below, (3) teach real skills, (4) produce a tangible shareable output — an API, demo app, or CLI tool a developer can show. The developer knows basic Python and JavaScript and is comfortable with APIs.
+
+Currently recommended AI tools (adopt/trial):
+${radarContext}`
 
   const response = await anthropic.messages.create({
     model: MODEL, max_tokens: 2500,

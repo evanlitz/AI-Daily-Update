@@ -702,7 +702,9 @@ Rules:
 - costs are per million tokens (e.g. "$3/M input" → 3.0)
 - highlights: 1–3 concrete facts, max 80 chars each
 - release_date: ISO date string YYYY-MM-DD, approximate from article date if needed
-- lab: one of Anthropic, OpenAI, Google, Meta, Mistral, DeepSeek, xAI, or the actual company name`,
+- lab: one of Anthropic, OpenAI, Google, Meta, Mistral, DeepSeek, xAI, or the actual company name
+- status: "preview" if announced but not yet generally available, "active" if released to the public; omit if unclear
+- family: model family name (e.g. "GPT-4", "Gemini 2.5", "Claude 3.5") — infer from the model name`,
           cache_control: { type: 'ephemeral' },
         },
       ],

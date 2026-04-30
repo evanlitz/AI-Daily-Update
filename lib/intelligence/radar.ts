@@ -11,12 +11,34 @@ function normalizeKey(s: string) {
   return s.toLowerCase().replace(/[\s\-_.]+/g, '')
 }
 
+const CLASSIFY_SYSTEM = `You classify AI tools for a personal tech radar (audience: self-taught developer learning AI).
+
+Quadrants — pick one per tool:
+- adopt: use it now; proven value, low friction, clear learning ROI
+- trial: worth a project; promising but needs more real-world validation
+- assess: watch but don't build on; early or niche
+- hold: avoid; legacy, superseded, or poor fit
+
+Categories — pick one: model, tool, framework, technique, infra
+
+Calibration examples:
+- vLLM → infra, adopt (production-ready local inference)
+- LangGraph → framework, trial (useful but API still shifting)
+- QLoRA → technique, adopt (standard fine-tuning approach)
+
+Be opinionated. Base on early 2026 ecosystem.
+
+CRITICAL:
+- Only return entries for tools explicitly listed in the input — use the exact name as given
+- Do NOT add entries for people, organizations, or historical figures
+- If an item is not a real AI tool, model, framework, technique, or infra product, omit it entirely`
+
 async function classifyBatch(tools: string[]): Promise<void> {
   if (!tools.length) return
   const toolKeys = new Set(tools.map(normalizeKey))
   const response = await anthropic.messages.create({
     model: MODEL_FAST, max_tokens: 2000,
-    system: [{ type: 'text', text: 'You are classifying AI tools for a personal tech radar (self-taught developer learning AI). Quadrants: adopt=use now, trial=worth experimenting, assess=watch but not yet, hold=not worth it. Categories: model, tool, framework, technique, infra. Be opinionated, base on early 2026 ecosystem. CRITICAL: only return entries for tools explicitly listed in the input. Use the exact name as given. Do NOT add entries for people, historical figures, organizations, or anything not in the input list. If an item is not a real AI tool, model, framework, technique, or infrastructure product, omit it entirely.', cache_control: { type: 'ephemeral' } }],
+    system: [{ type: 'text', text: CLASSIFY_SYSTEM, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: `Classify these AI tools. Return JSON array only — one entry per tool in the list, skip any that are not genuine AI tools:\n\n${tools.join(', ')}\n\n[{"name":"...","category":"model|tool|framework|technique|infra","quadrant":"adopt|trial|assess|hold","rationale":"One sentence."}]` }],
   })
   const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
@@ -84,4 +106,36 @@ export async function scanAllFeedItems(): Promise<number> {
   await classifyForRadar(rows as unknown as FeedItem[])
   const { rows: countRows } = await db.execute(`SELECT COUNT(*) as c FROM tech_radar`)
   return (countRows[0] as any).c
+}
+
+// Re-classify tools that haven't been updated in 30 days but are appearing in recent feed items.
+export async function reclassifyStaleTools(): Promise<void> {
+  const stale  = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const recent = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
+
+  const { rows: staleRows } = await db.execute({
+    sql: `SELECT name FROM tech_radar WHERE last_updated < ?`,
+    args: [stale],
+  })
+  if (!(staleRows as any[]).length) return
+
+  const staleNames = new Set((staleRows as any[]).map(r => (r.name as string).toLowerCase()))
+
+  const { rows: feedRows } = await db.execute({
+    sql: `SELECT title, raw_content FROM feed_items WHERE fetched_at >= ? ORDER BY velocity_score DESC LIMIT 200`,
+    args: [recent],
+  })
+
+  const allText = (feedRows as any[]).map(i => `${i.title} ${i.raw_content ?? ''}`).join(' ')
+  const matches = allText.match(TOOL_PATTERNS) ?? []
+  const seen = new Map<string, string>()
+  for (const m of matches) { const k = m.toLowerCase().trim(); if (!seen.has(k)) seen.set(k, m.trim()) }
+
+  const toReclassify = [...seen.values()].filter(t => staleNames.has(t.toLowerCase()))
+  if (!toReclassify.length) return
+
+  for (let i = 0; i < toReclassify.length; i += 20) {
+    await classifyBatch(toReclassify.slice(i, i + 20))
+  }
+  console.log(`[radar] reclassified ${toReclassify.length} stale tools`)
 }
