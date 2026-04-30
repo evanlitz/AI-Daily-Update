@@ -117,6 +117,31 @@ function TechFlow({ techs }: { techs: string[] }) {
   )
 }
 
+// ── Download helper ────────────────────────────────────────────────────────
+
+function downloadPlan(idea: ProjectIdea) {
+  const diffLabel = DIFF_LABELS[idea.difficulty] ?? 'Unknown'
+  const lines: string[] = [
+    `# ${idea.title}`,
+    '',
+    `**Difficulty:** ${diffLabel}`,
+    `**Estimated Time:** ${idea.estimated_hours} hours`,
+    '',
+    '## Objective',
+    idea.description,
+    '',
+  ]
+  if (idea.tech_stack.length)        lines.push('## Tech Stack',         ...idea.tech_stack.map(t => `- ${t}`), '')
+  if (idea.skills_learned.length)    lines.push('## Capabilities Gained',...idea.skills_learned.map(s => `- ${s}`), '')
+  if (idea.starter_checklist.length) lines.push('## Mission Phases',     ...idea.starter_checklist.map(s => `- [ ] ${s}`), '')
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown' })
+  const url  = URL.createObjectURL(blob)
+  const a    = Object.assign(document.createElement('a'), { href: url, download: `${idea.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.md` })
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 const INTERESTS = ['models', 'tools', 'research', 'safety', 'infra']
@@ -400,15 +425,31 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
                 Mission Briefing
               </span>
             </div>
-            <span style={{
-              fontSize: 12, fontWeight: 900, letterSpacing: '0.14em',
-              color: meta.color, opacity: 0.5,
-              background: `rgba(${meta.rgb},0.08)`,
-              border: `1px solid rgba(${meta.rgb},0.18)`,
-              borderRadius: 4, padding: '2px 8px', textTransform: 'uppercase',
-            }}>
-              Classified
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={() => idea && downloadPlan(idea)}
+                style={{
+                  fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+                  color: '#7878a8', background: 'transparent',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { (e.target as HTMLElement).style.color = '#a78bfa'; (e.target as HTMLElement).style.borderColor = 'rgba(124,106,255,0.3)' }}
+                onMouseLeave={e => { (e.target as HTMLElement).style.color = '#7878a8'; (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)' }}
+              >
+                ↓ Save Plan
+              </button>
+              <span style={{
+                fontSize: 12, fontWeight: 900, letterSpacing: '0.14em',
+                color: meta.color, opacity: 0.5,
+                background: `rgba(${meta.rgb},0.08)`,
+                border: `1px solid rgba(${meta.rgb},0.18)`,
+                borderRadius: 4, padding: '2px 8px', textTransform: 'uppercase',
+              }}>
+                Classified
+              </span>
+            </div>
           </div>
 
           <div style={{ padding: '22px 24px 28px' }}>

@@ -1,4 +1,4 @@
-import { ProjectAdvisor } from '@/components/ProjectAdvisor'
+import { AdvisorTabs } from '@/components/AdvisorTabs'
 import db from '@/lib/db'
 import type { ProjectIdea } from '@/lib/types'
 
@@ -37,11 +37,11 @@ export default async function AdvisorPage() {
           Project Advisor
         </h1>
         <p style={{ color: '#8080b0', fontSize: 12 }}>
-          3 missions calibrated to your level · powered by Claude · based on what's trending now
+          trending missions calibrated to your level · or describe your own idea · powered by Claude
         </p>
       </div>
 
-      <ProjectAdvisor initialIdeas={ideas} />
+      <AdvisorTabs initialIdeas={ideas} />
     </main>
   )
 }

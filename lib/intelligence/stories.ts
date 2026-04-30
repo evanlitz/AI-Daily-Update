@@ -221,7 +221,7 @@ Rules:
   try {
     const response = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 3000,
+      max_tokens: 6000,
       system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: userPrompt }],
     })
