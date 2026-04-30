@@ -1,4 +1,4 @@
-# AI Pulse
+# AI Daily Update
 
 A personal AI tracking dashboard that aggregates news across the AI ecosystem, tracks model releases, surfaces trending research, and uses Claude to generate narrative story threads, weekly digests, and project ideas.
 
