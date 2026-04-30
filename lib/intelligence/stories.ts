@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import db from '../db'
-import { anthropic, MODEL } from '../claude'
+import { anthropic, MODEL, MODEL_FAST } from '../claude'
 import { getMondayISO, safeJSON } from '../utils'
 import { applyStoryEvidence } from './predictions'
 
@@ -378,7 +378,7 @@ export async function linkThreads(): Promise<void> {
   let confirmed: { n: number; related: boolean; label?: string }[] = []
   try {
     const resp = await anthropic.messages.create({
-      model: MODEL,
+      model: MODEL_FAST,
       max_tokens: 800,
       system: [{
         type: 'text',

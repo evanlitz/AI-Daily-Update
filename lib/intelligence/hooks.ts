@@ -1,4 +1,4 @@
-import { anthropic, MODEL } from '../claude'
+import { anthropic, MODEL_FAST } from '../claude'
 import db from '../db'
 import type { FeedItem } from '../types'
 import type { ExtractedEntity } from './entities'
@@ -37,7 +37,7 @@ export async function screenAndHook(candidates: FeedItem[]): Promise<ScreenResul
 
     try {
       const resp = await anthropic.messages.create({
-        model: MODEL,
+        model: MODEL_FAST,
         max_tokens: 2400,
         system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
         messages: [{
@@ -89,7 +89,7 @@ export async function generateHooks(): Promise<void> {
 
   try {
     const resp = await anthropic.messages.create({
-      model: MODEL,
+      model: MODEL_FAST,
       max_tokens: 1500,
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
       messages: [{

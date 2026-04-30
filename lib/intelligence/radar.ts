@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import db from '../db'
-import { anthropic, MODEL } from '../claude'
+import { anthropic, MODEL_FAST } from '../claude'
 import type { FeedItem } from '../types'
 
 const TOOL_PATTERNS = /\b(GPT-?4o?|GPT-?[345][\w.-]*|o[134][\w-]*|Claude\s?(?:[34][\w.]*|Opus[\s\w.-]*|Sonnet[\s\w.-]*|Haiku[\s\w.-]*|Instant[\s\w.-]*|Code[\s\w.-]*)|Gemini[\s\w.-]+|Gemma[\s\d.-]*|Llama[\s-]?[23][\w.-]*|LLaMA[\s\d.-]*|Mistral[\s\w.-]*|Mixtral[\s\w.-]*|Grok[\s-]?[\w.-]*|DeepSeek[\s-]?[\w.-]*|Phi-[\w.-]+|Qwen[\s\d.-]*|Falcon[\s\d.-]*|Stable[\s-]?Diffusion[\s\w.-]*|SDXL|DALL-?E[\s\d.-]*|Midjourney|Flux[\s\d.-]*|Runway[\s\w.-]*|Sora|LangChain|LlamaIndex|LangGraph|DSPy|Instructor|CrewAI|AutoGen|Chroma|Pinecone|Weaviate|Qdrant|Ollama|LM Studio|vLLM|llama\.cpp|LoRA|QLoRA|RLHF|DPO|RAG|GraphRAG|Cursor\b|Copilot[\s\w.-]*|Codeium|Weights\s?&\s?Biases|MLflow|Hugging\s?Face|Transformers\b|PEFT|TRL|PyTorch|JAX|LiteLLM|Perplexity[\s\w.-]*|Groq\b|Cohere\b)\b/gi
@@ -15,7 +15,7 @@ async function classifyBatch(tools: string[]): Promise<void> {
   if (!tools.length) return
   const toolKeys = new Set(tools.map(normalizeKey))
   const response = await anthropic.messages.create({
-    model: MODEL, max_tokens: 2000,
+    model: MODEL_FAST, max_tokens: 2000,
     system: [{ type: 'text', text: 'You are classifying AI tools for a personal tech radar (self-taught developer learning AI). Quadrants: adopt=use now, trial=worth experimenting, assess=watch but not yet, hold=not worth it. Categories: model, tool, framework, technique, infra. Be opinionated, base on early 2026 ecosystem. CRITICAL: only return entries for tools explicitly listed in the input. Use the exact name as given. Do NOT add entries for people, historical figures, organizations, or anything not in the input list. If an item is not a real AI tool, model, framework, technique, or infrastructure product, omit it entirely.', cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: `Classify these AI tools. Return JSON array only — one entry per tool in the list, skip any that are not genuine AI tools:\n\n${tools.join(', ')}\n\n[{"name":"...","category":"model|tool|framework|technique|infra","quadrant":"adopt|trial|assess|hold","rationale":"One sentence."}]` }],
   })

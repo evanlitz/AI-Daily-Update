@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import db from '../db'
-import { anthropic, MODEL } from '../claude'
+import { anthropic, MODEL_FAST } from '../claude'
 import type { FeedItem } from '../types'
 import { safeJSON } from '../utils'
 
@@ -146,7 +146,7 @@ export async function backfillEntities(): Promise<void> {
 
     try {
       const resp = await anthropic.messages.create({
-        model: MODEL,
+        model: MODEL_FAST,
         max_tokens: 1200,
         system: [{ type: 'text', text: BACKFILL_SYSTEM, cache_control: { type: 'ephemeral' } }],
         messages: [{
