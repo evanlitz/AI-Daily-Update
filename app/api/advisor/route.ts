@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { generateProjectIdeas } from '@/lib/intelligence/advisor'
 
+export const maxDuration = 60
+
 async function getStoredIdeas() {
   const { rows } = await db.execute(`SELECT * FROM project_ideas ORDER BY created_at DESC LIMIT 3`)
   return (rows as any[]).map(idea => ({
