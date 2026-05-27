@@ -241,6 +241,18 @@ try { await db.execute(`
   )
 `) } catch {}
 
+try { await db.execute(`
+  CREATE TABLE IF NOT EXISTS thread_snapshots (
+    id        TEXT PRIMARY KEY,
+    thread_id TEXT NOT NULL REFERENCES story_threads(id) ON DELETE CASCADE,
+    summary   TEXT NOT NULL,
+    watch_for TEXT,
+    week      TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(thread_id, week)
+  )
+`) } catch {}
+
 try { await db.execute(`ALTER TABLE story_events ADD COLUMN source TEXT NOT NULL DEFAULT 'pipeline'`) } catch {}
 try { await db.execute(`ALTER TABLE story_events ADD COLUMN source_url TEXT`) } catch {}
 try {

@@ -4,7 +4,7 @@ import type { FeedItem } from '../types'
 import type { ExtractedEntity } from './entities'
 import { safeJSON } from '../utils'
 
-const SYSTEM_PROMPT = `You screen AI/ML news items for relevance, write hooks, and extract named entities.
+const SYSTEM_PROMPT = `You screen AI/ML news items for relevance, write hooks, and extract named entities and tools.
 
 Relevance: mark relevant=true only if the item is meaningfully about AI, ML, LLMs, robotics, or adjacent developer tooling. Mark relevant=false for: job postings, general tech/finance/politics news, press releases for non-AI products, content unrelated to AI development.
 
@@ -14,21 +14,31 @@ Bad: "This is significant for the AI community"
 Bad: "This could change everything for developers"
 Bad: "Researchers have achieved a new milestone in AI"
 
-Entities (all items, including irrelevant): up to 4 key named entities — companies, AI models, or researchers. Canonical form only: "GPT-4o" not "gpt 4o", "Anthropic" not "anthropic". Type must be "company", "model", "researcher", or "paper". Generic terms like "AI" or "LLM" are NOT entities. Omit entities array if none.`
+Entities (all items, including irrelevant): up to 4 key named entities — companies, AI models, or researchers. Canonical form only: "GPT-4o" not "gpt 4o", "Anthropic" not "anthropic". Type must be "company", "model", "researcher", or "paper". Generic terms like "AI" or "LLM" are NOT entities. Omit entities array if none.
+
+Tools (only for relevant items): up to 5 AI tool or model names explicitly mentioned — frameworks, libraries, models, techniques, or infra products a developer could actually use. Canonical form only: "LangGraph" not "langgraph", "vLLM" not "vllm", "GPT-4o" not "gpt4o". Generic terms ("AI", "LLM", "transformer", "neural network") are NOT tools. Omit tools array if none.`
 
 export type ScreenResult = {
   items: FeedItem[]
   entityMap: Record<string, ExtractedEntity[]>
+  toolNames: string[]
+}
+
+// Normalize a tool name for deduplication (same key as radar.ts normalizeKey)
+function normalizeToolKey(s: string): string {
+  return s.toLowerCase().replace(/[\s\-_.]+/g, '')
 }
 
 // Screen a batch of candidate items before DB insertion.
-// Returns relevant items (with hooks) and an entity map for ALL items.
+// Returns relevant items (with hooks), an entity map for ALL items, and
+// tool names extracted by Claude (replaces the regex in radar.ts for new items).
 export async function screenAndHook(candidates: FeedItem[]): Promise<ScreenResult> {
-  if (candidates.length === 0) return { items: [], entityMap: {} }
+  if (candidates.length === 0) return { items: [], entityMap: {}, toolNames: [] }
 
   const BATCH = 30
   const results: FeedItem[] = []
   const entityMap: Record<string, ExtractedEntity[]> = {}
+  const toolsSeen = new Map<string, string>() // normalizedKey -> canonical name
 
   for (let i = 0; i < candidates.length; i += BATCH) {
     const batch = candidates.slice(i, i + BATCH)
@@ -40,11 +50,12 @@ export async function screenAndHook(candidates: FeedItem[]): Promise<ScreenResul
     try {
       const resp = await anthropic.messages.create({
         model: MODEL_FAST,
-        max_tokens: 2400,
+        max_tokens: 2800,
         system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
         messages: [{
           role: 'user',
-          content: `Screen each item, write a hook for relevant ones, and extract entities for all. Return ONLY a JSON array (one entry per item, in order):\n[{"n":1,"relevant":true,"hook":"...","entities":[{"name":"Anthropic","type":"company"}]},{"n":2,"relevant":false,"entities":[]},...]\n\n${prompt}`,
+          content: `Screen each item, write a hook for relevant ones, and extract entities and tools. Return ONLY a JSON array (one entry per item, in order):\n[{"n":1,"relevant":true,"hook":"...","entities":[{"name":"Anthropic","type":"company"}],"tools":["LangGraph","vLLM"]},{"n":2,"relevant":false,"entities":[]},...]` +
+            `\n\n${prompt}`,
         }],
       })
 
@@ -52,7 +63,7 @@ export async function screenAndHook(candidates: FeedItem[]): Promise<ScreenResul
       const match = text.match(/\[[\s\S]*\]/)
       if (!match) { console.error('[hooks] no JSON in response'); results.push(...batch); continue }
 
-      const parsed: { n: number; relevant: boolean; hook?: string; entities?: ExtractedEntity[] }[] = safeJSON(match[0])
+      const parsed: { n: number; relevant: boolean; hook?: string; entities?: ExtractedEntity[]; tools?: string[] }[] = safeJSON(match[0])
       let kept = 0, dropped = 0
       for (const entry of parsed) {
         const item = batch[entry.n - 1]
@@ -61,6 +72,15 @@ export async function screenAndHook(candidates: FeedItem[]): Promise<ScreenResul
           entityMap[item.id] = entry.entities.filter(e => e.name && e.type)
         }
         if (entry.relevant === false) { dropped++; continue }
+        // Collect tool names from relevant items only
+        if (Array.isArray(entry.tools)) {
+          for (const t of entry.tools) {
+            if (typeof t === 'string' && t.length > 1) {
+              const key = normalizeToolKey(t)
+              if (!toolsSeen.has(key)) toolsSeen.set(key, t)
+            }
+          }
+        }
         results.push({ ...item, hook: entry.hook ? entry.hook.slice(0, 120) : item.hook })
         kept++
       }
@@ -71,7 +91,7 @@ export async function screenAndHook(candidates: FeedItem[]): Promise<ScreenResul
     }
   }
 
-  return { items: results, entityMap }
+  return { items: results, entityMap, toolNames: [...toolsSeen.values()] }
 }
 
 // Backfill hooks for any items already in the DB that slipped through without one.

@@ -7,9 +7,12 @@ import { fetchGithubTop } from './sources/github_top'
 import { fetchHuggingFace } from './sources/huggingface'
 import { fetchDatasets } from './sources/datasets'
 import { fetchKaggleDatasets } from './sources/kaggle'
+import { fetchReddit } from './sources/reddit'
+import { fetchPapersWithCode } from './sources/paperswithcode'
+import { fetchHFModels } from './sources/hf_models'
 import type { Dataset, FeedItem, GithubRepo } from './types'
 import { updateVelocityScores } from './intelligence/velocity'
-import { classifyForRadar, seedRadarIfEmpty, reclassifyStaleTools } from './intelligence/radar'
+import { classifyForRadar, classifyToolNames, seedRadarIfEmpty, reclassifyStaleTools } from './intelligence/radar'
 import { ensureAllModels, refreshModelsFromFeed } from './intelligence/models'
 import { screenAndHook, generateHooks } from './intelligence/hooks'
 import { updateStoryThreads, linkThreads } from './intelligence/stories'
@@ -44,6 +47,47 @@ async function insertDatasets(datasets: Dataset[]): Promise<void> {
   })))
 }
 
+// Return only items not already present in the DB (by id or url).
+// Also deduplicates within the batch itself so two sources returning the
+// same paper/story don't both get screened.
+async function filterNewItems(items: FeedItem[]): Promise<FeedItem[]> {
+  if (!items.length) return []
+
+  // Within-batch dedup: first occurrence wins
+  const seenIds = new Set<string>()
+  const seenUrls = new Set<string>()
+  const deduped: FeedItem[] = []
+  for (const item of items) {
+    if (seenIds.has(item.id) || seenUrls.has(item.url)) continue
+    seenIds.add(item.id)
+    seenUrls.add(item.url)
+    deduped.push(item)
+  }
+
+  // Check against DB in chunks — SQLite param limit is 999; each item uses 2 params
+  const CHUNK = 400
+  const existingIds = new Set<string>()
+  const existingUrls = new Set<string>()
+
+  for (let i = 0; i < deduped.length; i += CHUNK) {
+    const chunk = deduped.slice(i, i + CHUNK)
+    const ids = chunk.map(item => item.id)
+    const urls = chunk.map(item => item.url)
+    const idPh  = ids.map(() => '?').join(',')
+    const urlPh = urls.map(() => '?').join(',')
+    const { rows } = await db.execute({
+      sql: `SELECT id, url FROM feed_items WHERE id IN (${idPh}) OR url IN (${urlPh})`,
+      args: [...ids, ...urls],
+    })
+    for (const row of rows as any[]) {
+      if (row.id)  existingIds.add(row.id as string)
+      if (row.url) existingUrls.add(row.url as string)
+    }
+  }
+
+  return deduped.filter(item => !existingIds.has(item.id) && !existingUrls.has(item.url))
+}
+
 // Delete feed items older than 90 days that aren't linked to any story event.
 async function pruneOldFeedItems(): Promise<void> {
   const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
@@ -61,19 +105,21 @@ async function pruneOldFeedItems(): Promise<void> {
 
 export async function fetchAll(): Promise<number> {
   console.log('[pipeline] starting fetch...')
-  const [arxiv, hn, rss, github, huggingface, githubTop, hfDatasets, kaggleDatasets] = await Promise.all([
+  const [arxiv, hn, rss, github, huggingface, githubTop, hfDatasets, kaggleDatasets, reddit, pwc, hfModels] = await Promise.all([
     fetchArxiv(), fetchHackerNews(), fetchRSS(), fetchGithubTrending(),
     fetchHuggingFace(), fetchGithubTop(), fetchDatasets(), fetchKaggleDatasets(),
+    fetchReddit(), fetchPapersWithCode(), fetchHFModels(),
   ])
 
   const allDatasets = [...hfDatasets]
   const seenDatasets = new Set(hfDatasets.map(d => d.full_name))
   for (const d of kaggleDatasets) { if (!seenDatasets.has(d.full_name)) { seenDatasets.add(d.full_name); allDatasets.push(d) } }
 
-  const allFeedItems = [...arxiv, ...hn, ...rss, ...github, ...huggingface]
-  console.log(`[pipeline] screening ${allFeedItems.length} candidates...`)
-  const { items: screened, entityMap } = await screenAndHook(allFeedItems)
-  console.log(`[pipeline] ${screened.length}/${allFeedItems.length} passed relevance screen`)
+  const allFeedItems = [...arxiv, ...hn, ...rss, ...github, ...huggingface, ...reddit, ...pwc, ...hfModels]
+  const newCandidates = await filterNewItems(allFeedItems)
+  console.log(`[pipeline] ${newCandidates.length}/${allFeedItems.length} are new — screening...`)
+  const { items: screened, entityMap, toolNames } = await screenAndHook(newCandidates)
+  console.log(`[pipeline] ${screened.length}/${newCandidates.length} passed relevance screen`)
 
   const { count: newItemCount, newItems } = await insertItems(screened)
   await Promise.all([insertRepos(githubTop), insertDatasets(allDatasets)])
@@ -87,10 +133,12 @@ export async function fetchAll(): Promise<number> {
   const phase1: Promise<void>[] = [generateHooks()]
   if (allFeedItems.length > 0) {
     phase1.push(refreshModelsFromFeed(allFeedItems))
-    phase1.push(classifyForRadar(allFeedItems))
+  }
+  if (toolNames.length > 0) {
+    phase1.push(classifyToolNames(toolNames))
   }
   if (newItems.length > 0) {
-    phase1.push(updateStoryThreads(newItems))
+    phase1.push(updateStoryThreads(newItems, entityMap))
     phase1.push(saveEntityMentions(newItems, entityMap))
   }
   await Promise.all(phase1.map(p => p.catch(console.error)))

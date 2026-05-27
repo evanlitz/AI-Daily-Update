@@ -85,6 +85,17 @@ export async function seedRadarIfEmpty(): Promise<void> {
   await classifyBatch(SEED_TOOLS)
 }
 
+// Classify tool names extracted by Claude during screenAndHook.
+// Skips any name already in the radar; classifies the rest in batches of 20.
+export async function classifyToolNames(names: string[]): Promise<void> {
+  if (!names.length) return
+  const { rows: existing } = await db.execute(`SELECT name FROM tech_radar`)
+  const existingKeys = new Set((existing as any[]).map(r => normalizeKey(r.name as string)))
+  const newTools = names.filter(t => !existingKeys.has(normalizeKey(t)))
+  if (!newTools.length) return
+  for (let i = 0; i < newTools.length; i += 20) await classifyBatch(newTools.slice(i, i + 20))
+}
+
 export async function classifyForRadar(items: FeedItem[]): Promise<void> {
   const allText  = items.map(i => `${i.title} ${i.raw_content ?? ''}`).join(' ')
   const matches  = allText.match(TOOL_PATTERNS) ?? []

@@ -75,6 +75,28 @@ async function loadRecentEvents(): Promise<Map<string, { week: string; text: str
   return map
 }
 
+async function loadSnapshots(): Promise<Map<string, { week: string; summary: string }[]>> {
+  const currentWeek = getMondayISO()
+  const { rows } = await db.execute({
+    sql: `SELECT thread_id, week, summary
+          FROM thread_snapshots
+          WHERE week < ?
+          ORDER BY week DESC`,
+    args: [currentWeek],
+  })
+  const map = new Map<string, { week: string; summary: string }[]>()
+  for (const r of rows as any[]) {
+    const list = map.get(r.thread_id as string) ?? []
+    if (list.length < 3) {
+      list.push({ week: r.week as string, summary: (r.summary as string).slice(0, 150) })
+      map.set(r.thread_id as string, list)
+    }
+  }
+  // Rows came in DESC; reverse each list so history is oldest → newest for Claude
+  for (const [k, v] of map) map.set(k, v.reverse())
+  return map
+}
+
 async function loadManualNotes(): Promise<Map<string, string>> {
   const cutoff = new Date(Date.now() - 14 * 24 * 3600_000).toISOString()
   const { rows } = await db.execute({
@@ -135,36 +157,50 @@ async function archiveOldest(): Promise<void> {
 }
 
 export async function updateStoryThreads(
-  feedItems: { id: string; title: string; summary?: string | null; velocity_score?: number | null }[]
+  feedItems: { id: string; title: string; summary?: string | null; velocity_score?: number | null }[],
+  entityMap: Record<string, { name: string }[]> = {}
 ): Promise<void> {
   await seedPinnedStories()
 
-  const [{ rows: threadRows }, recentEvents, manualNotes] = await Promise.all([
+  const [{ rows: threadRows }, recentEvents, manualNotes, snapshots] = await Promise.all([
     loadThreads(),
     loadRecentEvents(),
     loadManualNotes(),
+    loadSnapshots(),
   ])
   const threads = threadRows as any[]
   const threadTitles = threads.map(t => t.title as string)
 
+  // Flat lowercase blob of all thread context — used for entity name lookup
+  const threadBlob = threads.map(t =>
+    `${t.title} ${t.watch_for ?? ''} ${t.current_summary ?? ''}`
+  ).join(' ').toLowerCase()
+
   const relevant = feedItems.filter(item => {
+    if ((item.velocity_score ?? 0) >= 0.1) return true
     const text = `${item.title} ${item.summary ?? ''}`
-    return (item.velocity_score ?? 0) >= 0.1 || itemMatchesAnyThread(text, threadTitles)
+    if (itemMatchesAnyThread(text, threadTitles)) return true
+    // Entity-based: if any Claude-extracted entity name appears in thread context
+    const entities = entityMap[item.id] ?? []
+    return entities.some(e => threadBlob.includes(e.name.toLowerCase()))
   }).slice(0, 60)
 
   if (!relevant.length) return
 
   const week = getMondayISO()
-  // Use integer refs instead of UUIDs — saves ~640 tokens and avoids hallucination risk
-  // Include last 2 weekly events per thread so Claude can identify follow-up developments
-  const threadContext = threads.map((t, i) => ({
-    ref: i,
-    title: t.title,
-    summary: (t.current_summary ?? '').slice(0, 250),
-    watch_for: (t.watch_for ?? '').slice(0, 150),
-    recent_events: recentEvents.get(t.id) ?? [],
-    manual_note: manualNotes.get(t.id) ?? null,
-  }))
+  const threadContext = threads.map((t, i) => {
+    const hist = snapshots.get(t.id) ?? []
+    return {
+      ref: i,
+      title: t.title,
+      summary: (t.current_summary ?? '').slice(0, 250),
+      watch_for: (t.watch_for ?? '').slice(0, 150),
+      recent_events: recentEvents.get(t.id) ?? [],
+      manual_note: manualNotes.get(t.id) ?? null,
+      // Only include history when it exists — omitting the field saves tokens for new threads
+      ...(hist.length > 0 ? { history: hist } : {}),
+    }
+  })
   // item.id never used by Claude (it returns item_idxs integers) — drop it
   const itemContext = relevant.map((item, i) => ({
     idx: i,
@@ -177,9 +213,11 @@ export async function updateStoryThreads(
 2. Identify genuinely new stories emerging from the feed (not just one-off events — real ongoing narratives)
 3. Update the current state of each thread
 
+When a thread has a history field, use it to write summaries with genuine continuity — reference how the story has evolved over prior weeks, note reversals or accelerations, and avoid restating context that has not changed.
+
 Be selective: not every item deserves a thread. A story needs multiple future developments to be worth tracking. A single product announcement is an event, not a story. A competitive dynamic, an ongoing safety debate, a technology adoption curve — those are stories.`
 
-  const userPrompt = `Current story threads (ref = integer index; recent_events = last 1-2 weekly updates; manual_note = human curator annotation, treat as high-priority signal):
+  const userPrompt = `Current story threads (ref = integer index; history = prior weeks' summaries oldest→newest; recent_events = last 1-2 weekly updates; manual_note = human curator annotation, treat as high-priority signal):
 ${JSON.stringify(threadContext, null, 2)}
 
 New feed items (idx = integer index to use in output):
@@ -251,9 +289,21 @@ Rules:
               created_at     = excluded.created_at`,
       args: [crypto.randomUUID(), thread.id, week, upd.update_text ?? '', upd.significance ?? 'medium', JSON.stringify(itemIds), now],
     })
+    const newSummary  = upd.new_summary  ?? thread.current_summary
+    const newWatchFor = upd.new_watch_for ?? thread.watch_for
     await db.execute({
       sql: `UPDATE story_threads SET current_summary = ?, watch_for = ?, last_updated = ? WHERE id = ?`,
-      args: [upd.new_summary ?? thread.current_summary, upd.new_watch_for ?? thread.watch_for, now, thread.id],
+      args: [newSummary, newWatchFor, now, thread.id],
+    })
+    // Snapshot the summary for this week — ON CONFLICT keeps the latest run's version
+    await db.execute({
+      sql: `INSERT INTO thread_snapshots (id, thread_id, summary, watch_for, week, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(thread_id, week) DO UPDATE SET
+              summary    = excluded.summary,
+              watch_for  = excluded.watch_for,
+              created_at = excluded.created_at`,
+      args: [crypto.randomUUID(), thread.id, newSummary, newWatchFor, week, now],
     })
   }))
 
@@ -279,17 +329,25 @@ Rules:
       activeCount--
     }
     const id = crypto.randomUUID()
+    const initSummary  = nt.current_summary ?? ''
+    const initWatchFor = nt.watch_for ?? ''
     await db.execute({
       sql: `INSERT OR IGNORE INTO story_threads
               (id, title, category, status, current_summary, watch_for, is_pinned, first_seen, last_updated)
             VALUES (?, ?, ?, 'active', ?, ?, 0, ?, ?)`,
-      args: [id, nt.title, nt.category ?? 'market', nt.current_summary ?? '', nt.watch_for ?? '', now, now],
+      args: [id, nt.title, nt.category ?? 'market', initSummary, initWatchFor, now, now],
     })
     const itemIds = (nt.item_idxs ?? []).map((i: number) => relevant[i]?.id).filter(Boolean)
     await db.execute({
       sql: `INSERT INTO story_events (id, thread_id, week, update_text, significance, feed_item_ids, source, created_at)
             VALUES (?, ?, ?, ?, ?, ?, 'pipeline', ?)`,
       args: [crypto.randomUUID(), id, week, nt.update_text ?? '', nt.significance ?? 'medium', JSON.stringify(itemIds), now],
+    })
+    // Snapshot the birth-week summary so the thread's history starts from day one
+    await db.execute({
+      sql: `INSERT OR IGNORE INTO thread_snapshots (id, thread_id, summary, watch_for, week, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [crypto.randomUUID(), id, initSummary, initWatchFor, week, now],
     })
     activeCount++
     if (nt.significance === 'high' && nt.title) {
