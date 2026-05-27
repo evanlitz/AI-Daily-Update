@@ -18,11 +18,39 @@ interface Entity {
   type: string
   mention_count: number
   first_seen: string
+  this_week: number
+  last_week: number
+  velocity: number
 }
 
-function EntityCard({ e }: { e: Entity }) {
+function VelocityBadge({ velocity, thisWeek }: { velocity: number; thisWeek: number }) {
+  if (thisWeek === 0) return null
+  const up   = velocity >= 1.5
+  const flat = velocity >= 0.7 && velocity < 1.5
+  const color = up ? '#34d399' : flat ? '#a0a0c0' : '#f87171'
+  const arrow = up ? '↑' : flat ? '→' : '↓'
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 800, color,
+      background: `${color}18`,
+      border: `1px solid ${color}33`,
+      borderRadius: 4, padding: '2px 6px',
+      marginLeft: 6, flexShrink: 0,
+    }}>
+      {arrow} {velocity}×
+    </span>
+  )
+}
+
+function EntityCard({ e, trending }: { e: Entity; trending: boolean }) {
   const meta = TYPE_META[e.type] ?? { color: '#7c6aff', rgb: '124,106,255', label: e.type }
   const [hovered, setHovered] = useState(false)
+
+  const badgeValue = trending ? e.this_week : e.mention_count
+  const badgeLabel = trending ? 'this wk' : ''
+  const subtitle   = trending
+    ? `${e.this_week} this week · ${e.last_week} last week`
+    : `since ${relTime(e.first_seen)}`
 
   return (
     <Link
@@ -50,20 +78,21 @@ function EntityCard({ e }: { e: Entity }) {
         }}>
           {e.name}
         </p>
-        <p style={{ fontSize: 10, color: '#5a5a7a' }}>
-          since {relTime(e.first_seen)}
-        </p>
+        <p style={{ fontSize: 10, color: '#5a5a7a' }}>{subtitle}</p>
       </div>
-      <span style={{
-        fontSize: 12, fontWeight: 900,
-        color: meta.color,
-        background: `rgba(${meta.rgb},0.1)`,
-        border: `1px solid rgba(${meta.rgb},0.22)`,
-        borderRadius: 5, padding: '3px 9px',
-        flexShrink: 0, marginLeft: 12,
-      }}>
-        {e.mention_count}
-      </span>
+      <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0, marginLeft: 12 }}>
+        {trending && <VelocityBadge velocity={e.velocity} thisWeek={e.this_week} />}
+        <span style={{
+          fontSize: 12, fontWeight: 900,
+          color: meta.color,
+          background: `rgba(${meta.rgb},0.1)`,
+          border: `1px solid rgba(${meta.rgb},0.22)`,
+          borderRadius: 5, padding: '3px 9px',
+          marginLeft: trending ? 6 : 0,
+        }}>
+          {badgeValue}{badgeLabel ? <span style={{ fontSize: 9, fontWeight: 700, marginLeft: 2 }}>{badgeLabel}</span> : null}
+        </span>
+      </div>
     </Link>
   )
 }
@@ -72,20 +101,21 @@ export default function EntitiesPage() {
   const [entities, setEntities] = useState<Entity[]>([])
   const [loading, setLoading]   = useState(true)
   const [activeType, setActiveType] = useState<string>('all')
+  const [sort, setSort] = useState<'mentions' | 'trending'>('mentions')
 
   useEffect(() => {
-    fetch('/api/entities')
+    setLoading(true)
+    fetch(`/api/entities?sort=${sort}`)
       .then(r => r.json())
       .then(d => setEntities(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false))
-  }, [])
+  }, [sort])
 
   const filtered = activeType === 'all' ? entities : entities.filter(e => e.type === activeType)
   const byType: Record<string, Entity[]> = {}
   for (const e of entities) (byType[e.type] ??= []).push(e)
 
-  // Top 5 by mention count for the stat strip
-  const top5 = [...entities].sort((a, b) => b.mention_count - a.mention_count).slice(0, 5)
+  const top5 = [...entities].slice(0, 5)
 
   return (
     <main style={{
@@ -95,26 +125,52 @@ export default function EntitiesPage() {
     }}>
 
       {/* Page header */}
-      <div style={{ marginBottom: 28 }}>
-        <p className="eyebrow" style={{ marginBottom: 8 }}>Entity Graph</p>
-        <h1 style={{
-          fontSize: 28, fontWeight: 900, color: '#e8e8f4',
-          letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 6,
-        }}>
-          Tracked Entities
-        </h1>
-        <p style={{ fontSize: 14, color: '#8080b0' }}>
-          {loading ? 'Loading…' : `${entities.length} entities extracted from feed items`}
-        </p>
+      <div style={{ marginBottom: 28, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <p className="eyebrow" style={{ marginBottom: 8 }}>Entity Graph</p>
+          <h1 style={{
+            fontSize: 28, fontWeight: 900, color: '#e8e8f4',
+            letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 6,
+          }}>
+            Tracked Entities
+          </h1>
+          <p style={{ fontSize: 14, color: '#8080b0' }}>
+            {loading ? 'Loading…' : `${entities.length} entities extracted from feed items`}
+          </p>
+        </div>
+
+        {/* Sort toggle */}
+        <div style={{ display: 'flex', gap: 6 }}>
+          {(['mentions', 'trending'] as const).map(s => {
+            const active = sort === s
+            return (
+              <button
+                key={s}
+                onClick={() => setSort(s)}
+                style={{
+                  background: active ? 'rgba(124,106,255,0.15)' : 'rgba(255,255,255,0.04)',
+                  color: active ? '#a78bfa' : '#5a5a7a',
+                  border: active ? '1px solid rgba(167,139,250,0.35)' : '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 8, padding: '7px 16px',
+                  fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {s === 'mentions' ? 'Most Mentioned' : '↑ Trending'}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      {/* Top entities stat strip */}
+      {/* Top 5 stat strip */}
       {top5.length > 0 && (
-        <div style={{
-          display: 'flex', gap: 10, marginBottom: 28, flexWrap: 'wrap',
-        }}>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 28, flexWrap: 'wrap' }}>
           {top5.map((e, i) => {
             const meta = TYPE_META[e.type] ?? { color: '#7c6aff', rgb: '124,106,255' }
+            const statLabel = sort === 'trending'
+              ? `${e.this_week} this wk · ${e.velocity}×`
+              : `${e.mention_count} mentions`
             return (
               <Link
                 key={e.id}
@@ -126,7 +182,7 @@ export default function EntitiesPage() {
                   background: `linear-gradient(135deg, rgba(${meta.rgb},0.1) 0%, rgba(${meta.rgb},0.04) 100%)`,
                   border: `1px solid rgba(${meta.rgb},0.22)`,
                   borderRadius: 10, flex: '1 1 160px',
-                  transition: 'border-color 0.15s, box-shadow 0.15s',
+                  transition: 'border-color 0.15s',
                 }}
               >
                 <div style={{
@@ -136,17 +192,13 @@ export default function EntitiesPage() {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   flexShrink: 0,
                 }}>
-                  <span style={{ fontSize: 11, fontWeight: 900, color: meta.color }}>
-                    {String(i + 1)}
-                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 900, color: meta.color }}>{i + 1}</span>
                 </div>
                 <div style={{ minWidth: 0 }}>
                   <p style={{ fontSize: 13, fontWeight: 800, color: '#d8d8ee', lineHeight: 1.2, marginBottom: 1 }}>
                     {e.name}
                   </p>
-                  <p style={{ fontSize: 10, color: meta.color, fontWeight: 700 }}>
-                    {e.mention_count} mentions
-                  </p>
+                  <p style={{ fontSize: 10, color: meta.color, fontWeight: 700 }}>{statLabel}</p>
                 </div>
               </Link>
             )
@@ -207,7 +259,7 @@ export default function EntitiesPage() {
             })}
           </div>
 
-          {/* Grouped entity grid */}
+          {/* Entity grid */}
           {activeType === 'all' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
               {TYPE_ORDER.map(type => {
@@ -234,7 +286,7 @@ export default function EntitiesPage() {
                       <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.05)' }} />
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 10 }}>
-                      {group.map(e => <EntityCard key={e.id} e={e} />)}
+                      {group.map(e => <EntityCard key={e.id} e={e} trending={sort === 'trending'} />)}
                     </div>
                   </section>
                 )
@@ -242,7 +294,7 @@ export default function EntitiesPage() {
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 10 }}>
-              {filtered.map(e => <EntityCard key={e.id} e={e} />)}
+              {filtered.map(e => <EntityCard key={e.id} e={e} trending={sort === 'trending'} />)}
             </div>
           )}
         </>

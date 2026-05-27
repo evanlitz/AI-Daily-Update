@@ -113,25 +113,34 @@ export async function saveEntityMentions(
   }
 }
 
-const BACKFILL_SYSTEM = `Extract key named entities from AI news items. Only extract:
-- Companies: "Anthropic", "OpenAI", "Google DeepMind", "Meta", "Microsoft", "xAI", "Mistral", "DeepSeek", "Cohere"
-- AI Models: "Claude 3.5 Sonnet", "GPT-4o", "Gemini 2.5 Pro", "Llama 4", "Grok 3", "DeepSeek R1"
-- Researchers: "Sam Altman", "Dario Amodei", "Yann LeCun", "Demis Hassabis", "Ilya Sutskever"
-- Papers: use the short official name only
+const EXTRACT_SYSTEM = `Extract named entities from AI news item titles and snippets.
 
-Canonical form only — "GPT-4o" not "gpt 4o", "Anthropic" not "ANTHROPIC".
-Limit to 4 entities per item. Generic terms ("AI", "LLM", "transformer") are NOT entities.`
+Extract up to 4 entities per item. Valid types:
+- "company": AI labs and tech companies (Anthropic, OpenAI, Google DeepMind, Meta, Mistral, DeepSeek, Cohere, xAI, Stability AI, Runway, etc.)
+- "model": specific AI models (GPT-4o, Claude 3.5 Sonnet, Gemini 2.5 Pro, Llama 3, Grok 3, DeepSeek R1, Phi-3, etc.)
+- "researcher": named individuals (Sam Altman, Dario Amodei, Yann LeCun, Geoffrey Hinton, etc.)
+- "paper": short official paper name only
 
+Rules:
+- Canonical casing: "GPT-4o" not "gpt-4o", "Anthropic" not "ANTHROPIC"
+- Generic terms are NOT entities: "AI", "LLM", "transformer", "neural network", "model", "paper"
+- If nothing specific is named, return an empty entities array — do not fabricate`
+
+// Processes feed items that have no entity mentions yet, up to 60 per pipeline run.
+// Runs every pipeline cycle; naturally stops when all items are covered.
 export async function backfillEntities(): Promise<void> {
-  const { rows: countRows } = await db.execute(
-    `SELECT COUNT(*) as c FROM entities`
-  ) as { rows: any[] }
-  if ((countRows[0] as any).c > 0) return  // already bootstrapped
-
   const { rows: feedRows } = await db.execute({
-    sql: `SELECT id, title, source, raw_content FROM feed_items ORDER BY fetched_at DESC LIMIT 200`,
+    sql: `SELECT fi.id, fi.title, fi.source, fi.raw_content
+          FROM feed_items fi
+          WHERE NOT EXISTS (
+            SELECT 1 FROM entity_mentions em
+            WHERE em.source_id = fi.id AND em.source_type = 'feed_item'
+          )
+          ORDER BY fi.fetched_at DESC
+          LIMIT 60`,
     args: [],
   }) as { rows: any[] }
+
   if (!feedRows.length) return
 
   const BATCH = 30
@@ -140,15 +149,15 @@ export async function backfillEntities(): Promise<void> {
   for (let i = 0; i < feedRows.length; i += BATCH) {
     const batch = feedRows.slice(i, i + BATCH)
     const prompt = batch.map((item: any, n: number) => {
-      const snippet = item.raw_content ? `\n   ${String(item.raw_content).slice(0, 150)}` : ''
-      return `${n + 1}. ${item.title}${snippet}`
+      const snippet = item.raw_content ? `\n   ${String(item.raw_content).slice(0, 200)}` : ''
+      return `${n + 1}. (${item.source}) ${item.title}${snippet}`
     }).join('\n')
 
     try {
       const resp = await anthropic.messages.create({
         model: MODEL_FAST,
-        max_tokens: 1200,
-        system: [{ type: 'text', text: BACKFILL_SYSTEM, cache_control: { type: 'ephemeral' } }],
+        max_tokens: 1400,
+        system: [{ type: 'text', text: EXTRACT_SYSTEM, cache_control: { type: 'ephemeral' } }],
         messages: [{
           role: 'user',
           content: `Extract entities from each item. Return ONLY a JSON array:\n[{"n":1,"entities":[{"name":"Anthropic","type":"company"},...]},...]\n\n${prompt}`,
@@ -172,5 +181,5 @@ export async function backfillEntities(): Promise<void> {
 
   const items = feedRows.map((r: any) => ({ id: r.id, topic_tags: [] }) as unknown as FeedItem)
   await saveEntityMentions(items, entityMap)
-  console.log(`[entities] backfill complete over ${feedRows.length} feed items`)
+  console.log(`[entities] backfilled ${feedRows.length} feed items`)
 }
