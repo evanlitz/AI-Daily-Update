@@ -2,17 +2,17 @@ import axios from 'axios'
 import he from 'he'
 import crypto from 'crypto'
 import type { FeedItem } from '../types'
+import { extractPageContent } from '../extract-content'
 
 const SUBREDDITS = [
-  { name: 'MachineLearning', minScore: 50, tags: ['research'] as string[] },
-  { name: 'LocalLLaMA',      minScore: 30, tags: ['tools', 'models'] as string[] },
-  { name: 'artificial',      minScore: 50, tags: ['industry'] as string[] },
+  { name: 'MachineLearning', minScore: 50,  tags: ['research'] as string[], filterKeywords: false },
+  { name: 'LocalLLaMA',      minScore: 30,  tags: ['tools', 'models'] as string[], filterKeywords: false },
+  { name: 'artificial',      minScore: 50,  tags: ['industry'] as string[], filterKeywords: true },
 ]
 
-// For r/artificial (broad sub) require at least one AI keyword
 const AI_KEYWORDS = /llm|gpt|claude|gemini|llama|mistral|transformer|diffusion|rag|fine.?tun|benchmark|paper|model|agent|openai|anthropic|deepmind|hugging.?face|neural|inference|quantiz/i
 
-const HEADERS = { 'User-Agent': 'AIPulse/1.0 personal-dashboard' }
+const CUTOFF_HOURS = 48
 
 function stableId(s: string): string {
   return crypto.createHash('sha1').update(s).digest('hex').slice(0, 16)
@@ -31,28 +31,34 @@ function getTopicTags(title: string, base: string[]): string[] {
 }
 
 async function fetchSubreddit(sub: typeof SUBREDDITS[number]): Promise<FeedItem[]> {
-  const cutoff = Date.now() - 48 * 60 * 60 * 1000
-  const res = await axios.get(
-    `https://www.reddit.com/r/${sub.name}/hot.json?limit=30`,
-    { timeout: 10000, headers: HEADERS }
-  )
+  const after = Math.floor((Date.now() - CUTOFF_HOURS * 60 * 60 * 1000) / 1000)
 
-  const posts: any[] = res.data?.data?.children ?? []
+  const res = await axios.get('https://api.pullpush.io/reddit/search/submission', {
+    params: {
+      subreddit: sub.name,
+      sort: 'desc',
+      sort_type: 'score',
+      size: 50,
+      after,
+    },
+    timeout: 15000,
+    headers: { 'User-Agent': 'AIPulse/1.0' },
+  })
+
+  const posts: any[] = res.data?.data ?? []
   const now = new Date().toISOString()
 
-  return posts
-    .map((c: any) => c.data)
+  const items = posts
     .filter((p: any) => {
-      if (p.score < sub.minScore) return false
+      if ((p.score ?? 0) < sub.minScore) return false
       if (p.stickied) return false
-      if (p.created_utc * 1000 < cutoff) return false
-      if (sub.name === 'artificial' && !AI_KEYWORDS.test(p.title + ' ' + (p.selftext ?? ''))) return false
+      if (sub.filterKeywords && !AI_KEYWORDS.test(p.title + ' ' + (p.selftext ?? ''))) return false
       return true
     })
     .map((p: any) => {
       const permalink = `https://www.reddit.com${p.permalink}`
-      const externalUrl = !p.is_self && p.url ? p.url : permalink
-      const content = stripHtml(he.decode(p.selftext ?? '')).slice(0, 600)
+      const externalUrl = !p.is_self && p.url && !p.url.includes('reddit.com') ? p.url : permalink
+      const content = stripHtml(he.decode(p.selftext ?? '')).slice(0, 1500)
       return {
         id: stableId(`reddit:${p.id}`),
         source: `reddit:${sub.name.toLowerCase()}`,
@@ -64,8 +70,14 @@ async function fetchSubreddit(sub: typeof SUBREDDITS[number]): Promise<FeedItem[
         topic_tags: getTopicTags(p.title, sub.tags),
         velocity_score: 0,
         is_read: 0,
-      }
+      } as FeedItem
     })
+
+  return Promise.all(items.map(async item => {
+    if (item.raw_content || item.url.includes('reddit.com')) return item
+    const content = await extractPageContent(item.url)
+    return content ? { ...item, raw_content: content } : item
+  }))
 }
 
 export async function fetchReddit(): Promise<FeedItem[]> {

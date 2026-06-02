@@ -8,6 +8,7 @@ import { fetchHuggingFace } from './sources/huggingface'
 import { fetchDatasets } from './sources/datasets'
 import { fetchKaggleDatasets } from './sources/kaggle'
 import { fetchReddit } from './sources/reddit'
+import { fetchYoutube } from './sources/youtube'
 import { fetchPapersWithCode } from './sources/paperswithcode'
 import { fetchHFModels } from './sources/hf_models'
 import type { Dataset, FeedItem, GithubRepo } from './types'
@@ -18,6 +19,7 @@ import { screenAndHook, generateHooks } from './intelligence/hooks'
 import { updateStoryThreads, linkThreads } from './intelligence/stories'
 import { backfillPredictionEvidence } from './intelligence/predictions'
 import { saveEntityMentions, backfillEntities } from './intelligence/entities'
+import { generateYoutubeSummaries } from './intelligence/youtube_summaries'
 
 async function insertItems(items: FeedItem[]): Promise<{ count: number; newItems: FeedItem[] }> {
   if (!items.length) return { count: 0, newItems: [] }
@@ -88,6 +90,17 @@ async function filterNewItems(items: FeedItem[]): Promise<FeedItem[]> {
   return deduped.filter(item => !existingIds.has(item.id) && !existingUrls.has(item.url))
 }
 
+async function recordSourceRuns(counts: Map<string, number>): Promise<void> {
+  if (!counts.size) return
+  const now = new Date().toISOString()
+  await db.batch(
+    Array.from(counts.entries()).map(([source, item_count]) => ({
+      sql: `INSERT OR REPLACE INTO source_runs (source, fetched_at, item_count) VALUES (?, ?, ?)`,
+      args: [source, now, item_count],
+    }))
+  )
+}
+
 // Delete feed items older than 90 days that aren't linked to any story event.
 async function pruneOldFeedItems(): Promise<void> {
   const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
@@ -105,17 +118,36 @@ async function pruneOldFeedItems(): Promise<void> {
 
 export async function fetchAll(): Promise<number> {
   console.log('[pipeline] starting fetch...')
-  const [arxiv, hn, rss, github, huggingface, githubTop, hfDatasets, kaggleDatasets, reddit, pwc, hfModels] = await Promise.all([
+
+  // Pre-load known YouTube URLs so fetchYoutube can skip up-to-date channels
+  // and avoid fetching transcripts for videos already in the DB
+  const { rows: ytRows } = await db.execute(
+    `SELECT url FROM feed_items WHERE source LIKE 'youtube:%'`
+  )
+  const knownYoutubeUrls = new Set((ytRows as any[]).map(r => r.url as string))
+
+  const [arxiv, hn, rss, github, huggingface, githubTop, hfDatasets, kaggleDatasets, reddit, pwc, hfModels, youtube] = await Promise.all([
     fetchArxiv(), fetchHackerNews(), fetchRSS(), fetchGithubTrending(),
     fetchHuggingFace(), fetchGithubTop(), fetchDatasets(), fetchKaggleDatasets(),
-    fetchReddit(), fetchPapersWithCode(), fetchHFModels(),
+    fetchReddit(), fetchPapersWithCode(), fetchHFModels(), fetchYoutube(knownYoutubeUrls),
   ])
 
   const allDatasets = [...hfDatasets]
   const seenDatasets = new Set(hfDatasets.map(d => d.full_name))
   for (const d of kaggleDatasets) { if (!seenDatasets.has(d.full_name)) { seenDatasets.add(d.full_name); allDatasets.push(d) } }
 
-  const allFeedItems = [...arxiv, ...hn, ...rss, ...github, ...huggingface, ...reddit, ...pwc, ...hfModels]
+  const allFeedItems = [...arxiv, ...hn, ...rss, ...github, ...huggingface, ...reddit, ...pwc, ...hfModels, ...youtube]
+
+  // Record per-source item counts for health monitoring
+  const sourceCounts = new Map<string, number>()
+  for (const item of allFeedItems) {
+    sourceCounts.set(item.source, (sourceCounts.get(item.source) ?? 0) + 1)
+  }
+  sourceCounts.set('github-top', githubTop.length)
+  sourceCounts.set('hf-datasets', hfDatasets.length)
+  sourceCounts.set('kaggle', kaggleDatasets.length)
+  await recordSourceRuns(sourceCounts).catch(console.error)
+
   const newCandidates = await filterNewItems(allFeedItems)
   console.log(`[pipeline] ${newCandidates.length}/${allFeedItems.length} are new — screening...`)
   const { items: screened, entityMap, toolNames } = await screenAndHook(newCandidates)
@@ -130,7 +162,7 @@ export async function fetchAll(): Promise<number> {
   await ensureAllModels()
 
   // Phase 1: parallel intelligence tasks — all awaited so Vercel doesn't kill them early
-  const phase1: Promise<void>[] = [generateHooks()]
+  const phase1: Promise<void>[] = [generateHooks(), generateYoutubeSummaries()]
   if (allFeedItems.length > 0) {
     phase1.push(refreshModelsFromFeed(allFeedItems))
   }

@@ -253,6 +253,14 @@ try { await db.execute(`
   )
 `) } catch {}
 
+try { await db.execute(`
+  CREATE TABLE IF NOT EXISTS source_runs (
+    source     TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    item_count INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (source, fetched_at)
+  )
+`) } catch {}
 try { await db.execute(`ALTER TABLE story_events ADD COLUMN source TEXT NOT NULL DEFAULT 'pipeline'`) } catch {}
 try { await db.execute(`ALTER TABLE story_events ADD COLUMN source_url TEXT`) } catch {}
 try {
@@ -265,45 +273,52 @@ try {
   await db.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_story_events_thread_week_sig_src ON story_events (thread_id, week, significance, source)`)
 } catch {}
 
-// FTS5 full-text search — clean drop+rebuild every startup to prevent corrupt vtab state.
-// Triggers use UPDATE OF so velocity_score updates never touch the vtab.
+// FTS5 full-text search. Only create the virtual table and triggers once —
+// never drop+rebuild on startup, which was O(n) in feed_items on every cold
+// start. If the index becomes corrupt the try/catch lets search fall back to
+// LIKE queries. A one-time populate-rebuild runs only when the table is new.
 try {
-  await db.execute(`DROP TRIGGER IF EXISTS fts_feed_ai`)
-  await db.execute(`DROP TRIGGER IF EXISTS fts_feed_ad`)
-  await db.execute(`DROP TRIGGER IF EXISTS fts_feed_au_del`)
-  await db.execute(`DROP TRIGGER IF EXISTS fts_feed_au_ins`)
-  await db.execute(`DROP TABLE IF EXISTS feed_items_fts`)
+  const { rows: ftsCheck } = await db.execute(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='feed_items_fts'`
+  )
+  const isNew = ftsCheck.length === 0
+
   await db.execute(`
-    CREATE VIRTUAL TABLE feed_items_fts USING fts5(
+    CREATE VIRTUAL TABLE IF NOT EXISTS feed_items_fts USING fts5(
       title, hook, raw_content,
       content='feed_items', content_rowid='rowid'
     )
   `)
+  // Triggers use UPDATE OF so velocity_score changes never touch the vtab.
   await db.execute(`
-    CREATE TRIGGER fts_feed_ai AFTER INSERT ON feed_items BEGIN
+    CREATE TRIGGER IF NOT EXISTS fts_feed_ai AFTER INSERT ON feed_items BEGIN
       INSERT INTO feed_items_fts(rowid, title, hook, raw_content)
       VALUES (new.rowid, COALESCE(new.title,''), COALESCE(new.hook,''), COALESCE(new.raw_content,''));
     END
   `)
   await db.execute(`
-    CREATE TRIGGER fts_feed_ad AFTER DELETE ON feed_items BEGIN
+    CREATE TRIGGER IF NOT EXISTS fts_feed_ad AFTER DELETE ON feed_items BEGIN
       INSERT INTO feed_items_fts(feed_items_fts, rowid, title, hook, raw_content)
       VALUES ('delete', old.rowid, COALESCE(old.title,''), COALESCE(old.hook,''), COALESCE(old.raw_content,''));
     END
   `)
   await db.execute(`
-    CREATE TRIGGER fts_feed_au_del BEFORE UPDATE OF title, hook, raw_content ON feed_items BEGIN
+    CREATE TRIGGER IF NOT EXISTS fts_feed_au_del BEFORE UPDATE OF title, hook, raw_content ON feed_items BEGIN
       INSERT INTO feed_items_fts(feed_items_fts, rowid, title, hook, raw_content)
       VALUES ('delete', old.rowid, COALESCE(old.title,''), COALESCE(old.hook,''), COALESCE(old.raw_content,''));
     END
   `)
   await db.execute(`
-    CREATE TRIGGER fts_feed_au_ins AFTER UPDATE OF title, hook, raw_content ON feed_items BEGIN
+    CREATE TRIGGER IF NOT EXISTS fts_feed_au_ins AFTER UPDATE OF title, hook, raw_content ON feed_items BEGIN
       INSERT INTO feed_items_fts(rowid, title, hook, raw_content)
       VALUES (new.rowid, COALESCE(new.title,''), COALESCE(new.hook,''), COALESCE(new.raw_content,''));
     END
   `)
-  await db.execute(`INSERT INTO feed_items_fts(feed_items_fts) VALUES ('rebuild')`)
+  if (isNew) {
+    // Backfill existing rows into the freshly created index.
+    await db.execute(`INSERT INTO feed_items_fts(feed_items_fts) VALUES ('rebuild')`)
+    console.log('[db] FTS5 table created — initial rebuild complete')
+  }
 } catch (err) {
   console.warn('[db] FTS5 setup skipped (search falls back to LIKE):', err)
 }

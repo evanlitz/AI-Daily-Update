@@ -18,7 +18,7 @@ function stableId(url: string): string {
 
 export async function fetchArxiv(): Promise<FeedItem[]> {
   try {
-    const url = 'http://export.arxiv.org/api/query?search_query=cat:cs.AI+OR+cat:cs.LG+OR+cat:cs.CL&start=0&max_results=20&sortBy=submittedDate&sortOrder=descending'
+    const url = 'https://export.arxiv.org/api/query?search_query=cat:cs.AI+OR+cat:cs.LG+OR+cat:cs.CL&start=0&max_results=20&sortBy=submittedDate&sortOrder=descending'
     const res = await axios.get(url, { timeout: 15000 })
     const result = await parseStringPromise(res.data)
     const entries: any[] = result.feed?.entry ?? []
@@ -27,7 +27,15 @@ export async function fetchArxiv(): Promise<FeedItem[]> {
     return entries.map((entry: any) => {
       const rawUrl: string = entry.id?.[0] ?? ''
       const arxivId = rawUrl.split('/').pop()?.replace(/v\d+$/, '') ?? stableId(rawUrl)
-      const rawContent = stripLatex(stripHtml(entry.summary?.[0] ?? ''))
+      const authors: string[] = (entry.author ?? [])
+        .map((a: any) => a.name?.[0] ?? '')
+        .filter(Boolean)
+        .slice(0, 5)
+      const abstract = stripLatex(stripHtml(entry.summary?.[0] ?? ''))
+      const rawContent = [
+        authors.length ? `Authors: ${authors.join(', ')}` : null,
+        abstract,
+      ].filter(Boolean).join(' | ')
       const published = entry.published?.[0]
 
       return {
@@ -35,7 +43,7 @@ export async function fetchArxiv(): Promise<FeedItem[]> {
         source: 'arxiv',
         title: he.decode(stripHtml(entry.title?.[0] ?? '')),
         url: rawUrl,
-        raw_content: rawContent.slice(0, 800),
+        raw_content: rawContent.slice(0, 1500),
         published_at: published ? new Date(published).toISOString() : now,
         fetched_at: now,
         topic_tags: ['research'],

@@ -18,12 +18,21 @@ export async function fetchHuggingFace(): Promise<FeedItem[]> {
       const summary: string = item.paper?.summary ?? ''
       const publishedAt: string = item.publishedAt ?? now
 
+      const authors: string[] = (item.paper?.authors ?? [])
+        .map((a: any) => a.name ?? a.user?.fullname ?? '')
+        .filter(Boolean)
+        .slice(0, 5)
+      const rawContent = [
+        authors.length ? `Authors: ${authors.join(', ')}` : null,
+        stripHtml(summary),
+      ].filter(Boolean).join(' | ')
+
       return {
         id: id || `hf-${Date.now()}`,
         source: 'huggingface',
         title: he.decode(stripHtml(title)),
         url: `https://huggingface.co/papers/${id}`,
-        raw_content: stripHtml(summary).slice(0, 800),
+        raw_content: rawContent.slice(0, 1500),
         published_at: publishedAt ? new Date(publishedAt).toISOString() : now,
         fetched_at: now,
         topic_tags: ['research'],

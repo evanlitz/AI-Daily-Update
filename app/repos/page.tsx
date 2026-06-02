@@ -96,7 +96,7 @@ export default function ReposPage() {
       )}
 
       <p className="mt-10 text-center" style={{ color: '#5a5a7a', fontSize: 11, fontWeight: 700, letterSpacing: '0.12em' }}>
-        DATA FROM GITHUB TRENDING · REFRESHED EVERY 6 HOURS
+        DATA FROM GITHUB TRENDING · REFRESHED TWICE DAILY
       </p>
     </main>
   )

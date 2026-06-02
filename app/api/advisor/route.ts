@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { generateProjectIdeas } from '@/lib/intelligence/advisor'
+import { checkCooldown } from '@/lib/rateLimiter'
 
 export const maxDuration = 60
 
@@ -28,6 +29,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const { ok, retryAfterMs } = checkCooldown('advisor', 3 * 60 * 1000)
+  if (!ok) return NextResponse.json({ error: 'Rate limited' }, { status: 429, headers: { 'Retry-After': String(Math.ceil(retryAfterMs / 1000)) } })
   let context: any = undefined
   try { context = await req.json() } catch {}
   try { return NextResponse.json(await generateProjectIdeas(context)) }

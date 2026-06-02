@@ -29,7 +29,7 @@ function getTopicTags(pipeline: string): string[] {
 export async function fetchHFModels(): Promise<FeedItem[]> {
   try {
     const res = await axios.get('https://huggingface.co/api/models', {
-      params: { sort: 'trending', limit: 50, full: false },
+      params: { sort: 'likes', limit: 50, full: false },
       timeout: 15000,
     })
 

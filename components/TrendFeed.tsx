@@ -20,9 +20,11 @@ const STATION_CONFIG: Record<string, { code: string; label: string; color: strin
   github:      { code: 'GTHB', label: 'GitHub',      color: '#fb923c', rgb: '251,146,60'  },
   hn:          { code: 'HNWS', label: 'HackerNews',  color: '#f87171', rgb: '248,113,113' },
   rss:         { code: 'RSS·', label: 'RSS Feeds',   color: '#34d399', rgb: '52,211,153'  },
+  youtube:     { code: 'YT··', label: 'YouTube',     color: '#a78bfa', rgb: '167,139,250' },
+  reddit:      { code: 'RDDT', label: 'Reddit',      color: '#e879a8', rgb: '232,121,168' },
 }
 
-const ALL_STATIONS = ['arxiv', 'hn', 'github', 'huggingface', 'rss']
+const ALL_STATIONS = ['arxiv', 'hn', 'github', 'huggingface', 'rss', 'youtube', 'reddit']
 
 const TOPIC_META: Record<string, { color: string; rgb: string }> = {
   models:   { color: '#a78bfa', rgb: '167,139,250' },
@@ -41,8 +43,10 @@ const SORT_LIST = [
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function stationMeta(source: string) {
-  if (source in STATION_CONFIG) return STATION_CONFIG[source]
-  if (source.startsWith('rss:')) return STATION_CONFIG.rss
+  if (source in STATION_CONFIG)       return STATION_CONFIG[source]
+  if (source.startsWith('rss:'))      return STATION_CONFIG.rss
+  if (source.startsWith('youtube:'))  return STATION_CONFIG.youtube
+  if (source.startsWith('reddit:'))   return STATION_CONFIG.reddit
   return { code: source.slice(0, 4).toUpperCase(), label: source, color: '#a78bfa', rgb: '167,139,250' }
 }
 
@@ -129,6 +133,20 @@ function VelBar({ score }: { score: number }) {
   )
 }
 
+function SummaryBullets({ summary }: { summary: string }) {
+  const lines = summary.split('\n').map(l => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean)
+  return (
+    <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {lines.map((line, i) => (
+        <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <span style={{ color: '#a78bfa', fontSize: 12, lineHeight: 1.7, flexShrink: 0, marginTop: 1 }}>▸</span>
+          <span style={{ fontSize: 13, color: '#c0c0e0', lineHeight: 1.7 }}>{line}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 
 export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: Stats }) {
@@ -180,7 +198,10 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
   const stationCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const item of items) {
-      const key = item.source.startsWith('rss:') ? 'rss' : item.source
+      const key = item.source.startsWith('rss:')     ? 'rss'
+                : item.source.startsWith('youtube:') ? 'youtube'
+                : item.source.startsWith('reddit:')  ? 'reddit'
+                : item.source
       counts[key] = (counts[key] ?? 0) + 1
     }
     return counts
@@ -641,9 +662,9 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
                               {tag}
                             </span>
                           )}
-                          {item.raw_content && !expanded && (
-                            <span style={{ fontSize: 11, color: '#5a5a8a' }}>
-                              ▾ summary
+                          {(item.summary || item.raw_content) && !expanded && (
+                            <span style={{ fontSize: 11, color: item.summary ? '#a78bfa' : '#5a5a8a' }}>
+                              {item.summary ? '▾ takeaways' : '▾ excerpt'}
                             </span>
                           )}
                         </div>
@@ -655,24 +676,48 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
                       </div>
                     </div>
 
-                    {/* Expanded summary */}
-                    {expanded && item.raw_content && (
+                    {/* Expanded panel */}
+                    {expanded && (item.summary || item.raw_content) && (
                       <div className="fade-up" style={{ padding: '0 16px 16px', paddingLeft: 91 }}>
                         <div style={{
                           background: 'rgba(0,0,0,0.3)',
-                          border: '1px solid rgba(255,255,255,0.06)',
+                          border: `1px solid ${item.summary ? 'rgba(167,139,250,0.18)' : 'rgba(255,255,255,0.06)'}`,
                           borderRadius: 8, overflow: 'hidden',
                         }}>
-                          <p style={{
-                            fontSize: 13, color: '#b8b8d4', lineHeight: 1.8,
-                            padding: '12px 16px', margin: 0,
-                          }}>
-                            {item.raw_content.slice(0, 400)}{item.raw_content.length > 400 ? '…' : ''}
-                          </p>
+                          {item.summary ? (
+                            <div style={{ padding: '14px 16px' }}>
+                              <p style={{
+                                fontSize: 10, fontWeight: 900, letterSpacing: '0.14em',
+                                color: '#7c6aff', textTransform: 'uppercase', marginBottom: 12,
+                              }}>
+                                Key Takeaways
+                              </p>
+                              <SummaryBullets summary={item.summary} />
+                            </div>
+                          ) : (
+                            <p style={{
+                              fontSize: 13, color: '#b8b8d4', lineHeight: 1.8,
+                              padding: '12px 16px', margin: 0,
+                            }}>
+                              {item.raw_content!.slice(0, 400)}{(item.raw_content?.length ?? 0) > 400 ? '…' : ''}
+                            </p>
+                          )}
                           <div style={{
                             borderTop: '1px solid rgba(255,255,255,0.05)',
-                            padding: '8px 12px', display: 'flex', justifyContent: 'flex-end',
+                            padding: '8px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                           }}>
+                            <a
+                              href={item.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              style={{
+                                fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+                                color: src.color, textDecoration: 'none',
+                              }}
+                            >
+                              Open ↗
+                            </a>
                             <button
                               onClick={e => { e.stopPropagation(); setExpandedId(null) }}
                               style={{
