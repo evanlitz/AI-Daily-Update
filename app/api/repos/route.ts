@@ -5,13 +5,16 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const lang  = searchParams.get('lang')
   const limit = Math.min(100, parseInt(searchParams.get('limit') ?? '25'))
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  // Always show the most recently fetched batch — repos within 60 min of the
+  // latest fetched_at — so the page never goes blank if the cron is late.
+  let sql = `
+    WITH latest AS (SELECT MAX(fetched_at) AS ts FROM github_repos)
+    SELECT gr.* FROM github_repos gr, latest l
+    WHERE gr.fetched_at >= datetime(l.ts, '-60 minutes')`
+  const args: any[] = []
 
-  let sql  = `SELECT * FROM github_repos WHERE fetched_at >= ?`
-  const args: any[] = [since]
-
-  if (lang && lang !== 'all') { sql += ` AND LOWER(language) = LOWER(?)`; args.push(lang) }
-  sql += ` ORDER BY stars_today DESC LIMIT ?`
+  if (lang && lang !== 'all') { sql += ` AND LOWER(gr.language) = LOWER(?)`; args.push(lang) }
+  sql += ` ORDER BY gr.stars_today DESC LIMIT ?`
   args.push(limit)
 
   const { rows } = await db.execute({ sql, args })

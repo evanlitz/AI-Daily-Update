@@ -1,70 +1,67 @@
 import axios from 'axios'
-import * as cheerio from 'cheerio'
-import he from 'he'
 import crypto from 'crypto'
 import type { FeedItem } from '../types'
 
-const AI_KEYWORDS = /llm|ai\b|gpt|claude|gemini|llama|ml\b|neural|diffusion|transformer|rag|agent/i
+const HEADERS: Record<string, string> = {
+  'Accept': 'application/vnd.github+json',
+  'User-Agent': 'AIPulse/1.0',
+}
+if (process.env.GITHUB_TOKEN) HEADERS['Authorization'] = `Bearer ${process.env.GITHUB_TOKEN}`
 
 function stableId(url: string): string {
   return crypto.createHash('sha1').update(url).digest('hex').slice(0, 16)
 }
 
-const HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; AIPulse/1.0)' }
+// 5 topic queries → up to 150 repos/run, deduped. Add GITHUB_TOKEN env var to raise
+// rate limit from 10 req/min to 30 req/min (both sources share the same quota).
+const TOPICS = ['llm', 'machine-learning', 'generative-ai', 'large-language-model', 'transformers']
 
-async function scrapePage(url: string): Promise<FeedItem[]> {
-  const res = await axios.get(url, { headers: HEADERS, timeout: 15000 })
-  const $ = cheerio.load(res.data)
-  const items: FeedItem[] = []
-  const now = new Date().toISOString()
-
-  $('article.Box-row').each((_, el) => {
-    const nameEl = $(el).find('h2.h3 a')
-    const href = nameEl.attr('href') ?? ''
-    const fullName = href.replace(/^\//, '').trim()
-    const description = he.decode($(el).find('p.col-9').text().trim())
-    const language = $(el).find('[itemprop="programmingLanguage"]').text().trim()
-    const starsText = $(el).find('a[href$="/stargazers"]').text().replace(/,/g, '').trim()
-    const stars = parseInt(starsText) || 0
-    const repoUrl = `https://github.com/${fullName}`
-
-    if (!fullName || (!AI_KEYWORDS.test(fullName) && !AI_KEYWORDS.test(description))) return
-
-    items.push({
-      id: stableId(repoUrl),
-      source: 'github',
-      title: he.decode(fullName),
-      url: repoUrl,
-      raw_content: description.slice(0, 800),
-      published_at: now,
-      fetched_at: now,
-      topic_tags: ['tools'],
-      velocity_score: 0,
-      is_read: 0,
+async function searchRepos(q: string): Promise<any[]> {
+  try {
+    const res = await axios.get('https://api.github.com/search/repositories', {
+      params: { q, sort: 'stars', order: 'desc', per_page: 30 },
+      headers: HEADERS,
+      timeout: 15000,
     })
-  })
-
-  return items
+    return res.data.items ?? []
+  } catch (err) {
+    console.error('[github] search error:', err)
+    return []
+  }
 }
 
 export async function fetchGithubTrending(): Promise<FeedItem[]> {
-  try {
-    const results = await Promise.all([
-      scrapePage('https://github.com/trending/python?since=weekly'),
-    ])
-    const all = results.flat()
-    if (all.length === 0) {
-      console.warn('[github] selectors returned empty — GitHub HTML may have changed')
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  const now = new Date().toISOString()
+
+  const results = await Promise.all(TOPICS.map(t => searchRepos(`topic:${t} pushed:>${weekAgo}`)))
+
+  const seen = new Set<string>()
+  const items: FeedItem[] = []
+
+  for (const repos of results) {
+    for (const repo of repos) {
+      if (seen.has(repo.html_url)) continue
+      seen.add(repo.html_url)
+      const parts = [
+        repo.description ?? '',
+        repo.topics?.length ? `Topics: ${(repo.topics as string[]).slice(0, 8).join(', ')}` : '',
+      ].filter(Boolean)
+      items.push({
+        id: stableId(repo.html_url),
+        source: 'github',
+        title: repo.full_name as string,
+        url: repo.html_url as string,
+        raw_content: parts.join(' | ').slice(0, 1000) || undefined,
+        published_at: (repo.pushed_at as string) ?? now,
+        fetched_at: now,
+        topic_tags: ['tools'],
+        velocity_score: 0,
+        is_read: 0,
+      })
     }
-    // deduplicate by url
-    const seen = new Set<string>()
-    return all.filter(item => {
-      if (seen.has(item.url)) return false
-      seen.add(item.url)
-      return true
-    })
-  } catch (err) {
-    console.error('[github] fetch failed:', err)
-    return []
   }
+
+  console.log(`[github] ${items.length} repos via API`)
+  return items
 }

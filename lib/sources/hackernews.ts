@@ -1,6 +1,7 @@
 import axios from 'axios'
 import he from 'he'
 import type { FeedItem } from '../types'
+import { extractPageContent } from '../extract-content'
 
 function getTopicTags(title: string): string[] {
   const t = title.toLowerCase()
@@ -63,7 +64,7 @@ export async function fetchHackerNews(): Promise<FeedItem[]> {
           source: 'hn',
           title: he.decode(hit.title ?? ''),
           url: stripTrackingParams(rawUrl),
-          raw_content: hit.story_text ? he.decode(hit.story_text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 400) : undefined,
+          raw_content: hit.story_text ? he.decode(hit.story_text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 1500) : undefined,
           published_at: hit.created_at ? new Date(hit.created_at).toISOString() : now,
           fetched_at: now,
           topic_tags: getTopicTags(hit.title ?? ''),
@@ -73,8 +74,16 @@ export async function fetchHackerNews(): Promise<FeedItem[]> {
       }
     }
 
-    console.log(`[hackernews] fetched ${results.length} unique stories`)
-    return results
+    // Enrich link posts with page content — runs in parallel, 5s timeout each
+    const enriched = await Promise.all(results.map(async item => {
+      if (item.raw_content || item.url.startsWith('https://news.ycombinator.com')) return item
+      const content = await extractPageContent(item.url)
+      return content ? { ...item, raw_content: content } : item
+    }))
+
+    const withContent = enriched.filter(i => i.raw_content).length
+    console.log(`[hackernews] fetched ${results.length} stories (${withContent} with body content)`)
+    return enriched
   } catch (err) {
     console.error('[hackernews] fetch failed:', err)
     return []

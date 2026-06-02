@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { updateStoryThreads } from '@/lib/intelligence/stories'
+import { checkCooldown } from '@/lib/rateLimiter'
 
 export async function POST() {
+  const { ok, retryAfterMs } = checkCooldown('stories-generate', 5 * 60 * 1000)
+  if (!ok) return NextResponse.json({ error: 'Rate limited' }, { status: 429, headers: { 'Retry-After': String(Math.ceil(retryAfterMs / 1000)) } })
   try {
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     const { rows } = await db.execute({
