@@ -20,7 +20,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     .filter((w: string) => w.length > 3 && !STOP.has(w))
     .slice(0, 4)
 
-  const [eventsResult, itemsResult, entitiesResult] = await Promise.all([
+  const [eventsResult, itemsResult, snapshotsResult, entitiesResult] = await Promise.all([
     db.execute({
       sql: `SELECT * FROM story_events WHERE thread_id = ? ORDER BY created_at DESC`,
       args: [id],
@@ -35,6 +35,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
           args: keywords.flatMap((k: string) => [`%${k}%`, `%${k}%`]),
         })
       : Promise.resolve({ rows: [] }),
+    db.execute({
+      sql: `SELECT week, summary, watch_for FROM thread_snapshots WHERE thread_id = ? ORDER BY week ASC`,
+      args: [id],
+    }),
     db.execute({
       sql: `SELECT e.id, e.name, e.type, COUNT(DISTINCT em.source_id) as item_count
             FROM entity_mentions em
@@ -59,6 +63,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     })),
     related_items: itemsResult.rows,
     topEntities: entitiesResult.rows,
+    snapshots: snapshotsResult.rows,
   })
 }
 

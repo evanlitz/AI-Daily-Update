@@ -51,10 +51,17 @@ interface TopEntity {
   item_count: number
 }
 
+interface SnapshotEntry {
+  week: string
+  summary: string
+  watch_for: string | null
+}
+
 interface StoryDetail extends StoryThread {
   events: StoryEvent[]
   related_items: FeedItem[]
   topEntities?: TopEntity[]
+  snapshots?: SnapshotEntry[]
 }
 
 interface RelatedThread {
@@ -691,6 +698,67 @@ function StoryDetailView({
                       ))}
                     </div>
                   )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Story arc — weekly snapshot progression */}
+      {detail.snapshots && detail.snapshots.length >= 2 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+            <span style={{
+              fontSize: 10, fontWeight: 900, letterSpacing: '0.18em',
+              color: '#5a5a7a', textTransform: 'uppercase', flexShrink: 0,
+            }}>
+              Story Arc · {detail.snapshots.length} week{detail.snapshots.length !== 1 ? 's' : ''}
+            </span>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.05)' }} />
+          </div>
+          <div style={{
+            background: 'rgba(255,255,255,0.015)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: 14, padding: '20px 22px',
+          }}>
+            {detail.snapshots.map((snap, i) => {
+              const isLatest = i === detail.snapshots!.length - 1
+              const isLast   = i === detail.snapshots!.length - 1
+              return (
+                <div key={snap.week} style={{ display: 'flex', gap: 14 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: 16 }}>
+                    <div style={{
+                      width: isLatest ? 10 : 7, height: isLatest ? 10 : 7,
+                      borderRadius: '50%',
+                      background: isLatest ? cat.color : 'rgba(255,255,255,0.15)',
+                      border: isLatest ? `2px solid rgba(${cat.rgb},0.4)` : '1px solid rgba(255,255,255,0.08)',
+                      marginTop: 4, flexShrink: 0,
+                      boxShadow: isLatest ? `0 0 8px rgba(${cat.rgb},0.4)` : 'none',
+                    }} />
+                    {!isLast && (
+                      <div style={{ width: 1, flex: 1, minHeight: 20, background: 'rgba(255,255,255,0.06)' }} />
+                    )}
+                  </div>
+                  <div style={{ paddingBottom: isLast ? 0 : 20, flex: 1, minWidth: 0 }}>
+                    <span style={{
+                      fontSize: 11, fontWeight: 800, fontFamily: 'monospace',
+                      letterSpacing: '0.02em', display: 'block', marginBottom: 5, marginTop: 2,
+                      color: isLatest ? '#a0a0d0' : '#5a5a7a',
+                    }}>
+                      {weekLabel(snap.week)}
+                    </span>
+                    <p style={{
+                      fontSize: 13, lineHeight: 1.75,
+                      color: isLatest ? '#8080b8' : '#5a5a7a',
+                      display: '-webkit-box',
+                      WebkitLineClamp: isLatest ? 5 : 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                    }}>
+                      {snap.summary}
+                    </p>
+                  </div>
                 </div>
               )
             })}

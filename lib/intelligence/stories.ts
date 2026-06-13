@@ -169,7 +169,9 @@ export async function updateStoryThreads(
     loadSnapshots(),
   ])
   const threads = threadRows as any[]
-  const threadTitles = threads.map(t => t.title as string)
+  // Include watch_for so items that match what Claude is explicitly watching
+  // for aren't cut before the Sonnet call (title-only matching missed these)
+  const threadKeyTexts = threads.map(t => `${t.title} ${t.watch_for ?? ''}`)
 
   // Flat lowercase blob of all thread context — used for entity name lookup
   const threadBlob = threads.map(t =>
@@ -179,11 +181,11 @@ export async function updateStoryThreads(
   const relevant = feedItems.filter(item => {
     if ((item.velocity_score ?? 0) >= 0.1) return true
     const text = `${item.title} ${item.summary ?? ''}`
-    if (itemMatchesAnyThread(text, threadTitles)) return true
+    if (itemMatchesAnyThread(text, threadKeyTexts)) return true
     // Entity-based: if any Claude-extracted entity name appears in thread context
     const entities = entityMap[item.id] ?? []
     return entities.some(e => threadBlob.includes(e.name.toLowerCase()))
-  }).slice(0, 60)
+  }).slice(0, 80)
 
   if (!relevant.length) return
 

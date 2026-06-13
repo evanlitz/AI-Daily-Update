@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { RepoCard } from '@/components/RepoCard'
+import { relTime } from '@/lib/utils'
 import type { GithubRepo } from '@/lib/types'
 
 const LANGUAGES = ['All', 'Python', 'TypeScript', 'JavaScript', 'Rust', 'Go', 'C++', 'Other']
@@ -44,7 +45,12 @@ export default function ReposPage() {
           Top AI Repos
         </h1>
         <p style={{ color: '#8080b0', fontSize: 14 }}>
-          Ranked by stars gained in the last 24 hours · {repos.length} repos tracked
+          Ranked by total stars · {repos.length} active AI/ML repos
+          {repos[0]?.fetched_at && (
+            <span style={{ color: '#5a5a7a', marginLeft: 8 }}>
+              · updated {relTime(repos[0].fetched_at)}
+            </span>
+          )}
         </p>
       </div>
 
@@ -96,7 +102,7 @@ export default function ReposPage() {
       )}
 
       <p className="mt-10 text-center" style={{ color: '#5a5a7a', fontSize: 11, fontWeight: 700, letterSpacing: '0.12em' }}>
-        DATA FROM GITHUB TRENDING · REFRESHED TWICE DAILY
+        DATA FROM GITHUB API · REFRESHED TWICE DAILY
       </p>
     </main>
   )

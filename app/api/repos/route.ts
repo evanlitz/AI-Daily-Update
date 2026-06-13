@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const args: any[] = []
 
   if (lang && lang !== 'all') { sql += ` AND LOWER(gr.language) = LOWER(?)`; args.push(lang) }
-  sql += ` ORDER BY gr.stars_today DESC LIMIT ?`
+  sql += ` ORDER BY gr.stars_total DESC LIMIT ?`
   args.push(limit)
 
   const { rows } = await db.execute({ sql, args })
