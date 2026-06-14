@@ -104,13 +104,13 @@ function BootScreen({ onDone }: { onDone: () => void }) {
         </p>
         {lines.map((line, i) => (
           <p key={i} style={{
-            color: i === lines.length - 1 ? '#34d399' : '#9090c4',
+            color: i === lines.length - 1 ? '#34d399' : '#71717a',
             fontSize: 14, letterSpacing: '0.05em', marginBottom: 7,
             animation: 'boot-reveal 0.18s ease-out',
           }}>{line}</p>
         ))}
         {lines.length < BOOT_LINES.length && (
-          <span style={{ color: '#a78bfa', fontSize: 14, animation: 'boot-blink 0.8s step-end infinite' }}>█</span>
+          <span style={{ color: '#60a5fa', fontSize: 14, animation: 'boot-blink 0.8s step-end infinite' }}>█</span>
         )}
       </div>
     </div>
@@ -171,7 +171,7 @@ function ScannerHeader({ models, visibleCount }: { models: AIModel[]; visibleCou
       </p>
       <h1 style={{
         fontSize: 'clamp(38px, 5vw, 58px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1, marginBottom: 20,
-        background: 'linear-gradient(135deg, #e8e8f0 30%, #b0b0d8 65%, #7c6aff 100%)',
+        background: 'linear-gradient(135deg, #f4f4f5 30%, #94a3b8 65%, #3b82f6 100%)',
         WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
       }}>
         AI Model Changelog
@@ -180,18 +180,18 @@ function ScannerHeader({ models, visibleCount }: { models: AIModel[]; visibleCou
       <div className="flex items-center gap-8 flex-wrap">
         {[
           { label: 'ACTIVE MODELS', value: String(counts.active), color: '#34d399' },
-          { label: 'LABS TRACKED',  value: String(counts.labs),   color: '#a78bfa' },
+          { label: 'LABS TRACKED',  value: String(counts.labs),   color: '#60a5fa' },
           { label: 'LATEST',        value: counts.newest,         color: '#f97316', mono: false },
           { label: 'SHOWING',       value: String(visibleCount),  color: '#60a5fa' },
         ].map(({ label, value, color, mono }) => (
           <div key={label} className="flex flex-col gap-1">
-            <span style={{ color: '#9090c0', fontSize: 11, fontWeight: 900, letterSpacing: '0.16em', textTransform: 'uppercase' }}>{label}</span>
+            <span style={{ color: '#71717a', fontSize: 11, fontWeight: 900, letterSpacing: '0.16em', textTransform: 'uppercase' }}>{label}</span>
             <span style={{ color, fontSize: 17, fontWeight: 900, fontFamily: mono !== false ? 'monospace' : undefined, letterSpacing: '-0.02em' }}>
               {value || '—'}
             </span>
           </div>
         ))}
-        <div style={{ marginLeft: 'auto', color: '#8080b0', fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+        <div style={{ marginLeft: 'auto', color: '#71717a', fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
           PRICING/MTOK · BENCHMARKS % · 2025
         </div>
       </div>
@@ -282,18 +282,18 @@ function MetricChart({ models }: { models: AIModel[] }) {
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
         <div>
-          <p style={{ color: '#d0d0e8', fontSize: 14, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 2 }}>
+          <p style={{ color: '#e4e4e7', fontSize: 14, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 2 }}>
             Capability Benchmark
           </p>
-          <p style={{ color: '#6060a0', fontSize: 12 }}>{activeMeta.desc} · active models only</p>
+          <p style={{ color: '#71717a', fontSize: 12 }}>{activeMeta.desc} · active models only</p>
         </div>
         <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 3 }}>
           {CHART_METRICS.map(cm => (
             <button key={cm.key} onClick={() => setMetric(cm.key)} style={{
               padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer',
               fontSize: 13, fontWeight: 700, letterSpacing: '0.03em',
-              background: metric === cm.key ? 'rgba(124,106,255,0.22)' : 'transparent',
-              color:      metric === cm.key ? '#a78bfa' : '#6060a0',
+              background: metric === cm.key ? 'rgba(59,130,246,0.18)' : 'transparent',
+              color:      metric === cm.key ? '#60a5fa' : '#71717a',
               transition: 'all 0.15s',
             }}>
               {cm.label}
@@ -305,7 +305,7 @@ function MetricChart({ models }: { models: AIModel[] }) {
       {/* Bars */}
       <div style={{ padding: '18px 24px 20px' }}>
         {rows.map((r, i) => {
-          const meta    = LAB[r.model.lab] ?? { color: '#7c6aff', rgb: '124,106,255', short: '???' }
+          const meta    = LAB[r.model.lab] ?? { color: '#3b82f6', rgb: '59,130,246', short: '???' }
           const p       = barPct(r)
           const hasData = r.val != null || (r.isOpen && metric === 'price')
           const label   = fmtMetric(r.val, metric, r.isOpen)
@@ -318,7 +318,7 @@ function MetricChart({ models }: { models: AIModel[] }) {
               <div style={{ width: 140, flexShrink: 0, textAlign: 'right', paddingRight: 4 }}>
                 <span style={{
                   display: 'block', fontSize: 12, fontWeight: isTop ? 800 : 600,
-                  color: !hasData ? '#3a3a5a' : isTop ? '#e8e8f0' : '#9090c0',
+                  color: !hasData ? '#3f3f46' : isTop ? '#f4f4f5' : '#71717a',
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                 }}>
                   {r.model.name}
@@ -351,9 +351,9 @@ function MetricChart({ models }: { models: AIModel[] }) {
               <div style={{ width: 52, flexShrink: 0, textAlign: 'right' }}>
                 <span style={{
                   fontSize: 12, fontWeight: 700,
-                  color: !hasData ? '#3a3a5a'
+                  color: !hasData ? '#3f3f46'
                     : r.isOpen && metric === 'price' ? '#34d399'
-                    : isTop ? meta.color : '#6868a0',
+                    : isTop ? meta.color : '#71717a',
                 }}>
                   {label}
                 </span>
@@ -381,7 +381,7 @@ function BenchBar({ label, value, color, rgb, delay }: {
   return (
     <div style={{ marginBottom: 9 }}>
       <div className="flex items-center justify-between" style={{ marginBottom: 4 }}>
-        <span style={{ color: '#a0a0c8', fontSize: 12, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{label}</span>
+        <span style={{ color: '#a1a1aa', fontSize: 12, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>{label}</span>
         <span style={{ color, fontSize: 13, fontWeight: 900, fontFamily: 'monospace' }}>{value}%</span>
       </div>
       <div style={{ height: 4, background: 'rgba(255,255,255,0.08)', borderRadius: 999 }}>
@@ -402,7 +402,7 @@ function ModelCard({ model, compareMode, isSelected, onSelect, highlighted, ente
   model: AIModel; compareMode: boolean; isSelected: boolean
   onSelect: (id: string) => void; highlighted: boolean; enterDelay: number
 }) {
-  const meta  = LAB[model.lab] ?? { color: '#7c6aff', rgb: '124,106,255', short: '???', bg: 'rgba(124,106,255,0.04)' }
+  const meta  = LAB[model.lab] ?? { color: '#3b82f6', rgb: '59,130,246', short: '???', bg: 'rgba(59,130,246,0.04)' }
   const bench = topBench(model.benchmarks)
   const isOpen = model.input_cost_per_mtok === null && model.output_cost_per_mtok === null
   const allBenches = BENCH_ORDER.filter(k => model.benchmarks[k] !== undefined)
@@ -467,16 +467,16 @@ function ModelCard({ model, compareMode, isSelected, onSelect, highlighted, ente
           </div>
         </div>
 
-        <h3 style={{ color: '#e8e8f0', fontSize: 20, fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: 5 }}>
+        <h3 style={{ color: '#f4f4f5', fontSize: 20, fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.15, marginBottom: 5 }}>
           {model.name}
         </h3>
-        <p style={{ color: '#a0a0c8', fontSize: 13, marginBottom: 14 }}>
+        <p style={{ color: '#a1a1aa', fontSize: 13, marginBottom: 14 }}>
           {model.family} · {fmtDate(model.release_date)}
-          {model.knowledge_cutoff && <span style={{ color: '#8080b0' }}> · cutoff {model.knowledge_cutoff}</span>}
+          {model.knowledge_cutoff && <span style={{ color: '#71717a' }}> · cutoff {model.knowledge_cutoff}</span>}
         </p>
 
         <div className="flex flex-wrap gap-2 mb-4">
-          <span style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, padding: '4px 10px', fontSize: 13, fontWeight: 700, color: '#b0b0d0', fontFamily: 'monospace' }}>
+          <span style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, padding: '4px 10px', fontSize: 13, fontWeight: 700, color: '#d4d4d8', fontFamily: 'monospace' }}>
             CTX {fmtCtx(model.context_window)}
           </span>
           {isOpen ? (
@@ -484,7 +484,7 @@ function ModelCard({ model, compareMode, isSelected, onSelect, highlighted, ente
               OPEN WEIGHT
             </span>
           ) : (
-            <span style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, padding: '4px 10px', fontSize: 13, fontWeight: 700, color: '#b0b0d0', fontFamily: 'monospace' }}>
+            <span style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 7, padding: '4px 10px', fontSize: 13, fontWeight: 700, color: '#d4d4d8', fontFamily: 'monospace' }}>
               {fmtCost(model.input_cost_per_mtok) ?? '?'} / {fmtCost(model.output_cost_per_mtok) ?? '?'}
             </span>
           )}
@@ -520,7 +520,7 @@ function LabSection({ lab, models, compareMode, compareIds, onSelect, hoveredId,
   lab: string; models: AIModel[]; compareMode: boolean; compareIds: string[]
   onSelect: (id: string) => void; hoveredId: string | null; enterBase: number
 }) {
-  const meta = LAB[lab] ?? { color: '#7c6aff', rgb: '124,106,255', short: '???' }
+  const meta = LAB[lab] ?? { color: '#3b82f6', rgb: '59,130,246', short: '???' }
   const active = models.filter(m => m.status === 'active').length
 
   return (
@@ -539,8 +539,8 @@ function LabSection({ lab, models, compareMode, compareIds, onSelect, hoveredId,
         </div>
 
         <div>
-          <h2 style={{ color: '#e8e8f0', fontSize: 24, fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1 }}>{lab}</h2>
-          <p style={{ color: '#a0a0c8', fontSize: 13, marginTop: 3 }}>{active} active · {models.length} total</p>
+          <h2 style={{ color: '#f4f4f5', fontSize: 24, fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1 }}>{lab}</h2>
+          <p style={{ color: '#a1a1aa', fontSize: 13, marginTop: 3 }}>{active} active · {models.length} total</p>
         </div>
 
         <div style={{ flex: 1, height: 1, background: `linear-gradient(to right, rgba(${meta.rgb},0.35), rgba(${meta.rgb},0.05), transparent)` }} />
@@ -589,28 +589,28 @@ function ComparePanel({ models, onClose, onRemove }: {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50"
-      style={{ marginLeft: 52, background: 'rgba(3,3,14,0.97)', borderTop: '1px solid rgba(124,106,255,0.38)',
+      style={{ marginLeft: 52, background: 'rgba(3,3,14,0.97)', borderTop: '1px solid rgba(59,130,246,0.3)',
         backdropFilter: 'blur(24px)', boxShadow: '0 -24px 80px rgba(0,0,0,0.7)', animation: 'arsenal-fade-in 0.25s ease-out' }}>
 
       <div className="flex items-center justify-between px-6 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <div className="flex items-center gap-4">
-          <span style={{ color: '#a78bfa', fontSize: 13, fontWeight: 900, letterSpacing: '0.14em' }}>
+          <span style={{ color: '#60a5fa', fontSize: 13, fontWeight: 900, letterSpacing: '0.14em' }}>
             {is2 ? '⚔ MODEL DUEL' : '◈ COMPARISON'}
           </span>
           <div className="flex gap-3">
             {models.map(m => {
-              const meta = LAB[m.lab] ?? { color: '#7c6aff' }
+              const meta = LAB[m.lab] ?? { color: '#3b82f6' }
               return (
                 <div key={m.id} className="flex items-center gap-1.5">
                   <div style={{ width: 10, height: 10, borderRadius: 3, background: meta.color, boxShadow: `0 0 6px ${meta.color}` }} />
-                  <span style={{ color: '#d0d0e8', fontSize: 13, fontWeight: 700 }}>{m.name}</span>
+                  <span style={{ color: '#e4e4e7', fontSize: 13, fontWeight: 700 }}>{m.name}</span>
                 </div>
               )
             })}
           </div>
         </div>
         <button onClick={onClose}
-          style={{ color: '#a0a0c8', fontSize: 13, padding: '5px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', cursor: 'pointer' }}>
+          style={{ color: '#a1a1aa', fontSize: 13, padding: '5px 14px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)', cursor: 'pointer' }}>
           ✕ Close
         </button>
       </div>
@@ -624,15 +624,15 @@ function ComparePanel({ models, onClose, onRemove }: {
               background: 'rgba(3,3,14,0.98)', borderBottom: '1px solid rgba(255,255,255,0.06)', marginBottom: 4, zIndex: 1 }}>
             <div />
             {models.map((m, i) => {
-              const meta = LAB[m.lab] ?? { color: '#7c6aff', rgb: '124,106,255' }
+              const meta = LAB[m.lab] ?? { color: '#3b82f6', rgb: '59,130,246' }
               return (
                 <React.Fragment key={m.id}>
                   <div className="relative flex flex-col gap-0.5">
                     <button onClick={() => onRemove(m.id)} className="absolute -top-1 right-0 flex items-center justify-center rounded-full"
                       style={{ width: 16, height: 16, background: 'rgba(239,68,68,0.14)', color: '#ef4444', fontSize: 9, fontWeight: 900, cursor: 'pointer', border: 'none' }}>✕</button>
                     <span style={{ color: meta.color, fontSize: 11, fontWeight: 900, letterSpacing: '0.1em' }}>{meta.short}</span>
-                    <span style={{ color: '#e8e8f0', fontSize: 14, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2 }}>{m.name}</span>
-                    <span style={{ color: '#a0a0c8', fontSize: 12 }}>{fmtDate(m.release_date)}</span>
+                    <span style={{ color: '#f4f4f5', fontSize: 14, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2 }}>{m.name}</span>
+                    <span style={{ color: '#a1a1aa', fontSize: 12 }}>{fmtDate(m.release_date)}</span>
                   </div>
                   {is2 && i === 0 && <div />}
                 </React.Fragment>
@@ -647,11 +647,11 @@ function ComparePanel({ models, onClose, onRemove }: {
               <div key={metric.label} className="grid items-center"
                 style={{ gridTemplateColumns: `160px ${is2 ? '1fr 40px 1fr' : `repeat(${models.length}, 1fr)`}`, gap: 8,
                   padding: '9px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                <span style={{ color: '#a0a0c8', fontSize: 12, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                <span style={{ color: '#a1a1aa', fontSize: 12, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
                   {metric.label}
                 </span>
                 {models.map((m, i) => {
-                  const meta = LAB[m.lab] ?? { color: '#7c6aff', rgb: '124,106,255' }
+                  const meta = LAB[m.lab] ?? { color: '#3b82f6', rgb: '59,130,246' }
                   const val = metric.getter(m)
                   const isWin = i === winIdx
                   const pct = (typeof val === 'number' && metric.label !== 'Context' && metric.label !== 'Input $/M') ? val : null
@@ -673,7 +673,7 @@ function ComparePanel({ models, onClose, onRemove }: {
                       </div>
                       {is2 && i === 0 && (
                         <div className="flex items-center justify-center">
-                          <span style={{ color: '#9090c0', fontSize: 11, fontWeight: 900, letterSpacing: '0.06em' }}>VS</span>
+                          <span style={{ color: '#71717a', fontSize: 11, fontWeight: 900, letterSpacing: '0.06em' }}>VS</span>
                         </div>
                       )}
                     </React.Fragment>
@@ -764,10 +764,10 @@ function BenchmarkHistory() {
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}>
         <div>
-          <p style={{ color: '#d0d0e8', fontSize: 14, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 2 }}>
+          <p style={{ color: '#e4e4e7', fontSize: 14, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 2 }}>
             Benchmark History
           </p>
-          <p style={{ color: '#6060a0', fontSize: 12 }}>
+          <p style={{ color: '#71717a', fontSize: 12 }}>
             {isBaseline
               ? 'Baseline snapshot · sync benchmarks to track changes over time'
               : 'Score progression over time · hover dots for details'}
@@ -778,8 +778,8 @@ function BenchmarkHistory() {
             <button key={m.key} onClick={() => setMetric(m.key)} style={{
               padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer',
               fontSize: 13, fontWeight: 700,
-              background: metric === m.key ? 'rgba(124,106,255,0.22)' : 'transparent',
-              color:      metric === m.key ? '#a78bfa' : '#6060a0',
+              background: metric === m.key ? 'rgba(59,130,246,0.18)' : 'transparent',
+              color:      metric === m.key ? '#60a5fa' : '#71717a',
               transition: 'all 0.15s',
             }}>{m.label}</button>
           ))}
@@ -792,12 +792,12 @@ function BenchmarkHistory() {
 
         {loading ? (
           <div style={{ height: VH, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="inline-block h-6 w-6 rounded-full border border-violet-500 border-t-transparent animate-spin" />
+            <span className="inline-block h-6 w-6 rounded-full border border-blue-500 border-t-transparent animate-spin" />
           </div>
         ) : series.length === 0 ? (
           <div style={{ height: VH, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <p style={{ color: '#5a5a8a', fontSize: 13 }}>No {HIST_METRICS.find(m => m.key === metric)?.label} data</p>
-            <p style={{ color: '#4a4a6a', fontSize: 12 }}>Add this benchmark to model data or sync from external sources</p>
+            <p style={{ color: '#52525b', fontSize: 13 }}>No {HIST_METRICS.find(m => m.key === metric)?.label} data</p>
+            <p style={{ color: '#52525b', fontSize: 12 }}>Add this benchmark to model data or sync from external sources</p>
           </div>
         ) : (
           <>
@@ -809,7 +809,7 @@ function BenchmarkHistory() {
                   <line x1={ML} y1={py(t)} x2={ML + CW} y2={py(t)}
                     stroke="rgba(255,255,255,0.045)" strokeWidth={1} />
                   <text x={ML - 7} y={py(t)} textAnchor="end" dominantBaseline="middle"
-                    fill="#4a4a6a" fontSize={10} fontFamily="monospace">{t}%</text>
+                    fill="#52525b" fontSize={10} fontFamily="monospace">{t}%</text>
                 </g>
               ))}
 
@@ -822,15 +822,15 @@ function BenchmarkHistory() {
                 <text key={i}
                   x={ML + (tSpan < 86400001 ? CW / 2 : (CW / 4) * i)}
                   y={VH - 6}
-                  textAnchor="middle" fill="#4a4a6a" fontSize={10} fontFamily="monospace">
+                  textAnchor="middle" fill="#52525b" fontSize={10} fontFamily="monospace">
                   {fmtD(d.getTime())}
                 </text>
               ))}
 
               {/* Series: lines + dots */}
               {series.map(s => {
-                const color = LAB[s.lab]?.color ?? '#7c6aff'
-                const rgb   = LAB[s.lab]?.rgb   ?? '124,106,255'
+                const color = LAB[s.lab]?.color ?? '#3b82f6'
+                const rgb   = LAB[s.lab]?.rgb   ?? '59,130,246'
                 const pts   = s.values.map(v => ({ x: px(v.date), y: py(v.value), ...v }))
                 const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
                 return (
@@ -862,26 +862,26 @@ function BenchmarkHistory() {
                 pointerEvents: 'none', zIndex: 20,
                 minWidth: 130,
               }}>
-                <p style={{ color: LAB[tip.lab]?.color ?? '#a78bfa', fontSize: 11, fontWeight: 900, letterSpacing: '0.1em', marginBottom: 2 }}>
+                <p style={{ color: LAB[tip.lab]?.color ?? '#60a5fa', fontSize: 11, fontWeight: 900, letterSpacing: '0.1em', marginBottom: 2 }}>
                   {LAB[tip.lab]?.short ?? tip.lab}
                 </p>
                 <p style={{ color: '#e0e0f0', fontSize: 13, fontWeight: 700, marginBottom: 3 }}>{tip.name}</p>
-                <p style={{ color: LAB[tip.lab]?.color ?? '#a78bfa', fontSize: 16, fontWeight: 900, fontFamily: 'monospace', marginBottom: 2 }}>
+                <p style={{ color: LAB[tip.lab]?.color ?? '#60a5fa', fontSize: 16, fontWeight: 900, fontFamily: 'monospace', marginBottom: 2 }}>
                   {tip.value}%
                 </p>
-                <p style={{ color: '#5a5a8a', fontSize: 11 }}>{fmtD(new Date(tip.date).getTime())}</p>
+                <p style={{ color: '#52525b', fontSize: 11 }}>{fmtD(new Date(tip.date).getTime())}</p>
               </div>
             )}
 
             {/* Legend */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px 20px', marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
               {series.map(s => {
-                const color = LAB[s.lab]?.color ?? '#7c6aff'
+                const color = LAB[s.lab]?.color ?? '#3b82f6'
                 const latest = s.values.at(-1)
                 return (
                   <div key={s.slug} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                     <div style={{ width: 12, height: 3, borderRadius: 2, background: color, opacity: 0.8 }} />
-                    <span style={{ color: '#9090c0', fontSize: 12 }}>{s.name}</span>
+                    <span style={{ color: '#71717a', fontSize: 12 }}>{s.name}</span>
                     <span style={{ color, fontSize: 12, fontWeight: 700, fontFamily: 'monospace' }}>
                       {latest?.value}%
                     </span>
@@ -1004,13 +1004,13 @@ export default function ModelsPage() {
 
         {/* Preset filters */}
         <div className="flex flex-wrap items-center gap-2 mb-3">
-          <span style={{ color: '#9090c0', fontSize: 11, fontWeight: 900, letterSpacing: '0.16em', textTransform: 'uppercase' }}>FILTER</span>
+          <span style={{ color: '#71717a', fontSize: 11, fontWeight: 900, letterSpacing: '0.16em', textTransform: 'uppercase' }}>FILTER</span>
           {PRESETS.map(p => (
             <button key={p.key} onClick={() => setActivePreset(prev => prev === p.key ? null : p.key)}
               style={{
-                background: activePreset === p.key ? 'rgba(124,106,255,0.16)' : 'rgba(255,255,255,0.03)',
-                color: activePreset === p.key ? '#a78bfa' : '#b0b0d0',
-                border: `1px solid ${activePreset === p.key ? 'rgba(124,106,255,0.38)' : 'rgba(255,255,255,0.09)'}`,
+                background: activePreset === p.key ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.03)',
+                color: activePreset === p.key ? '#60a5fa' : '#d4d4d8',
+                border: `1px solid ${activePreset === p.key ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.09)'}`,
                 borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s',
               }}>
               {p.label}
@@ -1019,9 +1019,9 @@ export default function ModelsPage() {
           <button onClick={() => { setCompareMode(v => !v); if (compareMode) setCompareIds([]) }}
             style={{
               marginLeft: 'auto',
-              background: compareMode ? 'rgba(124,106,255,0.16)' : 'rgba(255,255,255,0.04)',
-              color: compareMode ? '#a78bfa' : '#b0b0d0',
-              border: `1px solid ${compareMode ? 'rgba(124,106,255,0.38)' : 'rgba(255,255,255,0.09)'}`,
+              background: compareMode ? 'rgba(59,130,246,0.15)' : 'rgba(255,255,255,0.04)',
+              color: compareMode ? '#60a5fa' : '#d4d4d8',
+              border: `1px solid ${compareMode ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.09)'}`,
               borderRadius: 8, padding: '6px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s',
             }}>
@@ -1037,9 +1037,9 @@ export default function ModelsPage() {
             return (
               <button key={lab} onClick={() => setActiveLab(lab)}
                 style={{
-                  background: active ? (meta ? `rgba(${meta.rgb},0.14)` : 'rgba(124,106,255,0.14)') : 'rgba(255,255,255,0.03)',
-                  color: active ? (meta?.color ?? '#a78bfa') : '#b0b0d0',
-                  border: `1px solid ${active ? (meta ? `rgba(${meta.rgb},0.38)` : 'rgba(124,106,255,0.38)') : 'rgba(255,255,255,0.09)'}`,
+                  background: active ? (meta ? `rgba(${meta.rgb},0.14)` : 'rgba(59,130,246,0.14)') : 'rgba(255,255,255,0.03)',
+                  color: active ? (meta?.color ?? '#60a5fa') : '#d4d4d8',
+                  border: `1px solid ${active ? (meta ? `rgba(${meta.rgb},0.38)` : 'rgba(59,130,246,0.3)') : 'rgba(255,255,255,0.09)'}`,
                   borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s',
                 }}>
                 {lab}
@@ -1049,15 +1049,15 @@ export default function ModelsPage() {
           <div className="flex items-center gap-2" style={{ marginLeft: 'auto' }}>
             {hasFilters && (
               <button onClick={() => { setActiveLab('All'); setActivePreset(null); setShowDeprecated(false) }}
-                style={{ color: '#a78bfa', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                  background: 'rgba(124,106,255,0.09)', border: '1px solid rgba(124,106,255,0.22)', borderRadius: 8, padding: '6px 13px' }}>
+                style={{ color: '#60a5fa', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  background: 'rgba(59,130,246,0.09)', border: '1px solid rgba(59,130,246,0.18)', borderRadius: 8, padding: '6px 13px' }}>
                 ✕ Reset
               </button>
             )}
             <button onClick={() => setShowDeprecated(v => !v)}
               style={{
                 background: showDeprecated ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.03)',
-                color: showDeprecated ? '#ef4444' : '#b0b0d0',
+                color: showDeprecated ? '#ef4444' : '#d4d4d8',
                 border: `1px solid ${showDeprecated ? 'rgba(239,68,68,0.28)' : 'rgba(255,255,255,0.09)'}`,
                 borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s',
               }}>
@@ -1067,20 +1067,20 @@ export default function ModelsPage() {
         </div>
 
         {/* Count line */}
-        <p style={{ color: '#9090c0', fontSize: 13, fontWeight: 600, marginBottom: 22 }}>
-          Showing <span style={{ color: '#d0d0e8', fontWeight: 900 }}>{displayList.length}</span> model{displayList.length !== 1 ? 's' : ''}
-          {activeLab !== 'All' && <span> from <span style={{ color: LAB[activeLab]?.color ?? '#a78bfa' }}>{activeLab}</span></span>}
-          {activePreset && <span> · <span style={{ color: '#a78bfa' }}>{PRESETS.find(p => p.key === activePreset)?.label}</span></span>}
+        <p style={{ color: '#71717a', fontSize: 13, fontWeight: 600, marginBottom: 22 }}>
+          Showing <span style={{ color: '#e4e4e7', fontWeight: 900 }}>{displayList.length}</span> model{displayList.length !== 1 ? 's' : ''}
+          {activeLab !== 'All' && <span> from <span style={{ color: LAB[activeLab]?.color ?? '#60a5fa' }}>{activeLab}</span></span>}
+          {activePreset && <span> · <span style={{ color: '#60a5fa' }}>{PRESETS.find(p => p.key === activePreset)?.label}</span></span>}
         </p>
 
         {/* Compare banner */}
         {compareMode && (
           <div className="flex items-center gap-4 rounded-xl px-5 py-4 mb-6"
-            style={{ background: 'rgba(124,106,255,0.07)', border: '1px solid rgba(124,106,255,0.2)' }}>
-            <span style={{ color: '#7c6aff', fontSize: 20 }}>⚔</span>
+            style={{ background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.2)' }}>
+            <span style={{ color: '#3b82f6', fontSize: 20 }}>⚔</span>
             <div>
-              <span style={{ color: '#d0d0e8', fontSize: 14, fontWeight: 700 }}>Compare Mode </span>
-              <span style={{ color: '#a0a0c8', fontSize: 14 }}>
+              <span style={{ color: '#e4e4e7', fontSize: 14, fontWeight: 700 }}>Compare Mode </span>
+              <span style={{ color: '#a1a1aa', fontSize: 14 }}>
                 {compareIds.length === 0 ? '— click any model card to select'
                   : compareIds.length === 1 ? '— pick one more to start duel'
                   : `— ${compareIds.length} models selected · panel live below`}
@@ -1088,11 +1088,11 @@ export default function ModelsPage() {
             </div>
             {compareIds.length > 0 && (
               <button onClick={() => setCompareIds([])}
-                style={{ color: '#a0a0c8', fontSize: 13, fontWeight: 700, cursor: 'pointer', background: 'none', border: 'none' }}>
+                style={{ color: '#a1a1aa', fontSize: 13, fontWeight: 700, cursor: 'pointer', background: 'none', border: 'none' }}>
                 Clear
               </button>
             )}
-            <span style={{ color: '#8080b0', fontSize: 12, marginLeft: 'auto' }}>ESC to exit</span>
+            <span style={{ color: '#71717a', fontSize: 12, marginLeft: 'auto' }}>ESC to exit</span>
           </div>
         )}
 
@@ -1103,7 +1103,7 @@ export default function ModelsPage() {
         ) : displayList.length === 0 ? (
           <div className="flex items-center justify-center py-28 rounded-2xl"
             style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.07)' }}>
-            <p style={{ color: '#a0a0c8', fontSize: 16 }}>No models match the current filters</p>
+            <p style={{ color: '#a1a1aa', fontSize: 16 }}>No models match the current filters</p>
           </div>
         ) : activePreset ? (
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -1124,7 +1124,7 @@ export default function ModelsPage() {
             onClick={syncBenchmarks}
             disabled={syncing}
             style={{
-              background: 'transparent', color: syncing ? '#4a4a6a' : '#7070a8',
+              background: 'transparent', color: syncing ? '#52525b' : '#71717a',
               border: '1px solid rgba(255,255,255,0.07)',
               borderRadius: 8, padding: '7px 18px',
               fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
@@ -1133,11 +1133,11 @@ export default function ModelsPage() {
               opacity: syncing ? 0.5 : 1, transition: 'all 0.15s',
             }}
           >
-            {syncing && <span className="inline-block h-3 w-3 rounded-full border border-violet-500 border-t-transparent animate-spin" />}
+            {syncing && <span className="inline-block h-3 w-3 rounded-full border border-blue-500 border-t-transparent animate-spin" />}
             {syncing ? 'Syncing…' : '⟳ Sync Benchmarks'}
           </button>
-          {syncMsg && <p style={{ color: '#5a5a8a', fontSize: 12, fontFamily: 'monospace' }}>{syncMsg}</p>}
-          <p style={{ color: '#7070a8', fontSize: 12, letterSpacing: '0.1em', fontFamily: 'monospace' }}>
+          {syncMsg && <p style={{ color: '#52525b', fontSize: 12, fontFamily: 'monospace' }}>{syncMsg}</p>}
+          <p style={{ color: '#71717a', fontSize: 12, letterSpacing: '0.1em', fontFamily: 'monospace' }}>
             ■ PRICING APPROXIMATE · BENCHMARKS FROM PUBLIC SOURCES · DATA SNAPSHOT 2025 ■
           </p>
         </div>

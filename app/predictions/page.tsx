@@ -29,7 +29,7 @@ const STATUS = ['all', 'past', 'imminent', 'upcoming'] as const
 function confidenceDots(confidence: string) {
   const order = ['speculative', 'low', 'medium', 'high', 'confirmed']
   const idx   = order.indexOf(confidence)
-  const meta  = CONFIDENCE_META[confidence] ?? { color: '#5a5a8a', label: confidence }
+  const meta  = CONFIDENCE_META[confidence] ?? { color: '#52525b', label: confidence }
   return (
     <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
       {order.map((_, i) => (
@@ -51,8 +51,8 @@ function confidenceDots(confidence: string) {
 function PredCard({ p }: { p: AIPrediction }) {
   const [open, setOpen] = useState(false)
   const isPast   = p.status === 'past'
-  const cat      = CATEGORY_META[p.category] ?? { color: '#5a5a8a', rgb: '90,90,138', label: p.category }
-  const conf     = CONFIDENCE_META[p.confidence] ?? { color: '#5a5a8a', label: p.confidence }
+  const cat      = CATEGORY_META[p.category] ?? { color: '#52525b', rgb: '90,90,138', label: p.category }
+  const conf     = CONFIDENCE_META[p.confidence] ?? { color: '#52525b', label: p.confidence }
 
   return (
     <div style={{
@@ -70,11 +70,11 @@ function PredCard({ p }: { p: AIPrediction }) {
       >
         {/* Year column */}
         <div style={{ flexShrink: 0, textAlign: 'center', width: 52 }}>
-          <div style={{ fontSize: 17, fontWeight: 900, color: isPast ? '#34d399' : '#e8e8f0', lineHeight: 1 }}>
+          <div style={{ fontSize: 17, fontWeight: 900, color: isPast ? '#34d399' : '#f4f4f5', lineHeight: 1 }}>
             {p.year_guess}
           </div>
           {p.month_guess && !isPast && (
-            <div style={{ fontSize: 11, color: '#5a5a8a', marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: '#52525b', marginTop: 2 }}>
               {new Date(0, p.month_guess - 1).toLocaleString('default', { month: 'short' })}
             </div>
           )}
@@ -94,7 +94,7 @@ function PredCard({ p }: { p: AIPrediction }) {
             {!isPast && (
               <span style={{
                 fontSize: 10, fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase',
-                color: p.status === 'imminent' ? '#fbbf24' : '#5a5a8a',
+                color: p.status === 'imminent' ? '#fbbf24' : '#52525b',
                 background: p.status === 'imminent' ? 'rgba(251,191,36,0.08)' : 'transparent',
                 border: `1px solid ${p.status === 'imminent' ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.07)'}`,
                 borderRadius: 4, padding: '2px 8px',
@@ -102,7 +102,7 @@ function PredCard({ p }: { p: AIPrediction }) {
             )}
           </div>
 
-          <h3 style={{ color: '#e0e0f0', fontSize: 15, fontWeight: 700, lineHeight: 1.35, margin: '0 0 8px' }}>
+          <h3 style={{ color: '#e4e4e7', fontSize: 15, fontWeight: 700, lineHeight: 1.35, margin: '0 0 8px' }}>
             {p.title}
           </h3>
 
@@ -115,7 +115,7 @@ function PredCard({ p }: { p: AIPrediction }) {
                 <span style={{ marginLeft: 5, fontSize: 11, fontWeight: 700, color: '#34d399', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Confirmed</span>
               </div>
             )}
-            <span style={{ fontSize: 12, color: '#5a5a8a' }}>
+            <span style={{ fontSize: 12, color: '#52525b' }}>
               {open ? '▴ less' : '▾ details'}
             </span>
           </div>
@@ -126,20 +126,20 @@ function PredCard({ p }: { p: AIPrediction }) {
       {open && (
         <div className="fade-up" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '16px 18px 18px', paddingLeft: 84 }}>
           {p.description && (
-            <p style={{ color: '#b0b0d0', fontSize: 13, lineHeight: 1.8, margin: '0 0 14px' }}>
+            <p style={{ color: '#d4d4d8', fontSize: 13, lineHeight: 1.8, margin: '0 0 14px' }}>
               {p.description}
             </p>
           )}
           {p.rationale && (
             <>
-              <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.14em', color: '#5a5a8a', textTransform: 'uppercase', marginBottom: 6 }}>Rationale</p>
-              <p style={{ color: '#8080b0', fontSize: 13, lineHeight: 1.8, margin: '0 0 14px' }}>
+              <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.14em', color: '#52525b', textTransform: 'uppercase', marginBottom: 6 }}>Rationale</p>
+              <p style={{ color: '#71717a', fontSize: 13, lineHeight: 1.8, margin: '0 0 14px' }}>
                 {p.rationale}
               </p>
             </>
           )}
           {!isPast && p.year_min !== p.year_max && (
-            <p style={{ fontSize: 12, color: '#5a5a8a' }}>
+            <p style={{ fontSize: 12, color: '#52525b' }}>
               Range: {p.year_min}–{p.year_max}
               {p.date_guess ? ` · Best guess: ${p.date_guess}` : ''}
             </p>
@@ -149,17 +149,17 @@ function PredCard({ p }: { p: AIPrediction }) {
           )}
           {p.evidence && p.evidence.length > 0 && (
             <div style={{ marginTop: 12 }}>
-              <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.14em', color: '#5a5a8a', textTransform: 'uppercase', marginBottom: 8 }}>Evidence</p>
+              <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.14em', color: '#52525b', textTransform: 'uppercase', marginBottom: 8 }}>Evidence</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                 {p.evidence.map((e, i) => (
                   <a key={i} href={e.url} target="_blank" rel="noopener noreferrer" style={{
-                    fontSize: 12, color: '#7070b0', textDecoration: 'none',
+                    fontSize: 12, color: '#71717a', textDecoration: 'none',
                     display: 'flex', alignItems: 'center', gap: 6,
                   }}
                     onMouseEnter={ev => (ev.currentTarget.style.color = '#a0a0d0')}
-                    onMouseLeave={ev => (ev.currentTarget.style.color = '#7070b0')}
+                    onMouseLeave={ev => (ev.currentTarget.style.color = '#71717a')}
                   >
-                    <span style={{ flexShrink: 0, fontSize: 10, color: '#4a4a6a' }}>↗</span>
+                    <span style={{ flexShrink: 0, fontSize: 10, color: '#3f3f46' }}>↗</span>
                     {e.title || e.source}
                   </a>
                 ))}
@@ -207,12 +207,12 @@ export default function PredictionsPage() {
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <p className="eyebrow" style={{ marginBottom: 6 }}>AI Futures</p>
-        <h1 style={{ color: '#e8e8f0', fontSize: 28, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 8 }}>
+        <h1 style={{ color: '#f4f4f5', fontSize: 28, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 8 }}>
           Predictions
         </h1>
         <div style={{ display: 'flex', gap: 20 }}>
           <span style={{ fontSize: 13, color: '#34d399', fontWeight: 700 }}>{totalPast} confirmed milestones</span>
-          <span style={{ fontSize: 13, color: '#8080b0' }}>·</span>
+          <span style={{ fontSize: 13, color: '#71717a' }}>·</span>
           <span style={{ fontSize: 13, color: '#a78bfa', fontWeight: 700 }}>{totalFuture} future predictions</span>
         </div>
       </div>
@@ -231,7 +231,7 @@ export default function PredictionsPage() {
                 fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'capitalize',
                 padding: '4px 11px', borderRadius: 6, cursor: 'pointer',
                 background: active ? `rgba(${rgb},0.14)` : 'transparent',
-                color: active ? color : '#6060a0',
+                color: active ? color : '#71717a',
                 border: `1px solid ${active ? `rgba(${rgb},0.3)` : 'transparent'}`,
                 transition: 'all 0.15s',
               }}>{cat === 'all' ? 'All' : CATEGORY_META[cat]?.label ?? cat}</button>
@@ -250,7 +250,7 @@ export default function PredictionsPage() {
                 fontSize: 12, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'capitalize',
                 padding: '4px 11px', borderRadius: 6, cursor: 'pointer',
                 background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
-                color: active ? '#e0e0f0' : '#6060a0',
+                color: active ? '#e4e4e7' : '#71717a',
                 border: `1px solid ${active ? 'rgba(255,255,255,0.14)' : 'transparent'}`,
                 transition: 'all 0.15s',
               }}>{s === 'all' ? 'All time' : s}</button>
@@ -260,7 +260,7 @@ export default function PredictionsPage() {
       </div>
 
       {loading ? (
-        <div style={{ padding: '60px 0', textAlign: 'center', color: '#5a5a8a' }}>Loading predictions…</div>
+        <div style={{ padding: '60px 0', textAlign: 'center', color: '#52525b' }}>Loading predictions…</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
@@ -280,7 +280,7 @@ export default function PredictionsPage() {
           {/* Upcoming */}
           {upcoming.length > 0 && (
             <section>
-              <p style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.18em', color: '#5a5a8a', textTransform: 'uppercase', marginBottom: 14 }}>Upcoming · longer horizon</p>
+              <p style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.18em', color: '#52525b', textTransform: 'uppercase', marginBottom: 14 }}>Upcoming · longer horizon</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {upcoming.map(p => <PredCard key={p.id} p={p} />)}
               </div>
@@ -298,7 +298,7 @@ export default function PredictionsPage() {
           )}
 
           {filtered.length === 0 && (
-            <div style={{ padding: '48px 0', textAlign: 'center', color: '#5a5a8a', fontSize: 14 }}>
+            <div style={{ padding: '48px 0', textAlign: 'center', color: '#52525b', fontSize: 14 }}>
               No predictions match the current filters.
             </div>
           )}

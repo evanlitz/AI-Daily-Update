@@ -29,17 +29,17 @@ function BootScreen({ onDone }: { onDone: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center flex-col"
       style={{ background: '#030308', opacity: done ? 0 : 1, transition: 'opacity 0.35s ease', pointerEvents: done ? 'none' : 'auto' }}>
       <div style={{ fontFamily: 'monospace', width: 440 }}>
-        <p style={{ color: '#7c6aff', fontSize: 13, fontWeight: 900, letterSpacing: '0.2em', marginBottom: 24 }}>
+        <p style={{ color: '#3b82f6', fontSize: 13, fontWeight: 900, letterSpacing: '0.2em', marginBottom: 24 }}>
           ■ AI PULSE · TIMELINE
         </p>
         {lines.map((line, i) => (
           <p key={i} style={{
-            color: i === lines.length - 1 ? '#34d399' : '#9090c4',
+            color: i === lines.length - 1 ? '#34d399' : '#71717a',
             fontSize: 14, letterSpacing: '0.05em', marginBottom: 7,
           }}>{line}</p>
         ))}
         {lines.length < BOOT_LINES.length && (
-          <span style={{ color: '#a78bfa', fontSize: 14, animation: 'boot-blink 0.8s step-end infinite' }}>█</span>
+          <span style={{ color: '#60a5fa', fontSize: 14, animation: 'boot-blink 0.8s step-end infinite' }}>█</span>
         )}
       </div>
     </div>
@@ -69,7 +69,7 @@ const CONF_META: Record<string, { color: string; label: string; pct: number }> =
   high:        { color: '#a78bfa', label: 'High confidence',   pct: 80  },
   medium:      { color: '#fbbf24', label: 'Medium confidence', pct: 55  },
   low:         { color: '#fb923c', label: 'Low confidence',    pct: 30  },
-  speculative: { color: '#9090c0', label: 'Speculative',       pct: 10  },
+  speculative: { color: '#71717a', label: 'Speculative',       pct: 10  },
 }
 
 const NOW_YEAR = new Date().getFullYear() + new Date().getMonth() / 12
@@ -91,8 +91,8 @@ function EventSlide({
   prevP:       AIPrediction | null
   nextP:       AIPrediction | null
 }) {
-  const color  = CAT_COLOR[p.category] ?? '#7c6aff'
-  const rgb    = CAT_RGB[p.category]   ?? '124,106,255'
+  const color  = CAT_COLOR[p.category] ?? '#3b82f6'
+  const rgb    = CAT_RGB[p.category]   ?? '59,130,246'
   const conf   = CONF_META[p.confidence] ?? CONF_META.low
   const isPast = p.year_guess < NOW_YEAR
 
@@ -157,7 +157,7 @@ function EventSlide({
                   background: active
                     ? `rgba(${r},0.2)`
                     : catFilter && catFilter !== cat ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.06)',
-                  color:      active ? c : '#3a3a5a',
+                  color:      active ? c : '#3f3f46',
                   boxShadow:  active ? `0 0 0 1px rgba(${r},0.4)` : 'none',
                 }}
               >
@@ -166,8 +166,8 @@ function EventSlide({
             )
           })}
           <div style={{ flex: 1 }} />
-          <span style={{ fontSize: 13, color: '#5a5a8a' }}>
-            {idx + 1} <span style={{ color: '#4a4a6a' }}>/</span> {total}
+          <span style={{ fontSize: 13, color: '#52525b' }}>
+            {idx + 1} <span style={{ color: '#3f3f46' }}>/</span> {total}
           </span>
         </div>
 
@@ -198,7 +198,7 @@ function EventSlide({
         {/* Row 3: Title */}
         <h1 style={{
           fontSize: 'clamp(36px, 5vw, 60px)',
-          fontWeight: 800, color: '#f0f0fc',
+          fontWeight: 800, color: '#f4f4f5',
           lineHeight: 1.15, letterSpacing: '-0.03em',
           margin: '0 0 36px',
         }}>
@@ -226,7 +226,7 @@ function EventSlide({
         {(p.description || p.rationale) && (
           <p style={{
             fontSize: 'clamp(16px, 1.8vw, 20px)',
-            lineHeight: 1.75, color: '#7a7aa8',
+            lineHeight: 1.75, color: '#a1a1aa',
             margin: '0 0 32px', maxWidth: 620,
           }}>
             {p.description || p.rationale}
@@ -242,11 +242,11 @@ function EventSlide({
                 padding: '9px 16px', borderRadius: 8,
                 background: 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.08)',
-                color: '#6060a0', fontSize: 13, fontWeight: 500,
+                color: '#71717a', fontSize: 13, fontWeight: 500,
                 textDecoration: 'none', transition: 'all 0.15s',
               }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = `rgba(${rgb},0.4)`; e.currentTarget.style.color = color }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#6060a0' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#71717a' }}
               >
                 <span style={{ color, fontSize: 12 }}>→</span>
                 {ev.title.length > 50 ? ev.title.slice(0, 48) + '…' : ev.title}
@@ -263,11 +263,11 @@ function EventSlide({
           background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: 12, cursor: 'pointer', padding: '14px 10px',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-          color: '#4a4a6a', transition: 'all 0.18s', maxWidth: 44,
+          color: '#3f3f46', transition: 'all 0.18s', maxWidth: 44,
           opacity: isActive ? 1 : 0,
         }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#c0c0e0' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#4a4a6a' }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#d4d4d8' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#3f3f46' }}
         >
           <span style={{ fontSize: 18 }}>↑</span>
           <span style={{
@@ -282,11 +282,11 @@ function EventSlide({
           background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: 12, cursor: 'pointer', padding: '14px 10px',
           display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-          color: '#4a4a6a', transition: 'all 0.18s', maxWidth: 44,
+          color: '#3f3f46', transition: 'all 0.18s', maxWidth: 44,
           opacity: isActive ? 1 : 0,
         }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#c0c0e0' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#4a4a6a' }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; e.currentTarget.style.color = '#d4d4d8' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#3f3f46' }}
         >
           <span style={{ fontSize: 18 }}>↓</span>
           <span style={{
@@ -352,7 +352,7 @@ function TimelineStrip({
         {CATS.map(cat => (
           <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: CAT_COLOR[cat], flexShrink: 0 }} />
-            <span style={{ fontSize: 9, fontWeight: 700, color: '#5a5a8a', letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: '#52525b', letterSpacing: '0.08em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
               {cat.slice(0, 5)}
             </span>
           </div>
@@ -386,12 +386,12 @@ function TimelineStrip({
             left: `${nowPct * 100}%`,
             top: 8, bottom: AXIS_H - 4,
             width: 1.5,
-            background: 'rgba(124,106,255,0.6)',
+            background: 'rgba(59,130,246,0.5)',
             pointerEvents: 'none', zIndex: 3,
           }}>
             <div style={{
               position: 'absolute', top: -1, left: '50%', transform: 'translateX(-50%)',
-              background: '#7c6aff', color: '#fff',
+              background: '#3b82f6', color: '#fff',
               fontSize: 8, fontWeight: 900, letterSpacing: '0.1em',
               padding: '1px 5px', borderRadius: 3, whiteSpace: 'nowrap',
             }}>NOW</div>
@@ -400,8 +400,8 @@ function TimelineStrip({
           {/* Event dots */}
           {events.map((p, i) => {
             const pct    = (p.year_guess - minY) / span
-            const color  = CAT_COLOR[p.category] ?? '#7c6aff'
-            const rgb    = CAT_RGB[p.category]   ?? '124,106,255'
+            const color  = CAT_COLOR[p.category] ?? '#3b82f6'
+            const rgb    = CAT_RGB[p.category]   ?? '59,130,246'
             const active = i === activeIdx
             const hovered = hov === i
 
@@ -427,7 +427,7 @@ function TimelineStrip({
                     marginBottom: 8,
                     background: active ? color : 'rgba(30,30,50,0.95)',
                     border: `1px solid ${active ? color : 'rgba(255,255,255,0.1)'}`,
-                    color: active ? '#fff' : '#c0c0e0',
+                    color: active ? '#fff' : '#d4d4d8',
                     fontSize: 11, fontWeight: 600,
                     padding: '4px 8px', borderRadius: 5,
                     whiteSpace: 'nowrap', maxWidth: 180,
@@ -480,7 +480,7 @@ function TimelineStrip({
               }}>
                 <div style={{ width: 1, height: 8, background: 'rgba(255,255,255,0.1)' }} />
                 <span style={{
-                  fontSize: 12, fontWeight: 600, color: '#5a5a8a',
+                  fontSize: 12, fontWeight: 600, color: '#52525b',
                   transform: 'translateX(-50%)', marginTop: 4, whiteSpace: 'nowrap',
                 }}>{y}</span>
               </div>
@@ -500,8 +500,8 @@ function ListView({ events, onSelect }: { events: AIPrediction[]; onSelect: (i: 
     <div style={{ flex: 1, overflowY: 'auto', padding: '20px 40px 32px' }}>
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
         {events.map((p, i) => {
-          const color  = CAT_COLOR[p.category] ?? '#7c6aff'
-          const rgb    = CAT_RGB[p.category]   ?? '124,106,255'
+          const color  = CAT_COLOR[p.category] ?? '#3b82f6'
+          const rgb    = CAT_RGB[p.category]   ?? '59,130,246'
           const conf   = CONF_META[p.confidence] ?? CONF_META.low
           const isPast = p.year_guess < NOW_YEAR
           const isHov  = hov === p.id
@@ -511,12 +511,12 @@ function ListView({ events, onSelect }: { events: AIPrediction[]; onSelect: (i: 
             <div key={p.id}>
               {prevYear !== p.year_guess && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, margin: i === 0 ? '4px 0 10px' : '28px 0 10px' }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: '#5a5a8a', letterSpacing: '0.06em' }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: '#52525b', letterSpacing: '0.06em' }}>
                     {p.year_guess}
                   </span>
                   <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.05)' }} />
                   {isPast && <span style={{ fontSize: 10, fontWeight: 800, color: '#34d399', letterSpacing: '0.1em' }}>PAST</span>}
-                  {Math.abs(p.year_guess - NOW_YEAR) < 0.6 && <span style={{ fontSize: 10, fontWeight: 800, color: '#7c6aff', letterSpacing: '0.1em' }}>NOW</span>}
+                  {Math.abs(p.year_guess - NOW_YEAR) < 0.6 && <span style={{ fontSize: 10, fontWeight: 800, color: '#3b82f6', letterSpacing: '0.1em' }}>NOW</span>}
                 </div>
               )}
               <div
@@ -539,16 +539,16 @@ function ListView({ events, onSelect }: { events: AIPrediction[]; onSelect: (i: 
                 }}>{p.category}</span>
                 <span style={{
                   flex: 1, fontSize: 16, fontWeight: 600,
-                  color: isHov ? '#eaeaf8' : '#b0b0d0', transition: 'color 0.15s',
+                  color: isHov ? '#f4f4f5' : '#d4d4d8', transition: 'color 0.15s',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>{p.title}</span>
                 <span style={{ fontSize: 13, fontWeight: 700, color: conf.color, flexShrink: 0 }}>
                   {conf.label.split(' ')[0]}
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: isPast ? '#34d399' : '#5a5a8a', flexShrink: 0, minWidth: 62, textAlign: 'right' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: isPast ? '#34d399' : '#52525b', flexShrink: 0, minWidth: 62, textAlign: 'right' }}>
                   {isPast ? '✓ past' : 'upcoming'}
                 </span>
-                <span style={{ color: isHov ? color : '#2e2e50', fontSize: 18, flexShrink: 0, transition: 'color 0.15s' }}>›</span>
+                <span style={{ color: isHov ? color : '#27272a', fontSize: 18, flexShrink: 0, transition: 'color 0.15s' }}>›</span>
               </div>
             </div>
           )
@@ -675,15 +675,15 @@ export default function TimelinePage() {
         background: 'rgba(5,5,14,0.95)', backdropFilter: 'blur(12px)',
         zIndex: 5,
       }}>
-        <span style={{ fontSize: 16, fontWeight: 800, color: '#e8e8f0', letterSpacing: '-0.02em' }}>
-          AI Daily Update <span style={{ color: '#2e2e50', fontWeight: 400 }}>·</span>{' '}
-          <span style={{ color: '#7c6aff' }}>Timeline</span>
+        <span style={{ fontSize: 16, fontWeight: 800, color: '#f4f4f5', letterSpacing: '-0.02em' }}>
+          AI Daily Update <span style={{ color: '#27272a', fontWeight: 400 }}>·</span>{' '}
+          <span style={{ color: '#3b82f6' }}>Timeline</span>
         </span>
 
         <div style={{ flex: 1 }} />
 
         {view === 'story' && sorted.length > 0 && (
-          <span style={{ fontSize: 13, color: '#5a5a8a' }}>
+          <span style={{ fontSize: 13, color: '#52525b' }}>
             {sorted[activeIdx]?.year_guess} · {activeIdx + 1} / {sorted.length}
           </span>
         )}
@@ -694,8 +694,8 @@ export default function TimelinePage() {
             <button key={v} onClick={() => setView(v)} style={{
               padding: '7px 18px', border: 'none', cursor: 'pointer',
               fontSize: 13, fontWeight: 700,
-              background: view === v ? 'rgba(124,106,255,0.22)' : 'rgba(255,255,255,0.04)',
-              color:      view === v ? '#a78bfa' : '#4a4a6a',
+              background: view === v ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)',
+              color:      view === v ? '#60a5fa' : '#3f3f46',
               transition: 'all 0.15s',
             }}>
               {v === 'story' ? '⊡ Story' : '≡ List'}
@@ -730,7 +730,7 @@ export default function TimelinePage() {
               </div>
             ))}
             {sorted.length === 0 && (
-              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2e2e50', fontSize: 15 }}>
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#27272a', fontSize: 15 }}>
                 No predictions loaded
               </div>
             )}

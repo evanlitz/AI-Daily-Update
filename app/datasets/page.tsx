@@ -54,7 +54,7 @@ const LICENSE_SAFE = new Set(['apache 2.0', 'mit', 'cc0 1.0', 'cc by 4.0', 'cc b
 function DataRow({ d, maxDownloads }: { d: Dataset; maxDownloads: number }) {
   const [open, setOpen] = useState(false)
   const mod  = d.modalities[0]
-  const meta = MODALITY_META[mod ?? ''] ?? { label: mod?.slice(0, 5).toUpperCase() ?? '?', color: '#8080b0', rgb: '61,61,90' }
+  const meta = MODALITY_META[mod ?? ''] ?? { label: mod?.slice(0, 5).toUpperCase() ?? '?', color: '#71717a', rgb: '61,61,90' }
   const { owner, name } = parseName(d.full_name)
   const kaggle = isKaggle(d.full_name)
   const pct  = maxDownloads > 0 ? Math.max(d.downloads / maxDownloads, 0.02) : 0
@@ -104,8 +104,8 @@ function DataRow({ d, maxDownloads }: { d: Dataset; maxDownloads: number }) {
             </span>
             <div style={{ minWidth: 0 }}>
               <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                <span style={{ color: '#8080b0', fontSize: 15 }}>{owner}/</span>
-                <span style={{ color: '#d0d0e8', fontSize: 16, fontWeight: 700 }}>{name}</span>
+                <span style={{ color: '#71717a', fontSize: 15 }}>{owner}/</span>
+                <span style={{ color: '#e4e4e7', fontSize: 16, fontWeight: 700 }}>{name}</span>
               </div>
             </div>
           </div>
@@ -117,9 +117,9 @@ function DataRow({ d, maxDownloads }: { d: Dataset; maxDownloads: number }) {
             {task1 && (
               <span style={{
                 fontSize: 16, fontWeight: 700, letterSpacing: '0.03em',
-                color: '#7c6aff',
-                background: 'rgba(124,106,255,0.09)',
-                border: '1px solid rgba(124,106,255,0.18)',
+                color: '#3b82f6',
+                background: 'rgba(59,130,246,0.09)',
+                border: '1px solid rgba(59,130,246,0.18)',
                 borderRadius: 5, padding: '3px 8px',
               }}>
                 {TASK_LABELS[task1] ?? task1}
@@ -128,16 +128,16 @@ function DataRow({ d, maxDownloads }: { d: Dataset; maxDownloads: number }) {
             {task2 && (
               <span style={{
                 fontSize: 16, fontWeight: 700, letterSpacing: '0.03em',
-                color: '#7c6aff',
-                background: 'rgba(124,106,255,0.09)',
-                border: '1px solid rgba(124,106,255,0.18)',
+                color: '#3b82f6',
+                background: 'rgba(59,130,246,0.09)',
+                border: '1px solid rgba(59,130,246,0.18)',
                 borderRadius: 5, padding: '3px 8px',
               }}>
                 {TASK_LABELS[task2] ?? task2}
               </span>
             )}
             {extra > 0 && (
-              <span style={{ fontSize: 16, color: '#8080b0', fontWeight: 700 }}>+{extra}</span>
+              <span style={{ fontSize: 16, color: '#71717a', fontWeight: 700 }}>+{extra}</span>
             )}
           </div>
         </td>
@@ -154,7 +154,7 @@ function DataRow({ d, maxDownloads }: { d: Dataset; maxDownloads: number }) {
                 transition: 'width 0.4s ease',
               }} />
             </div>
-            <span style={{ fontSize: 15, color: '#6060a0', fontWeight: 700, whiteSpace: 'nowrap', minWidth: 40, textAlign: 'right' }}>
+            <span style={{ fontSize: 15, color: '#71717a', fontWeight: 700, whiteSpace: 'nowrap', minWidth: 40, textAlign: 'right' }}>
               {fmt(d.downloads)}
             </span>
           </div>
@@ -162,7 +162,7 @@ function DataRow({ d, maxDownloads }: { d: Dataset; maxDownloads: number }) {
 
         {/* Likes */}
         <td style={{ padding: '0 18px 0 0', verticalAlign: 'middle', width: 70, textAlign: 'right' }}>
-          <span style={{ fontSize: 15, color: '#4a4a6a', fontWeight: 700 }}>
+          <span style={{ fontSize: 15, color: '#52525b', fontWeight: 700 }}>
             <span style={{ color: '#f87171', marginRight: 3 }}>♥</span>{fmt(d.likes)}
           </span>
         </td>
@@ -171,7 +171,7 @@ function DataRow({ d, maxDownloads }: { d: Dataset; maxDownloads: number }) {
         <td style={{ padding: '0 18px 0 0', verticalAlign: 'middle', width: 80 }}>
           {sizeShort(d.size_category) && (
             <span style={{
-              fontSize: 16, fontWeight: 700, color: '#8080b0',
+              fontSize: 16, fontWeight: 700, color: '#71717a',
               background: 'rgba(255,255,255,0.04)',
               border: '1px solid rgba(255,255,255,0.07)',
               borderRadius: 5, padding: '3px 8px',
@@ -185,7 +185,7 @@ function DataRow({ d, maxDownloads }: { d: Dataset; maxDownloads: number }) {
         <td style={{ width: 36, verticalAlign: 'middle', textAlign: 'right', paddingRight: 18 }}>
           <span style={{
             fontSize: 16,
-            color: open ? meta.color : '#8080b0',
+            color: open ? meta.color : '#71717a',
             display: 'inline-block',
             transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
             transition: 'transform 0.2s, color 0.2s',
@@ -201,7 +201,7 @@ function DataRow({ d, maxDownloads }: { d: Dataset; maxDownloads: number }) {
           <td />
           <td colSpan={6} style={{ padding: '14px 18px 18px 0' }}>
             {d.description && (
-              <p style={{ color: '#6868a0', fontSize: 15, lineHeight: 1.75, marginBottom: 12, maxWidth: 660 }}>
+              <p style={{ color: '#71717a', fontSize: 15, lineHeight: 1.75, marginBottom: 12, maxWidth: 660 }}>
                 {d.description}
               </p>
             )}
@@ -210,9 +210,9 @@ function DataRow({ d, maxDownloads }: { d: Dataset; maxDownloads: number }) {
                 {d.task_categories.map(t => (
                   <span key={t} style={{
                     fontSize: 16, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
-                    color: '#7c6aff',
-                    background: 'rgba(124,106,255,0.08)',
-                    border: '1px solid rgba(124,106,255,0.16)',
+                    color: '#3b82f6',
+                    background: 'rgba(59,130,246,0.08)',
+                    border: '1px solid rgba(59,130,246,0.16)',
                     borderRadius: 5, padding: '3px 9px',
                   }}>
                     {TASK_LABELS[t] ?? t}
@@ -294,7 +294,7 @@ export default function DatasetsPage() {
     return { key, count, pct: Math.round(count / datasets.length * 100) }
   }, [modalityCount, datasets.length])
 
-  const topMeta  = topModality ? (MODALITY_META[topModality.key] ?? { label: topModality.key.toUpperCase(), color: '#8080b0', rgb: '61,61,90' }) : null
+  const topMeta  = topModality ? (MODALITY_META[topModality.key] ?? { label: topModality.key.toUpperCase(), color: '#71717a', rgb: '61,61,90' }) : null
   const taskLabel = TASK_FILTERS.find(f => f.key === activeTask)?.label ?? activeTask
 
   return (
@@ -303,7 +303,7 @@ export default function DatasetsPage() {
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="mb-7">
         <p className="eyebrow mb-2">Data Vault</p>
-        <h1 style={{ color: '#e8e8f0', fontSize: 28, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 18 }}>
+        <h1 style={{ color: '#f4f4f5', fontSize: 28, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 18 }}>
           AI Datasets
         </h1>
 
@@ -318,13 +318,13 @@ export default function DatasetsPage() {
             { label: 'TOP TYPE',  value: topMeta?.label ?? '—', sub: topModality ? `${topModality.pct}% of results` : '', color: topMeta?.color },
           ].map((m, i) => (
             <div key={i} style={{ background: '#05050e', padding: '18px 24px' }}>
-              <p style={{ fontSize: 15, fontWeight: 900, letterSpacing: '0.2em', color: '#7878a8', marginBottom: 5 }}>
+              <p style={{ fontSize: 15, fontWeight: 900, letterSpacing: '0.2em', color: '#71717a', marginBottom: 5 }}>
                 {m.label}
               </p>
-              <p style={{ fontSize: 26, fontWeight: 900, color: m.color ?? '#e8e8f0', letterSpacing: '-0.02em', lineHeight: 1, fontFamily: 'monospace' }}>
+              <p style={{ fontSize: 26, fontWeight: 900, color: m.color ?? '#f4f4f5', letterSpacing: '-0.02em', lineHeight: 1, fontFamily: 'monospace' }}>
                 {m.value}
               </p>
-              <p style={{ fontSize: 15, color: '#8080b0', marginTop: 4 }}>{m.sub}</p>
+              <p style={{ fontSize: 15, color: '#71717a', marginTop: 4 }}>{m.sub}</p>
             </div>
           ))}
         </div>
@@ -349,7 +349,7 @@ export default function DatasetsPage() {
               <div key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c, opacity: 0.5 }} />
             ))}
           </div>
-          <span style={{ fontSize: 16, color: '#7878a8', fontFamily: 'monospace', marginLeft: 6, letterSpacing: '0.04em' }}>
+          <span style={{ fontSize: 16, color: '#71717a', fontFamily: 'monospace', marginLeft: 6, letterSpacing: '0.04em' }}>
             query_builder.sql
           </span>
         </div>
@@ -358,14 +358,14 @@ export default function DatasetsPage() {
         <div style={{ padding: '16px 22px', fontFamily: 'monospace', fontSize: 16, lineHeight: 2.1 }}>
           <div>
             <span style={{ color: '#60a5fa' }}>SELECT </span>
-            <span style={{ color: '#e8e8f0' }}>* </span>
+            <span style={{ color: '#f4f4f5' }}>* </span>
             <span style={{ color: '#60a5fa' }}>FROM </span>
             <span style={{ color: '#34d399' }}>datasets</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
             <span style={{ color: '#60a5fa', marginLeft: 24 }}>WHERE </span>
-            <span style={{ color: '#a78bfa' }}>task_category </span>
-            <span style={{ color: '#8080b0' }}>=&nbsp;</span>
+            <span style={{ color: '#60a5fa' }}>task_category </span>
+            <span style={{ color: '#71717a' }}>=&nbsp;</span>
             {TASK_FILTERS.map(f => {
               const active = activeTask === f.key
               return (
@@ -375,7 +375,7 @@ export default function DatasetsPage() {
                   style={{
                     fontFamily: 'monospace', fontSize: 15,
                     fontWeight: active ? 900 : 400,
-                    color: active ? '#fbbf24' : '#8080b0',
+                    color: active ? '#fbbf24' : '#71717a',
                     background: active ? 'rgba(251,191,36,0.12)' : 'transparent',
                     border: `1px solid ${active ? 'rgba(251,191,36,0.32)' : 'rgba(255,255,255,0.06)'}`,
                     borderRadius: 5, padding: '2px 9px',
@@ -398,20 +398,20 @@ export default function DatasetsPage() {
                   style={{
                     fontFamily: 'monospace', fontSize: 15,
                     fontWeight: active ? 900 : 400,
-                    color: active ? '#a78bfa' : '#8080b0',
+                    color: active ? '#60a5fa' : '#71717a',
                     background: 'transparent', border: 'none',
                     cursor: 'pointer', padding: '0 4px', transition: 'color 0.15s',
                     display: 'flex', alignItems: 'center', gap: 6,
                   }}
                 >
                   {active
-                    ? <><span style={{ color: '#a78bfa' }}>{s === 'likes' ? 'likes' : 'last_modified'}</span><span style={{ color: '#60a5fa' }}> DESC</span></>
-                    : <span style={{ color: '#8080b0' }}>{s === 'likes' ? 'likes' : 'last_modified'}</span>
+                    ? <><span style={{ color: '#60a5fa' }}>{s === 'likes' ? 'likes' : 'last_modified'}</span><span style={{ color: '#60a5fa' }}> DESC</span></>
+                    : <span style={{ color: '#71717a' }}>{s === 'likes' ? 'likes' : 'last_modified'}</span>
                   }
                 </button>
               )
             })}
-            <span style={{ color: '#8080b0' }}>LIMIT 60;</span>
+            <span style={{ color: '#71717a' }}>LIMIT 60;</span>
           </div>
         </div>
       </div>
@@ -419,8 +419,8 @@ export default function DatasetsPage() {
       {/* ── Table ──────────────────────────────────────────────────── */}
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0', gap: 16 }}>
-          <div className="h-7 w-7 rounded-full border border-violet-500 border-t-transparent animate-spin" />
-          <p style={{ fontFamily: 'monospace', fontSize: 15, color: '#8080b0', letterSpacing: '0.12em' }}>EXECUTING QUERY…</p>
+          <div className="h-7 w-7 rounded-full border border-blue-500 border-t-transparent animate-spin" />
+          <p style={{ fontFamily: 'monospace', fontSize: 15, color: '#71717a', letterSpacing: '0.12em' }}>EXECUTING QUERY…</p>
         </div>
       ) : datasets.length === 0 ? (
         <div style={{
@@ -429,7 +429,7 @@ export default function DatasetsPage() {
           background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14,
         }}>
           <p style={{ fontFamily: 'monospace', color: '#f87171', fontSize: 15, marginBottom: 8 }}>ERROR: no records found</p>
-          <p style={{ color: '#8080b0', fontSize: 15 }}>Restart the server to trigger a fresh fetch</p>
+          <p style={{ color: '#71717a', fontSize: 15 }}>Restart the server to trigger a fresh fetch</p>
         </div>
       ) : (
         <div style={{ overflow: 'hidden', background: 'rgba(255,255,255,0.016)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14 }}>
@@ -452,7 +452,7 @@ export default function DatasetsPage() {
                       textAlign: 'left',
                       padding: i === 0 ? '14px 14px 14px 18px' : '14px 18px 14px 0',
                       fontSize: 15, fontWeight: 900, letterSpacing: '0.18em',
-                      color: '#7878a8',
+                      color: '#71717a',
                       width: col.w !== 'auto' ? col.w : undefined,
                       whiteSpace: 'nowrap',
                     }}>
@@ -475,7 +475,7 @@ export default function DatasetsPage() {
 
           {/* Footer */}
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)', padding: '10px 18px' }}>
-            <p style={{ fontFamily: 'monospace', fontSize: 16, color: '#7878a8', letterSpacing: '0.1em' }}>
+            <p style={{ fontFamily: 'monospace', fontSize: 16, color: '#71717a', letterSpacing: '0.1em' }}>
               {datasets.length} RECORDS · task = {taskLabel.toUpperCase()} · ORDER BY {activeSort === 'likes' ? 'LIKES' : 'LAST_MODIFIED'} DESC
             </p>
           </div>
