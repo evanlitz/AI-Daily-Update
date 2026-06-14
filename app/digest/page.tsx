@@ -7,11 +7,11 @@ import type { WeeklyDigest, DigestChange } from '@/lib/types'
 // ── Section palette — cycles through for each H2 ──────────────────────────
 
 const PALETTE = [
-  { color: '#7c6aff', rgb: '124,106,255' },
-  { color: '#38bdf8', rgb: '56,189,248'  },
-  { color: '#60a5fa', rgb: '96,165,250'  },
-  { color: '#34d399', rgb: '52,211,153'  },
-  { color: '#fb923c', rgb: '251,146,60'  },
+  { color: '#3b82f6', rgb: '59,130,246'   },
+  { color: '#38bdf8', rgb: '56,189,248'   },
+  { color: '#60a5fa', rgb: '96,165,250'   },
+  { color: '#34d399', rgb: '52,211,153'   },
+  { color: '#fb923c', rgb: '251,146,60'   },
 ]
 
 // ── Custom markdown renderer ────────────────────────────────────────────────
@@ -30,21 +30,21 @@ function DigestDocument({ markdown }: { markdown: string }) {
               {/* Section marker row */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 11 }}>
                 <span style={{
-                  fontSize: 12, fontWeight: 900, letterSpacing: '0.18em',
+                  fontSize: 12, fontWeight: 700, letterSpacing: '0.14em',
                   color: pal.color,
                   background: `rgba(${pal.rgb},0.08)`,
-                  border: `1px solid rgba(${pal.rgb},0.28)`,
+                  border: `1px solid rgba(${pal.rgb},0.22)`,
                   borderRadius: 4, padding: '2px 9px', flexShrink: 0,
                   fontFamily: 'monospace',
                 }}>
                   §{String(i + 1).padStart(2, '0')}
                 </span>
-                <div style={{ flex: 1, height: 1, background: `rgba(${pal.rgb},0.15)` }} />
-                <div style={{ width: 4, height: 4, borderRadius: '50%', background: pal.color, opacity: 0.4 }} />
+                <div style={{ flex: 1, height: 1, background: `rgba(${pal.rgb},0.12)` }} />
+                <div style={{ width: 4, height: 4, borderRadius: '50%', background: pal.color, opacity: 0.35 }} />
               </div>
               {/* Section title */}
               <h2 style={{
-                fontSize: 20, fontWeight: 900, color: '#e0e0f4',
+                fontSize: 20, fontWeight: 800, color: '#e4e4e7',
                 letterSpacing: '-0.025em', lineHeight: 1.2, margin: 0,
               }}>
                 {children}
@@ -55,7 +55,7 @@ function DigestDocument({ markdown }: { markdown: string }) {
 
         h3: ({ children }) => (
           <h3 style={{
-            fontSize: 13, fontWeight: 800, color: '#9090b8',
+            fontSize: 13, fontWeight: 700, color: '#a1a1aa',
             letterSpacing: '-0.01em', lineHeight: 1.3,
             marginTop: 24, marginBottom: 8,
           }}>
@@ -65,7 +65,7 @@ function DigestDocument({ markdown }: { markdown: string }) {
 
         p: ({ children }) => (
           <p style={{
-            color: '#5a5a82', fontSize: 14.5, lineHeight: 1.9,
+            color: '#a1a1aa', fontSize: 14.5, lineHeight: 1.9,
             marginBottom: 16, margin: '0 0 16px',
           }}>
             {children}
@@ -80,21 +80,21 @@ function DigestDocument({ markdown }: { markdown: string }) {
 
         li: ({ children }) => (
           <li style={{ display: 'flex', gap: 11, alignItems: 'flex-start', marginBottom: 9 }}>
-            <span style={{ color: '#7c6aff', fontSize: 6, marginTop: 9, flexShrink: 0 }}>◆</span>
-            <span style={{ color: '#5a5a82', fontSize: 14, lineHeight: 1.85 }}>{children}</span>
+            <span style={{ color: '#3b82f6', fontSize: 6, marginTop: 9, flexShrink: 0 }}>◆</span>
+            <span style={{ color: '#a1a1aa', fontSize: 14, lineHeight: 1.85 }}>{children}</span>
           </li>
         ),
 
         strong: ({ children }) => (
-          <strong style={{ color: '#d4d4ee', fontWeight: 700 }}>{children}</strong>
+          <strong style={{ color: '#e4e4e7', fontWeight: 600 }}>{children}</strong>
         ),
 
         code: ({ children }) => (
           <code style={{
-            background: 'rgba(124,106,255,0.08)',
-            border: '1px solid rgba(124,106,255,0.22)',
+            background: 'rgba(59,130,246,0.08)',
+            border: '1px solid rgba(59,130,246,0.2)',
             borderRadius: 4, padding: '1px 7px',
-            fontSize: 12, color: '#a78bfa', fontFamily: 'monospace',
+            fontSize: 12, color: '#60a5fa', fontFamily: 'monospace',
           }}>
             {children}
           </code>
@@ -102,7 +102,7 @@ function DigestDocument({ markdown }: { markdown: string }) {
 
         blockquote: ({ children }) => (
           <blockquote style={{
-            borderLeft: '2px solid rgba(124,106,255,0.3)',
+            borderLeft: '2px solid rgba(59,130,246,0.25)',
             paddingLeft: 16, margin: '18px 0',
           }}>
             {children}
@@ -160,33 +160,33 @@ export default function DigestPage() {
       {/* ── Classification bar ──────────────────────────────── */}
       <div style={{
         position: 'sticky', top: 0, zIndex: 20,
-        background: 'rgba(5,5,14,0.85)',
+        background: 'rgba(9,9,11,0.92)',
         backdropFilter: 'blur(12px)',
-        borderBottom: '1px solid rgba(124,106,255,0.14)',
+        borderBottom: '1px solid rgba(255,255,255,0.08)',
         padding: '5px 20px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           <span style={{
-            fontSize: 12, fontWeight: 900, letterSpacing: '0.22em',
-            color: '#7c6aff', textTransform: 'uppercase',
+            fontSize: 12, fontWeight: 700, letterSpacing: '0.16em',
+            color: '#71717a', textTransform: 'uppercase',
           }}>
-            █ CLASSIFICATION: WEEKLY-ALPHA
+            WEEKLY INTELLIGENCE BRIEF
           </span>
           <span style={{ width: 1, height: 10, background: 'rgba(255,255,255,0.08)', display: 'inline-block' }} />
-          <span style={{ fontSize: 12, color: '#7070a8', fontFamily: 'monospace', letterSpacing: '0.1em' }}>
+          <span style={{ fontSize: 12, color: '#52525b', fontFamily: 'monospace', letterSpacing: '0.1em' }}>
             REF: {docRef}
           </span>
           <span style={{ width: 1, height: 10, background: 'rgba(255,255,255,0.08)', display: 'inline-block' }} />
-          <span style={{ fontSize: 12, color: '#7070a8', fontFamily: 'monospace', letterSpacing: '0.1em' }}>
+          <span style={{ fontSize: 12, color: '#52525b', fontFamily: 'monospace', letterSpacing: '0.1em' }}>
             ANALYST: CLAUDE SONNET
           </span>
         </div>
         <span style={{
-          fontSize: 12, fontWeight: 900, letterSpacing: '0.22em',
-          color: '#7c6aff', textTransform: 'uppercase',
+          fontSize: 12, fontWeight: 700, letterSpacing: '0.16em',
+          color: '#71717a', textTransform: 'uppercase',
         }}>
-          RESTRICTED █
+          RESTRICTED
         </span>
       </div>
 
@@ -197,12 +197,12 @@ export default function DigestPage() {
         <div style={{ marginBottom: 28 }}>
           <p className="eyebrow" style={{ marginBottom: 8 }}>Weekly Briefing</p>
           <h1 style={{
-            color: '#e8e8f0', fontSize: 28, fontWeight: 900,
+            color: '#f4f4f5', fontSize: 28, fontWeight: 800,
             letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 5,
           }}>
             AI Digest
           </h1>
-          <p style={{ color: '#7070a8', fontSize: 14 }}>
+          <p style={{ color: '#71717a', fontSize: 14 }}>
             {weekOf ? `Week of ${weekOf}` : "Claude's analysis of this week's AI developments"}
           </p>
         </div>
@@ -210,7 +210,7 @@ export default function DigestPage() {
         {/* ── Loading ──────────────────────────────────────── */}
         {loading && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '120px 0' }}>
-            <div className="h-7 w-7 rounded-full border border-violet-500 border-t-transparent animate-spin" />
+            <div className="h-7 w-7 rounded-full border border-blue-500 border-t-transparent animate-spin" />
           </div>
         )}
 
@@ -220,30 +220,30 @@ export default function DigestPage() {
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'center', minHeight: 400, textAlign: 'center',
             background: 'rgba(255,255,255,0.015)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: 16, gap: 16,
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 12, gap: 16,
           }}>
             <div style={{
               fontSize: 42, fontWeight: 900, letterSpacing: '0.12em',
-              color: 'rgba(124,106,255,0.07)',
-              border: '3px solid rgba(124,106,255,0.07)',
+              color: 'rgba(255,255,255,0.04)',
+              border: '3px solid rgba(255,255,255,0.06)',
               borderRadius: 8, padding: '8px 24px',
               fontFamily: 'monospace',
             }}>
               VOID
             </div>
             <p className="eyebrow">No Intelligence Available</p>
-            <p style={{ color: '#7070a8', fontSize: 13, maxWidth: 320, lineHeight: 1.7 }}>
+            <p style={{ color: '#71717a', fontSize: 13, maxWidth: 320, lineHeight: 1.7 }}>
               Generate this week's briefing. Claude will analyze the latest AI developments and compile a structured report.
             </p>
             <button onClick={generate} style={{
-              background: 'rgba(124,106,255,0.12)', color: '#a78bfa',
-              border: '1px solid rgba(124,106,255,0.28)',
+              background: 'rgba(59,130,246,0.1)', color: '#60a5fa',
+              border: '1px solid rgba(59,130,246,0.25)',
               borderRadius: 10, padding: '11px 24px',
-              fontSize: 14, fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase',
+              fontSize: 14, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
               cursor: 'pointer',
             }}>
-              Initiate Briefing →
+              Generate Briefing →
             </button>
           </div>
         )}
@@ -254,22 +254,22 @@ export default function DigestPage() {
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             justifyContent: 'center', minHeight: 400, gap: 20,
             background: 'rgba(255,255,255,0.015)',
-            border: '1px solid rgba(124,106,255,0.14)',
-            borderRadius: 16,
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 12,
           }}>
-            {/* Concentric ring spinner */}
+            {/* Spinner */}
             <div style={{ position: 'relative', width: 64, height: 64 }}>
               <div style={{
                 position: 'absolute', inset: 0, borderRadius: '50%',
-                border: '1px solid rgba(124,106,255,0.12)',
+                border: '1px solid rgba(59,130,246,0.1)',
               }} />
               <div style={{
                 position: 'absolute', inset: 8, borderRadius: '50%',
-                border: '1px solid rgba(124,106,255,0.2)',
+                border: '1px solid rgba(59,130,246,0.15)',
               }} />
               <div style={{
                 position: 'absolute', inset: 0, borderRadius: '50%',
-                border: '2px solid transparent', borderTopColor: '#7c6aff',
+                border: '2px solid transparent', borderTopColor: '#3b82f6',
               }} className="animate-spin" />
               <div style={{
                 position: 'absolute', inset: 8, borderRadius: '50%',
@@ -279,12 +279,12 @@ export default function DigestPage() {
             </div>
             <div style={{ textAlign: 'center' }}>
               <p style={{
-                color: '#a78bfa', fontSize: 12, fontWeight: 900,
+                color: '#60a5fa', fontSize: 12, fontWeight: 700,
                 letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 5,
               }}>
                 Compiling Intelligence Brief
               </p>
-              <p style={{ color: '#7070a8', fontSize: 13, fontFamily: 'monospace' }}>
+              <p style={{ color: '#71717a', fontSize: 13, fontFamily: 'monospace' }}>
                 Analyzing this week's AI signals · ~15–20 seconds
               </p>
             </div>
@@ -300,9 +300,9 @@ export default function DigestPage() {
 
               {/* Signal status */}
               <div style={{
-                background: 'rgba(255,255,255,0.018)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 12, padding: '11px 13px',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 10, padding: '11px 13px',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
                 <div>
@@ -311,11 +311,10 @@ export default function DigestPage() {
                     {[5, 7, 9, 11, 13].map((h, i) => (
                       <div key={i} style={{
                         width: 4, height: h, borderRadius: 1.5,
-                        background: '#34d399', opacity: 0.45 + i * 0.11,
-                        boxShadow: '0 0 4px rgba(52,211,153,0.4)',
+                        background: '#22c55e', opacity: 0.45 + i * 0.11,
                       }} />
                     ))}
-                    <span style={{ fontSize: 12, color: '#34d399', fontWeight: 900, letterSpacing: '0.12em', marginLeft: 6 }}>
+                    <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 700, letterSpacing: '0.1em', marginLeft: 6 }}>
                       STRONG
                     </span>
                   </div>
@@ -325,9 +324,9 @@ export default function DigestPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5, justifyContent: 'flex-end' }}>
                     <div style={{
                       width: 5, height: 5, borderRadius: '50%',
-                      background: '#34d399', boxShadow: '0 0 5px #34d399',
-                    }} className="glow-pulse" />
-                    <span style={{ fontSize: 12, color: '#34d399', fontWeight: 900, letterSpacing: '0.12em' }}>
+                      background: '#22c55e',
+                    }} />
+                    <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 700, letterSpacing: '0.1em' }}>
                       CURRENT
                     </span>
                   </div>
@@ -336,9 +335,9 @@ export default function DigestPage() {
 
               {/* Document metadata */}
               <div style={{
-                background: 'rgba(255,255,255,0.018)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                borderRadius: 12, padding: '11px 13px',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 10, padding: '11px 13px',
               }}>
                 <span className="eyebrow" style={{ display: 'block', marginBottom: 9 }}>Document Info</span>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
@@ -350,12 +349,12 @@ export default function DigestPage() {
                   ].map(({ label, value }) => (
                     <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                       <span style={{
-                        fontSize: 12, color: '#7070a8', fontWeight: 900,
-                        letterSpacing: '0.12em', textTransform: 'uppercase', flexShrink: 0,
+                        fontSize: 12, color: '#71717a', fontWeight: 700,
+                        letterSpacing: '0.1em', textTransform: 'uppercase', flexShrink: 0,
                       }}>
                         {label}
                       </span>
-                      <span style={{ fontSize: 13, color: '#4a4a80', fontFamily: 'monospace', textAlign: 'right', lineHeight: 1.4 }}>
+                      <span style={{ fontSize: 13, color: '#a1a1aa', fontFamily: 'monospace', textAlign: 'right', lineHeight: 1.4 }}>
                         {value}
                       </span>
                     </div>
@@ -367,15 +366,14 @@ export default function DigestPage() {
               {digest.highlights.length > 0 && (
                 <div style={{
                   position: 'relative', overflow: 'hidden',
-                  background: 'rgba(255,255,255,0.018)',
-                  border: '1px solid rgba(124,106,255,0.15)',
-                  borderRadius: 12, padding: '11px 13px 13px 16px',
+                  background: 'var(--surface)',
+                  border: '1px solid rgba(59,130,246,0.18)',
+                  borderRadius: 10, padding: '11px 13px 13px 16px',
                 }}>
-                  {/* Violet left accent */}
+                  {/* Blue left accent */}
                   <div style={{
                     position: 'absolute', left: 0, top: 0, bottom: 0, width: 2.5,
-                    background: '#7c6aff',
-                    boxShadow: '0 0 12px rgba(124,106,255,0.35)',
+                    background: '#3b82f6',
                   }} />
                   <span className="eyebrow" style={{ display: 'block', marginBottom: 10 }}>Key Findings</span>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
@@ -383,16 +381,16 @@ export default function DigestPage() {
                       <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
                         <span style={{
                           flexShrink: 0, width: 18, height: 18,
-                          background: 'rgba(124,106,255,0.1)',
-                          border: '1px solid rgba(124,106,255,0.22)',
+                          background: 'rgba(59,130,246,0.08)',
+                          border: '1px solid rgba(59,130,246,0.2)',
                           borderRadius: 4,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 14, fontWeight: 900, color: '#7c6aff',
+                          fontSize: 11, fontWeight: 700, color: '#60a5fa',
                           fontFamily: 'monospace', marginTop: 1,
                         }}>
                           {String(i + 1).padStart(2, '0')}
                         </span>
-                        <p style={{ fontSize: 14, color: '#5050a0', lineHeight: 1.65, margin: 0 }}>
+                        <p style={{ fontSize: 13, color: '#a1a1aa', lineHeight: 1.65, margin: 0 }}>
                           {h}
                         </p>
                       </div>
@@ -404,31 +402,31 @@ export default function DigestPage() {
               {/* Changes from last week */}
               {digest.changes?.length > 0 && (
                 <div style={{
-                  background: 'rgba(255,255,255,0.018)',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  borderRadius: 12, padding: '11px 13px',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 10, padding: '11px 13px',
                 }}>
                   <span className="eyebrow" style={{ display: 'block', marginBottom: 10 }}>vs Last Week</span>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {digest.changes.map((c: DigestChange, i: number) => {
                       const meta = {
                         escalated: { label: '↑ Escalated', color: '#f87171', rgb: '248,113,113' },
-                        resolved:  { label: '✓ Resolved',  color: '#34d399', rgb: '52,211,153'  },
-                        new:       { label: '★ New',        color: '#a78bfa', rgb: '167,139,250' },
-                      }[c.type] ?? { label: c.type, color: '#7070a8', rgb: '112,112,168' }
+                        resolved:  { label: '✓ Resolved',  color: '#22c55e', rgb: '34,197,94'  },
+                        new:       { label: '★ New',        color: '#60a5fa', rgb: '96,165,250' },
+                      }[c.type] ?? { label: c.type, color: '#71717a', rgb: '113,113,122' }
                       return (
                         <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                           <span style={{
-                            fontSize: 9, fontWeight: 900, letterSpacing: '0.12em',
+                            fontSize: 9, fontWeight: 700, letterSpacing: '0.1em',
                             color: meta.color,
                             background: `rgba(${meta.rgb},0.1)`,
-                            border: `1px solid rgba(${meta.rgb},0.22)`,
+                            border: `1px solid rgba(${meta.rgb},0.2)`,
                             borderRadius: 3, padding: '1px 6px',
                             textTransform: 'uppercase', alignSelf: 'flex-start',
                           }}>
                             {meta.label}
                           </span>
-                          <p style={{ fontSize: 12, color: '#5a5a80', lineHeight: 1.6, margin: 0 }}>
+                          <p style={{ fontSize: 12, color: '#a1a1aa', lineHeight: 1.6, margin: 0 }}>
                             {c.text}
                           </p>
                         </div>
@@ -441,9 +439,9 @@ export default function DigestPage() {
               {/* Section index */}
               {sections.length > 0 && (
                 <div style={{
-                  background: 'rgba(255,255,255,0.018)',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                  borderRadius: 12, padding: '11px 13px',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 10, padding: '11px 13px',
                 }}>
                   <span className="eyebrow" style={{ display: 'block', marginBottom: 9 }}>Section Index</span>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -452,15 +450,15 @@ export default function DigestPage() {
                       return (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
                           <span style={{
-                            fontSize: 14, fontWeight: 900, letterSpacing: '0.1em',
+                            fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
                             color: pal.color, fontFamily: 'monospace', flexShrink: 0,
-                            background: `rgba(${pal.rgb},0.08)`,
-                            border: `1px solid rgba(${pal.rgb},0.2)`,
+                            background: `rgba(${pal.rgb},0.07)`,
+                            border: `1px solid rgba(${pal.rgb},0.18)`,
                             borderRadius: 3, padding: '1px 5px',
                           }}>
                             §{String(i + 1).padStart(2, '0')}
                           </span>
-                          <span style={{ fontSize: 13, color: '#a0a0c8', lineHeight: 1.3 }}>
+                          <span style={{ fontSize: 12, color: '#a1a1aa', lineHeight: 1.3 }}>
                             {title}
                           </span>
                         </div>
@@ -475,11 +473,11 @@ export default function DigestPage() {
                 onClick={generate}
                 disabled={generating}
                 style={{
-                  background: generating ? 'rgba(255,255,255,0.02)' : 'rgba(124,106,255,0.07)',
-                  color: generating ? '#7070a8' : '#7c6aff',
-                  border: '1px solid rgba(124,106,255,0.18)',
+                  background: generating ? 'rgba(255,255,255,0.02)' : 'rgba(59,130,246,0.07)',
+                  color: generating ? '#71717a' : '#60a5fa',
+                  border: '1px solid rgba(59,130,246,0.18)',
                   borderRadius: 10, padding: '10px 14px',
-                  fontSize: 12, fontWeight: 900, letterSpacing: '0.16em', textTransform: 'uppercase',
+                  fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
                   cursor: generating ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                   transition: 'all 0.2s',
@@ -487,7 +485,7 @@ export default function DigestPage() {
               >
                 {generating ? (
                   <>
-                    <span className="inline-block h-3 w-3 rounded-full border border-violet-500 border-t-transparent animate-spin" />
+                    <span className="inline-block h-3 w-3 rounded-full border border-blue-500 border-t-transparent animate-spin" />
                     Generating…
                   </>
                 ) : '↻ Regenerate Brief'}
@@ -496,9 +494,9 @@ export default function DigestPage() {
 
             {/* ── RIGHT: Document viewer ────────────────────── */}
             <div style={{
-              background: 'rgba(255,255,255,0.018)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              borderRadius: 14, overflow: 'hidden',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 12, overflow: 'hidden',
               position: 'relative',
             }}>
               {/* Faint watermark */}
@@ -506,7 +504,7 @@ export default function DigestPage() {
                 position: 'absolute', top: '50%', left: '50%',
                 transform: 'translate(-50%, -50%) rotate(-30deg)',
                 fontSize: 128, fontWeight: 900, letterSpacing: '0.08em',
-                color: 'rgba(124,106,255,0.025)',
+                color: 'rgba(255,255,255,0.02)',
                 pointerEvents: 'none', userSelect: 'none', whiteSpace: 'nowrap',
                 fontFamily: 'monospace',
               }}>
@@ -516,31 +514,31 @@ export default function DigestPage() {
               {/* Document header strip */}
               <div style={{
                 padding: '18px 28px',
-                borderBottom: '1px solid rgba(255,255,255,0.05)',
-                background: 'rgba(0,0,0,0.18)',
+                borderBottom: '1px solid var(--border)',
+                background: 'rgba(0,0,0,0.12)',
                 display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16,
               }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
                     <span style={{
-                      fontSize: 12, fontWeight: 900, letterSpacing: '0.18em',
-                      color: '#7c6aff',
-                      background: 'rgba(124,106,255,0.1)',
-                      border: '1px solid rgba(124,106,255,0.25)',
+                      fontSize: 12, fontWeight: 700, letterSpacing: '0.14em',
+                      color: '#60a5fa',
+                      background: 'rgba(59,130,246,0.08)',
+                      border: '1px solid rgba(59,130,246,0.2)',
                       borderRadius: 4, padding: '2px 9px',
                     }}>
                       WEEKLY INTELLIGENCE BRIEF
                     </span>
                   </div>
-                  <p style={{ fontSize: 13, color: '#7070a8', fontFamily: 'monospace', letterSpacing: '0.06em' }}>
+                  <p style={{ fontSize: 13, color: '#71717a', fontFamily: 'monospace', letterSpacing: '0.06em' }}>
                     {weekOf?.toUpperCase() ?? 'PENDING'} · GENERATED BY CLAUDE SONNET
                   </p>
                 </div>
-                {/* Rotated "CURRENT" stamp */}
+                {/* "CURRENT" stamp */}
                 <div style={{
-                  fontSize: 12, fontWeight: 900, letterSpacing: '0.2em',
-                  color: 'rgba(52,211,153,0.55)',
-                  border: '2px solid rgba(52,211,153,0.22)',
+                  fontSize: 12, fontWeight: 700, letterSpacing: '0.16em',
+                  color: 'rgba(34,197,94,0.6)',
+                  border: '2px solid rgba(34,197,94,0.2)',
                   borderRadius: 4, padding: '5px 10px',
                   transform: 'rotate(-2.5deg)',
                   fontFamily: 'monospace', flexShrink: 0,
@@ -549,11 +547,8 @@ export default function DigestPage() {
                 </div>
               </div>
 
-              {/* Ruled separator */}
-              <div style={{
-                height: 1,
-                background: 'linear-gradient(to right, rgba(124,106,255,0.25), transparent 60%)',
-              }} />
+              {/* Divider */}
+              <div style={{ height: 1, background: 'var(--border)' }} />
 
               {/* Document body */}
               <div style={{ padding: '32px 36px 48px', position: 'relative' }}>

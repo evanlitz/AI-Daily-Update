@@ -136,8 +136,8 @@ function Sidebar() {
     <aside
       className="sidebar fixed left-0 top-0 bottom-0 z-50 flex flex-col"
       style={{
-        background: 'rgba(5,5,14,0.92)',
-        borderRight: '1px solid rgba(255,255,255,0.05)',
+        background: 'rgba(9,9,11,0.96)',
+        borderRight: '1px solid rgba(255,255,255,0.08)',
         backdropFilter: 'blur(20px)',
       }}
     >
@@ -147,8 +147,8 @@ function Sidebar() {
           className="flex shrink-0 items-center justify-center rounded-xl"
           style={{
             width: 38, height: 38,
-            background: 'linear-gradient(135deg, #7c6aff, #5b8aff)',
-            boxShadow: '0 0 20px rgba(124,106,255,0.5)',
+            background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
+            boxShadow: '0 0 16px rgba(59,130,246,0.2)',
           }}
         >
           <span style={{ color: '#fff', fontSize: 13, fontWeight: 900, letterSpacing: '-0.02em' }}>AI</span>
@@ -172,21 +172,21 @@ function Sidebar() {
               className="relative flex items-center gap-3 rounded-xl transition-all duration-150"
               style={{
                 padding: '11px 12px',
-                color: active ? '#e8e8f0' : '#4a4a6a',
-                background: active ? 'rgba(124,106,255,0.14)' : 'transparent',
+                color: active ? '#f4f4f5' : '#52525b',
+                background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
               }}
               onMouseEnter={e => {
-                if (!active) (e.currentTarget as HTMLElement).style.color = '#9090b0'
+                if (!active) (e.currentTarget as HTMLElement).style.color = '#a1a1aa'
               }}
               onMouseLeave={e => {
-                if (!active) (e.currentTarget as HTMLElement).style.color = '#4a4a6a'
+                if (!active) (e.currentTarget as HTMLElement).style.color = '#52525b'
               }}
             >
               {/* Active indicator bar */}
               {active && (
                 <div
                   className="absolute left-0 top-2 bottom-2 rounded-full"
-                  style={{ width: 3, background: '#7c6aff', boxShadow: '0 0 10px #7c6aff' }}
+                  style={{ width: 3, background: '#3b82f6' }}
                 />
               )}
               <div className="shrink-0" style={{ marginLeft: active ? 3 : 0 }}>{icon}</div>
@@ -225,7 +225,7 @@ function MobileNav() {
             key={href}
             href={href}
             className="mobile-nav-item"
-            style={{ color: active ? '#a78bfa' : '#4a4a6a' }}
+            style={{ color: active ? '#60a5fa' : '#52525b' }}
           >
             {icon}
             <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginTop: 3 }}>

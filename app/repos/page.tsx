@@ -26,15 +26,12 @@ export default function ReposPage() {
     : repos.filter(r => r.language?.toLowerCase() === activeLang.toLowerCase())
 
   return (
-    <main className="mx-auto max-w-screen-xl px-5 py-8" style={{
-      backgroundImage: 'radial-gradient(rgba(255,255,255,0.022) 1px, transparent 1px)',
-      backgroundSize: '28px 28px',
-    }}>
+    <main className="mx-auto max-w-screen-xl px-5 py-8">
       <div className="mb-8">
         <p className="eyebrow mb-2">Trending Signals</p>
         <h1
           style={{
-            color: '#e8e8f0',
+            color: '#f4f4f5',
             fontSize: 28,
             fontWeight: 900,
             letterSpacing: '-0.02em',
@@ -44,10 +41,10 @@ export default function ReposPage() {
         >
           Top AI Repos
         </h1>
-        <p style={{ color: '#8080b0', fontSize: 14 }}>
+        <p style={{ color: '#71717a', fontSize: 14 }}>
           Ranked by total stars · {repos.length} active AI/ML repos
           {repos[0]?.fetched_at && (
-            <span style={{ color: '#5a5a7a', marginLeft: 8 }}>
+            <span style={{ color: '#52525b', marginLeft: 8 }}>
               · updated {relTime(repos[0].fetched_at)}
             </span>
           )}
@@ -64,9 +61,9 @@ export default function ReposPage() {
               onClick={() => setActiveLang(lang)}
               className="transition-all duration-150"
               style={{
-                background: active ? 'rgba(124,106,255,0.12)' : 'transparent',
-                color: active ? '#a78bfa' : '#8080b0',
-                border: `1px solid ${active ? 'rgba(124,106,255,0.3)' : 'rgba(255,255,255,0.05)'}`,
+                background: active ? 'rgba(59,130,246,0.1)' : 'transparent',
+                color: active ? '#60a5fa' : '#71717a',
+                border: `1px solid ${active ? 'rgba(59,130,246,0.28)' : 'rgba(255,255,255,0.08)'}`,
                 borderRadius: 8,
                 padding: '5px 10px',
                 fontSize: 15,
@@ -79,14 +76,14 @@ export default function ReposPage() {
             </button>
           )
         })}
-        <span style={{ marginLeft: 'auto', color: '#7878a8', fontSize: 11 }}>
+        <span style={{ marginLeft: 'auto', color: '#52525b', fontSize: 11 }}>
           {filtered.length}
         </span>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-24">
-          <div className="h-7 w-7 rounded-full border border-violet-500 border-t-transparent animate-spin" />
+          <div className="h-7 w-7 rounded-full border border-blue-500 border-t-transparent animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
         <div
@@ -101,7 +98,7 @@ export default function ReposPage() {
         </div>
       )}
 
-      <p className="mt-10 text-center" style={{ color: '#5a5a7a', fontSize: 11, fontWeight: 700, letterSpacing: '0.12em' }}>
+      <p className="mt-10 text-center" style={{ color: '#52525b', fontSize: 11, fontWeight: 700, letterSpacing: '0.12em' }}>
         DATA FROM GITHUB API · REFRESHED TWICE DAILY
       </p>
     </main>
