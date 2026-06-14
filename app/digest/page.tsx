@@ -191,7 +191,7 @@ export default function DigestPage() {
       </div>
 
       {/* ── Page body ───────────────────────────────────────── */}
-      <div style={{ maxWidth: 1500, margin: '0 auto', padding: '32px 20px 60px' }}>
+      <div style={{ maxWidth: 1600, margin: '0 auto', padding: '32px 48px 60px' }}>
 
         {/* Page header */}
         <div style={{ marginBottom: 28 }}>

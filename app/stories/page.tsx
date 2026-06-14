@@ -1454,7 +1454,7 @@ export default function StoriesPage() {
 
   return (
     <main style={{
-      padding: '32px 28px', maxWidth: 1500, margin: '0 auto',
+      padding: '32px 48px', maxWidth: 1600, margin: '0 auto',
     }}>
       <style>{ANIM_CSS}</style>
 

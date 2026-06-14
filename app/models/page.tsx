@@ -994,7 +994,7 @@ export default function ModelsPage() {
       <AmbientBg />
       {!booted && <BootScreen onDone={handleBootDone} />}
 
-      <main className="relative mx-auto max-w-screen-xl px-6 py-10"
+      <main className="relative mx-auto max-w-screen-2xl px-10 py-10"
         style={{ zIndex: 1, paddingBottom: 60 + bottomPad, opacity: pageVisible ? 1 : 0, transition: 'opacity 0.4s ease' }}>
 
         <ScannerHeader models={models} visibleCount={displayList.length} />

@@ -110,7 +110,7 @@ export default async function HomePage() {
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
   return (
-    <main style={{ padding: '36px 28px', maxWidth: 1400, margin: '0 auto' }}>
+    <main style={{ padding: '36px 48px', maxWidth: 1600, margin: '0 auto' }}>
 
       {/* Header */}
       <div style={{ marginBottom: 36 }}>

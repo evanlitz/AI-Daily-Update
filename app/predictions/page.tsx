@@ -201,9 +201,7 @@ export default function PredictionsPage() {
 
   return (
     <main style={{
-      maxWidth: 1100, margin: '0 auto', padding: '32px 28px',
-      backgroundImage: 'radial-gradient(rgba(255,255,255,0.022) 1px, transparent 1px)',
-      backgroundSize: '28px 28px',
+      maxWidth: 1600, margin: '0 auto', padding: '32px 48px',
     }}>
 
       {/* Header */}

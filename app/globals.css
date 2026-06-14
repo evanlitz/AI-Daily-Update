@@ -27,6 +27,7 @@ body {
   color: var(--text);
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  font-size: 15px;
 }
 
 /* ── Scrollbar ─────────────────────────────────────────── */
@@ -120,20 +121,20 @@ body {
 
 /* ── Digest content prose ──────────────────────────────── */
 .digest-content h2 {
-  font-size: 1.05rem; font-weight: 700; color: var(--text);
+  font-size: 1.1rem; font-weight: 700; color: var(--text);
   margin: 2rem 0 0.6rem; padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border);
   letter-spacing: -0.01em;
 }
 .digest-content h3 {
-  font-size: 0.9rem; font-weight: 600; color: #d4d4d8;
+  font-size: 0.95rem; font-weight: 600; color: #d4d4d8;
   margin: 1.25rem 0 0.4rem;
 }
-.digest-content p { color: #a1a1aa; line-height: 1.8; margin-bottom: 0.9rem; font-size: 0.9rem; }
+.digest-content p { color: #a1a1aa; line-height: 1.85; margin-bottom: 0.9rem; font-size: 0.95rem; }
 .digest-content ul { list-style: none; padding: 0; margin-bottom: 1rem; }
 .digest-content ul li {
-  color: #a1a1aa; font-size: 0.9rem; line-height: 1.7;
-  padding: 0.2rem 0 0.2rem 1.25rem; position: relative;
+  color: #a1a1aa; font-size: 0.95rem; line-height: 1.75;
+  padding: 0.25rem 0 0.25rem 1.25rem; position: relative;
 }
 .digest-content ul li::before { content: '→'; position: absolute; left: 0; color: var(--accent); font-size: 0.75rem; }
 .digest-content strong { color: #e4e4e7; font-weight: 600; }

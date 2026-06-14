@@ -298,7 +298,7 @@ export default function DatasetsPage() {
   const taskLabel = TASK_FILTERS.find(f => f.key === activeTask)?.label ?? activeTask
 
   return (
-    <main className="mx-auto max-w-7xl px-5 py-8">
+    <main className="mx-auto max-w-screen-2xl px-10 py-8">
 
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="mb-7">
