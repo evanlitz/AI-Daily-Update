@@ -27,9 +27,9 @@ export function AdvisorTabs({ initialIdeas }: { initialIdeas: ProjectIdea[] }) {
               style={{
                 fontSize: 11, fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase',
                 padding: '7px 18px', borderRadius: 8,
-                background: active ? 'rgba(124,106,255,0.15)' : 'transparent',
-                color: active ? '#a78bfa' : '#5a5a7a',
-                border: `1px solid ${active ? 'rgba(124,106,255,0.3)' : 'rgba(255,255,255,0.07)'}`,
+                background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
+                color: active ? '#60a5fa' : '#52525b',
+                border: `1px solid ${active ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.08)'}`,
                 cursor: 'pointer', transition: 'all 0.15s',
               }}
             >

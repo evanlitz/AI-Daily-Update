@@ -86,7 +86,7 @@ const CAT_META: Record<string, { color: string; rgb: string }> = {
   research:   { color: '#fb923c', rgb: '251,146,60'  },
 }
 
-const DEFAULT_CAT = { color: '#7c6aff', rgb: '124,106,255' }
+const DEFAULT_CAT = { color: '#3b82f6', rgb: '59,130,246' }
 
 const ENTITY_COLORS: Record<string, { color: string; rgb: string }> = {
   company:    { color: '#34d399', rgb: '52,211,153'  },
@@ -98,7 +98,7 @@ const ENTITY_COLORS: Record<string, { color: string; rgb: string }> = {
 const SIG_COLOR: Record<string, string> = {
   high:   '#f87171',
   medium: '#fbbf24',
-  low:    '#5a5a8a',
+  low:    '#71717a',
 }
 
 const SIG_LABEL: Record<string, string> = {
@@ -163,7 +163,7 @@ function StoryCard({
 }) {
   const cat      = CAT_META[story.category] ?? DEFAULT_CAT
   const sig      = story.latest_significance ?? 'low'
-  const sigColor = SIG_COLOR[sig] ?? '#5a5a8a'
+  const sigColor = SIG_COLOR[sig] ?? '#71717a'
   const isHigh   = sig === 'high'
 
   return (
@@ -172,10 +172,10 @@ function StoryCard({
       onClick={onSelect}
       style={{
         animationDelay: `${index * 45}ms`,
-        background: 'rgba(255,255,255,0.025)',
-        border: '1px solid rgba(255,255,255,0.07)',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
         borderLeft: `3px solid ${cat.color}`,
-        borderRadius: 14,
+        borderRadius: 10,
         padding: '18px 20px',
         cursor: 'pointer',
         transition: 'transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, border-color 0.16s ease',
@@ -198,8 +198,8 @@ function StoryCard({
         const el = e.currentTarget as HTMLDivElement
         el.style.transform = ''
         el.style.boxShadow = ''
-        el.style.background = 'rgba(255,255,255,0.025)'
-        el.style.borderColor = 'rgba(255,255,255,0.07)'
+        el.style.background = 'var(--surface)'
+        el.style.borderColor = 'rgba(255,255,255,0.08)'
         const arrow = el.querySelector('.card-arrow') as HTMLElement | null
         if (arrow) { arrow.style.opacity = '0'; arrow.style.transform = 'translateX(-4px)' }
       }}
@@ -244,14 +244,14 @@ function StoryCard({
           }} />
         )}
 
-        <span style={{ fontSize: 10, color: '#4a4a6a', marginLeft: 'auto', flexShrink: 0 }}>
+        <span style={{ fontSize: 10, color: '#52525b', marginLeft: 'auto', flexShrink: 0 }}>
           {relTime(story.last_updated)}
         </span>
       </div>
 
       {/* Title */}
       <p style={{
-        fontSize: 15, fontWeight: 800, color: '#d8d8ee',
+        fontSize: 15, fontWeight: 800, color: '#e4e4e7',
         lineHeight: 1.35, letterSpacing: '-0.015em',
       }}>
         {story.title}
@@ -260,7 +260,7 @@ function StoryCard({
       {/* Latest update snippet */}
       {story.latest_update && (
         <p style={{
-          fontSize: 13, color: '#6868a8', lineHeight: 1.65,
+          fontSize: 13, color: '#a1a1aa', lineHeight: 1.65,
           display: '-webkit-box', WebkitLineClamp: 3,
           WebkitBoxOrient: 'vertical', overflow: 'hidden',
         }}>
@@ -271,15 +271,15 @@ function StoryCard({
       {/* Footer: event count + first seen + open arrow */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto', paddingTop: 4 }}>
         <span style={{
-          fontSize: 11, fontWeight: 700, color: '#4a4a6a',
+          fontSize: 11, fontWeight: 700, color: '#52525b',
           background: 'rgba(255,255,255,0.04)',
           border: '1px solid rgba(255,255,255,0.06)',
           borderRadius: 4, padding: '2px 7px',
         }}>
           {story.event_count} update{story.event_count !== 1 ? 's' : ''}
         </span>
-        <span style={{ fontSize: 11, color: '#3a3a5a' }}>·</span>
-        <span style={{ fontSize: 11, color: '#4a4a6a' }}>since {weekLabel(story.first_seen)}</span>
+        <span style={{ fontSize: 11, color: '#3f3f46' }}>·</span>
+        <span style={{ fontSize: 11, color: '#52525b' }}>since {weekLabel(story.first_seen)}</span>
         <span
           className="card-arrow"
           style={{
@@ -380,13 +380,13 @@ function StoryDetailView({
             background: 'rgba(255,255,255,0.03)',
             border: '1px solid rgba(255,255,255,0.09)',
             borderRadius: 8, padding: '8px 16px',
-            fontSize: 13, fontWeight: 700, color: '#8080b0',
+            fontSize: 13, fontWeight: 700, color: '#a1a1aa',
             cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7,
             transition: 'color 0.15s, background 0.15s',
           }}
           onMouseEnter={e => {
             const el = e.currentTarget as HTMLButtonElement
-            el.style.color = '#c0c0e0'
+            el.style.color = '#d4d4d8'
             el.style.background = 'rgba(255,255,255,0.06)'
           }}
           onMouseLeave={e => {
@@ -417,7 +417,7 @@ function StoryDetailView({
             onClick={() => confirmDelete ? onDelete() : setConfirmDelete(true)}
             style={{
               background: confirmDelete ? 'rgba(248,113,113,0.12)' : 'transparent',
-              color: confirmDelete ? '#f87171' : '#5a5a7a',
+              color: confirmDelete ? '#f87171' : '#71717a',
               border: `1px solid ${confirmDelete ? 'rgba(248,113,113,0.3)' : 'rgba(255,255,255,0.09)'}`,
               borderRadius: 8, padding: '8px 18px',
               fontSize: 12, fontWeight: 700, letterSpacing: '0.07em',
@@ -463,20 +463,20 @@ function StoryDetailView({
               PINNED
             </span>
           )}
-          <span style={{ fontSize: 12, color: '#5a5a7a', marginLeft: 'auto' }}>
+          <span style={{ fontSize: 12, color: '#71717a', marginLeft: 'auto' }}>
             Active since {weekLabel(detail.first_seen)}
           </span>
         </div>
 
         <h2 style={{
-          fontSize: 28, fontWeight: 900, color: '#eeeef8',
+          fontSize: 28, fontWeight: 800, color: '#f4f4f5',
           letterSpacing: '-0.025em', lineHeight: 1.2, marginBottom: 14,
         }}>
           {detail.title}
         </h2>
 
         {detail.current_summary && (
-          <p style={{ fontSize: 15, color: '#7878b0', lineHeight: 1.8, maxWidth: 800 }}>
+          <p style={{ fontSize: 15, color: '#a1a1aa', lineHeight: 1.8, maxWidth: 800 }}>
             {detail.current_summary}
           </p>
         )}
@@ -499,12 +499,12 @@ function StoryDetailView({
                 onClick={() => { setWatchDraft(detail.watch_for ?? ''); setEditingWatch(true) }}
                 style={{
                   marginLeft: 'auto', fontSize: 10, fontWeight: 700,
-                  color: '#5a5a8a', background: 'transparent', border: 'none',
+                  color: '#71717a', background: 'transparent', border: 'none',
                   cursor: 'pointer', padding: '2px 6px',
                   borderRadius: 4, transition: 'color 0.15s',
                 }}
                 onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = cat.color }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#5a5a8a' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = '#71717a' }}
               >
                 Edit
               </button>
@@ -521,7 +521,7 @@ function StoryDetailView({
                   width: '100%', background: 'rgba(0,0,0,0.3)',
                   border: `1px solid rgba(${cat.rgb},0.3)`,
                   borderRadius: 7, padding: '9px 12px',
-                  fontSize: 13, color: '#c0c0e0', lineHeight: 1.65,
+                  fontSize: 13, color: '#d4d4d8', lineHeight: 1.65,
                   resize: 'vertical', outline: 'none', boxSizing: 'border-box',
                 }}
               />
@@ -529,7 +529,7 @@ function StoryDetailView({
                 <button
                   onClick={() => setEditingWatch(false)}
                   style={{
-                    fontSize: 12, fontWeight: 700, color: '#5a5a8a',
+                    fontSize: 12, fontWeight: 700, color: '#71717a',
                     background: 'transparent', border: '1px solid rgba(255,255,255,0.1)',
                     borderRadius: 6, padding: '5px 14px', cursor: 'pointer',
                   }}
@@ -541,7 +541,7 @@ function StoryDetailView({
                   disabled={savingWatch}
                   style={{
                     fontSize: 12, fontWeight: 700,
-                    color: savingWatch ? '#5a5a8a' : cat.color,
+                    color: savingWatch ? '#71717a' : cat.color,
                     background: `rgba(${cat.rgb},0.12)`,
                     border: `1px solid rgba(${cat.rgb},0.3)`,
                     borderRadius: 6, padding: '5px 14px', cursor: 'pointer',
@@ -552,8 +552,8 @@ function StoryDetailView({
               </div>
             </div>
           ) : (
-            <p style={{ fontSize: 14, color: '#8888c0', lineHeight: 1.65, marginTop: 6 }}>
-              {detail.watch_for || <span style={{ color: '#4a4a6a', fontStyle: 'italic' }}>Not set — click Edit to add a curation signal for the pipeline.</span>}
+            <p style={{ fontSize: 14, color: '#a1a1aa', lineHeight: 1.65, marginTop: 6 }}>
+              {detail.watch_for || <span style={{ color: '#52525b', fontStyle: 'italic' }}>Not set — click Edit to add a curation signal for the pipeline.</span>}
             </p>
           )}
         </div>
@@ -569,10 +569,10 @@ function StoryDetailView({
             { label: 'Last updated', value: relTime(detail.last_updated) },
           ].map(({ label, value }) => (
             <div key={label}>
-              <p style={{ fontSize: 10, fontWeight: 700, color: '#4a4a6a', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 3 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, color: '#52525b', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 3 }}>
                 {label}
               </p>
-              <p style={{ fontSize: 16, fontWeight: 900, color: '#c0c0e0', letterSpacing: '-0.01em' }}>
+              <p style={{ fontSize: 16, fontWeight: 900, color: '#d4d4d8', letterSpacing: '-0.01em' }}>
                 {value}
               </p>
             </div>
@@ -586,7 +586,7 @@ function StoryDetailView({
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
             <span style={{
               fontSize: 10, fontWeight: 900, letterSpacing: '0.18em',
-              color: '#5a5a7a', textTransform: 'uppercase', flexShrink: 0,
+              color: '#71717a', textTransform: 'uppercase', flexShrink: 0,
             }}>
               Key Entities
             </span>
@@ -594,7 +594,7 @@ function StoryDetailView({
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {detail.topEntities.map(e => {
-              const em = ENTITY_COLORS[e.type] ?? { color: '#7c6aff', rgb: '124,106,255' }
+              const em = ENTITY_COLORS[e.type] ?? { color: '#3b82f6', rgb: '59,130,246' }
               return (
                 <span key={e.id} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 7,
@@ -626,7 +626,7 @@ function StoryDetailView({
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
             <span style={{
               fontSize: 10, fontWeight: 900, letterSpacing: '0.18em',
-              color: '#5a5a7a', textTransform: 'uppercase', flexShrink: 0,
+              color: '#71717a', textTransform: 'uppercase', flexShrink: 0,
             }}>
               Related Threads
             </span>
@@ -640,10 +640,10 @@ function StoryDetailView({
                   key={rt.related_id}
                   onClick={() => onSelectThread(rt.related_id, rt.category)}
                   style={{
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid rgba(255,255,255,0.07)',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
                     borderLeft: `3px solid ${rcat.color}`,
-                    borderRadius: 12, padding: '14px 16px',
+                    borderRadius: 10, padding: '14px 16px',
                     cursor: 'pointer',
                     transition: 'background 0.15s, box-shadow 0.15s',
                     display: 'flex', flexDirection: 'column', gap: 7,
@@ -655,7 +655,7 @@ function StoryDetailView({
                   }}
                   onMouseLeave={e => {
                     const el = e.currentTarget as HTMLDivElement
-                    el.style.background = 'rgba(255,255,255,0.02)'
+                    el.style.background = 'var(--surface)'
                     el.style.boxShadow  = ''
                   }}
                 >
@@ -668,15 +668,15 @@ function StoryDetailView({
                     }}>
                       {rt.category}
                     </span>
-                    <span style={{ fontSize: 10, color: '#4a4a6a', marginLeft: 'auto' }}>
+                    <span style={{ fontSize: 10, color: '#52525b', marginLeft: 'auto' }}>
                       {relTime(rt.last_updated)}
                     </span>
                   </div>
-                  <p style={{ fontSize: 13, fontWeight: 800, color: '#c8c8e4', lineHeight: 1.35 }}>
+                  <p style={{ fontSize: 13, fontWeight: 800, color: '#d4d4d8', lineHeight: 1.35 }}>
                     {rt.title}
                   </p>
                   {rt.label && (
-                    <p style={{ fontSize: 11, color: '#5a5a80', lineHeight: 1.55, fontStyle: 'italic' }}>
+                    <p style={{ fontSize: 11, color: '#71717a', lineHeight: 1.55, fontStyle: 'italic' }}>
                       {rt.label}
                     </p>
                   )}
@@ -684,7 +684,7 @@ function StoryDetailView({
                     <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                       {rt.shared_tags.slice(0, 4).map(tag => (
                         <span key={tag} style={{
-                          fontSize: 9, fontWeight: 700, color: '#4a4a6a',
+                          fontSize: 9, fontWeight: 700, color: '#52525b',
                           background: 'rgba(255,255,255,0.04)',
                           border: '1px solid rgba(255,255,255,0.07)',
                           borderRadius: 3, padding: '1px 5px',
@@ -707,16 +707,16 @@ function StoryDetailView({
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
             <span style={{
               fontSize: 10, fontWeight: 900, letterSpacing: '0.18em',
-              color: '#5a5a7a', textTransform: 'uppercase', flexShrink: 0,
+              color: '#71717a', textTransform: 'uppercase', flexShrink: 0,
             }}>
               Story Arc · {detail.snapshots.length} week{detail.snapshots.length !== 1 ? 's' : ''}
             </span>
             <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.05)' }} />
           </div>
           <div style={{
-            background: 'rgba(255,255,255,0.015)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: 14, padding: '20px 22px',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 10, padding: '20px 22px',
           }}>
             {detail.snapshots.map((snap, i) => {
               const isLatest = i === detail.snapshots!.length - 1
@@ -740,13 +740,13 @@ function StoryDetailView({
                     <span style={{
                       fontSize: 11, fontWeight: 800, fontFamily: 'monospace',
                       letterSpacing: '0.02em', display: 'block', marginBottom: 5, marginTop: 2,
-                      color: isLatest ? '#a0a0d0' : '#5a5a7a',
+                      color: '#a1a1aa',
                     }}>
                       {weekLabel(snap.week)}
                     </span>
                     <p style={{
                       fontSize: 13, lineHeight: 1.75,
-                      color: isLatest ? '#8080b8' : '#5a5a7a',
+                      color: isLatest ? '#a1a1aa' : '#71717a',
                       display: '-webkit-box',
                       WebkitLineClamp: isLatest ? 5 : 2,
                       WebkitBoxOrient: 'vertical',
@@ -767,14 +767,14 @@ function StoryDetailView({
 
         {/* Timeline */}
         <div style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          borderRadius: 16, padding: '24px 26px',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 12, padding: '24px 26px',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
             <p style={{
               fontSize: 10, fontWeight: 900, letterSpacing: '0.18em',
-              color: '#5a5a7a', textTransform: 'uppercase',
+              color: '#71717a', textTransform: 'uppercase',
             }}>
               Timeline · {detail.events.length} update{detail.events.length !== 1 ? 's' : ''}
             </p>
@@ -782,7 +782,7 @@ function StoryDetailView({
               onClick={() => setShowLogForm(v => !v)}
               style={{
                 marginLeft: 'auto', fontSize: 11, fontWeight: 700,
-                color: showLogForm ? cat.color : '#5a5a8a',
+                color: showLogForm ? cat.color : '#71717a',
                 background: showLogForm ? `rgba(${cat.rgb},0.1)` : 'transparent',
                 border: `1px solid ${showLogForm ? `rgba(${cat.rgb},0.3)` : 'rgba(255,255,255,0.1)'}`,
                 borderRadius: 6, padding: '4px 12px', cursor: 'pointer',
@@ -809,7 +809,7 @@ function StoryDetailView({
                   width: '100%', background: 'rgba(0,0,0,0.3)',
                   border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: 7, padding: '9px 12px',
-                  fontSize: 13, color: '#c0c0e0', lineHeight: 1.65,
+                  fontSize: 13, color: '#d4d4d8', lineHeight: 1.65,
                   resize: 'vertical', outline: 'none', boxSizing: 'border-box',
                 }}
               />
@@ -854,7 +854,7 @@ function StoryDetailView({
                   disabled={submittingLog || !logText.trim()}
                   style={{
                     fontSize: 12, fontWeight: 700,
-                    color: (submittingLog || !logText.trim()) ? '#5a5a8a' : cat.color,
+                    color: (submittingLog || !logText.trim()) ? '#71717a' : cat.color,
                     background: `rgba(${cat.rgb},0.12)`,
                     border: `1px solid rgba(${cat.rgb},0.3)`,
                     borderRadius: 6, padding: '5px 16px',
@@ -868,15 +868,15 @@ function StoryDetailView({
           )}
 
           {detail.events.length === 0 ? (
-            <p style={{ fontSize: 13, color: '#4a4a6a', fontStyle: 'italic', lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13, color: '#52525b', fontStyle: 'italic', lineHeight: 1.6 }}>
               No AI-generated updates yet — next feed fetch will populate this.
             </p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {detail.events.map((event, i) => {
                 const isManual = event.source === 'manual'
-                const sigColor = isManual ? '#a78bfa' : (SIG_COLOR[event.significance] ?? '#5a5a8a')
-                const dotColor = isManual ? '#a78bfa' : (i === 0 ? cat.color : sigColor)
+                const sigColor = isManual ? '#60a5fa' : (SIG_COLOR[event.significance] ?? '#71717a')
+                const dotColor = isManual ? '#60a5fa' : (i === 0 ? cat.color : sigColor)
                 const isLatest = i === 0
                 const isLast   = i === detail.events.length - 1
                 return (
@@ -893,7 +893,7 @@ function StoryDetailView({
                         background: dotColor,
                         border: isLatest && !isManual ? `2px solid rgba(${cat.rgb},0.4)` : `2px solid ${dotColor}40`,
                         marginTop: 4, flexShrink: 0,
-                        boxShadow: isManual ? `0 0 8px rgba(167,139,250,0.4)` : isLatest ? `0 0 10px rgba(${cat.rgb},0.5)` : 'none',
+                        boxShadow: 'none',
                         transition: 'transform 0.15s',
                       }} />
                       {!isLast && (
@@ -910,7 +910,7 @@ function StoryDetailView({
                     <div style={{ paddingBottom: isLast ? 0 : 26, flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
                         <span style={{
-                          fontSize: 11, fontWeight: 800, color: isLatest ? '#a0a0d0' : '#7070a8',
+                          fontSize: 11, fontWeight: 800, color: '#a1a1aa',
                           fontFamily: 'monospace', letterSpacing: '0.02em',
                         }}>
                           {weekLabel(event.week)}
@@ -918,9 +918,9 @@ function StoryDetailView({
                         {isManual ? (
                           <span style={{
                             fontSize: 9, fontWeight: 900, letterSpacing: '0.1em',
-                            color: '#a78bfa',
-                            background: 'rgba(167,139,250,0.12)',
-                            border: '1px solid rgba(167,139,250,0.28)',
+                            color: '#60a5fa',
+                            background: 'rgba(96,165,250,0.12)',
+                            border: '1px solid rgba(96,165,250,0.28)',
                             borderRadius: 3, padding: '1px 6px',
                             textTransform: 'uppercase',
                           }}>
@@ -948,7 +948,7 @@ function StoryDetailView({
                         )}
                       </div>
                       <p style={{
-                        fontSize: 14, color: isLatest ? '#9090c8' : '#7878a8',
+                        fontSize: 14, color: '#a1a1aa',
                         lineHeight: 1.75,
                       }}>
                         {event.update_text}
@@ -960,8 +960,8 @@ function StoryDetailView({
                           rel="noopener noreferrer"
                           style={{
                             display: 'inline-block', marginTop: 4,
-                            fontSize: 11, color: '#a78bfa', opacity: 0.75,
-                            textDecoration: 'underline', textDecorationColor: 'rgba(167,139,250,0.3)',
+                            fontSize: 11, color: '#60a5fa', opacity: 0.75,
+                            textDecoration: 'underline', textDecorationColor: 'rgba(96,165,250,0.3)',
                           }}
                         >
                           Source →
@@ -977,19 +977,19 @@ function StoryDetailView({
 
         {/* Related articles */}
         <div style={{
-          background: 'rgba(255,255,255,0.02)',
-          border: '1px solid rgba(255,255,255,0.07)',
-          borderRadius: 16, padding: '24px 26px',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 12, padding: '24px 26px',
         }}>
           <p style={{
             fontSize: 10, fontWeight: 900, letterSpacing: '0.18em',
-            color: '#5a5a7a', textTransform: 'uppercase', marginBottom: 20,
+            color: '#71717a', textTransform: 'uppercase', marginBottom: 20,
           }}>
             Recent Coverage · {detail.related_items.length}
           </p>
 
           {detail.related_items.length === 0 ? (
-            <p style={{ fontSize: 13, color: '#4a4a6a', fontStyle: 'italic', lineHeight: 1.6 }}>
+            <p style={{ fontSize: 13, color: '#52525b', fontStyle: 'italic', lineHeight: 1.6 }}>
               No matching feed articles yet.
             </p>
           ) : (
@@ -1028,19 +1028,19 @@ function StoryDetailView({
                         HOT
                       </span>
                     )}
-                    <span style={{ fontSize: 10, color: '#4a4a6a', marginLeft: 'auto', flexShrink: 0 }}>
+                    <span style={{ fontSize: 10, color: '#52525b', marginLeft: 'auto', flexShrink: 0 }}>
                       {relTime(item.published_at)}
                     </span>
                   </div>
                   <p style={{
-                    fontSize: 13, fontWeight: 700, color: '#c4c4e0',
+                    fontSize: 13, fontWeight: 700, color: '#d4d4d8',
                     lineHeight: 1.45, marginBottom: item.hook ? 5 : 0,
                   }}>
                     {item.title}
                   </p>
                   {item.hook && (
                     <p style={{
-                      fontSize: 12, color: '#5a5a80', lineHeight: 1.65,
+                      fontSize: 12, color: '#71717a', lineHeight: 1.65,
                       display: '-webkit-box', WebkitLineClamp: 2,
                       WebkitBoxOrient: 'vertical', overflow: 'hidden',
                     }}>
@@ -1063,7 +1063,7 @@ function StoryDetailView({
 function SpotlightCard({ story, onSelect }: { story: StoryThread; onSelect: () => void }) {
   const cat      = CAT_META[story.category] ?? DEFAULT_CAT
   const sig      = story.latest_significance ?? 'low'
-  const sigColor = SIG_COLOR[sig] ?? '#5a5a8a'
+  const sigColor = SIG_COLOR[sig] ?? '#71717a'
   const isHigh   = sig === 'high'
 
   return (
@@ -1130,7 +1130,7 @@ function SpotlightCard({ story, onSelect }: { story: StoryThread; onSelect: () =
           }}>
             Spotlight
           </span>
-          <span style={{ width: 3, height: 3, borderRadius: '50%', background: '#3a3a5a' }} />
+          <span style={{ width: 3, height: 3, borderRadius: '50%', background: '#3f3f46' }} />
           <span style={{
             fontSize: 10, fontWeight: 900, letterSpacing: '0.13em',
             color: cat.color, background: `rgba(${cat.rgb},0.14)`,
@@ -1160,7 +1160,7 @@ function SpotlightCard({ story, onSelect }: { story: StoryThread; onSelect: () =
         </div>
 
         <h2 style={{
-          fontSize: 22, fontWeight: 900, color: '#eeeef8',
+          fontSize: 22, fontWeight: 800, color: '#f4f4f5',
           letterSpacing: '-0.02em', lineHeight: 1.25,
         }}>
           {story.title}
@@ -1168,7 +1168,7 @@ function SpotlightCard({ story, onSelect }: { story: StoryThread; onSelect: () =
 
         {story.latest_update && (
           <p style={{
-            fontSize: 14, color: '#7070a8', lineHeight: 1.75,
+            fontSize: 14, color: '#a1a1aa', lineHeight: 1.75,
             display: '-webkit-box', WebkitLineClamp: 3,
             WebkitBoxOrient: 'vertical', overflow: 'hidden',
           }}>
@@ -1192,7 +1192,7 @@ function SpotlightCard({ story, onSelect }: { story: StoryThread; onSelect: () =
               Watch
             </span>
             <p style={{
-              fontSize: 13, color: '#8080b8', lineHeight: 1.6,
+              fontSize: 13, color: '#a1a1aa', lineHeight: 1.6,
               display: '-webkit-box', WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical', overflow: 'hidden',
             }}>
@@ -1217,14 +1217,13 @@ function SpotlightCard({ story, onSelect }: { story: StoryThread; onSelect: () =
             <div key={label}>
               <p style={{
                 fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
-                color: '#4a4a6a', textTransform: 'uppercase', marginBottom: 2,
+                color: '#52525b', textTransform: 'uppercase', marginBottom: 2,
               }}>
                 {label}
               </p>
               <p style={{
                 fontSize: 15, fontWeight: 900, letterSpacing: '-0.01em',
-                color: color ?? '#c0c0e0',
-                textShadow: color && sig === 'high' ? `0 0 12px ${color}60` : 'none',
+                color: color ?? '#d4d4d8',
               }}>
                 {value}
               </p>
@@ -1274,7 +1273,7 @@ function CategoryChips({
         onClick={() => onChange(catKey)}
         style={{
           background: isActive ? `rgba(${meta.rgb},0.15)` : 'rgba(255,255,255,0.03)',
-          color: isActive ? meta.color : '#5a5a7a',
+          color: isActive ? meta.color : '#71717a',
           border: isActive
             ? `1px solid rgba(${meta.rgb},0.35)`
             : '1px solid rgba(255,255,255,0.08)',
@@ -1282,7 +1281,7 @@ function CategoryChips({
           fontSize: 12, fontWeight: 700, letterSpacing: '0.04em',
           cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7,
           transition: 'all 0.15s ease',
-          boxShadow: isActive ? `0 0 12px rgba(${meta.rgb},0.12)` : 'none',
+          boxShadow: 'none',
           flexShrink: 0,
         }}
       >
@@ -1290,13 +1289,12 @@ function CategoryChips({
           <span style={{
             width: 5, height: 5, borderRadius: '50%',
             background: meta.color, flexShrink: 0,
-            boxShadow: `0 0 6px ${meta.color}`,
           }} />
         )}
         <span style={{ textTransform: 'capitalize' }}>{label}</span>
         <span style={{
           fontSize: 10, fontWeight: 900,
-          color: isActive ? meta.color : '#3a3a5a',
+          color: isActive ? meta.color : '#3f3f46',
           background: isActive ? `rgba(${meta.rgb},0.15)` : 'rgba(255,255,255,0.05)',
           borderRadius: 3, padding: '1px 5px',
           transition: 'all 0.15s',
@@ -1328,13 +1326,13 @@ function SectionHeader({ label, count }: { label: string; count?: number }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
       <span style={{
         fontSize: 11, fontWeight: 900, letterSpacing: '0.18em',
-        color: '#5a5a7a', textTransform: 'uppercase', flexShrink: 0,
+        color: '#71717a', textTransform: 'uppercase', flexShrink: 0,
       }}>
         {label}
       </span>
       {count !== undefined && (
         <span style={{
-          fontSize: 10, fontWeight: 700, color: '#3a3a5a',
+          fontSize: 10, fontWeight: 700, color: '#3f3f46',
           background: 'rgba(255,255,255,0.04)',
           border: '1px solid rgba(255,255,255,0.07)',
           borderRadius: 4, padding: '1px 7px',
@@ -1352,7 +1350,7 @@ function SectionHeader({ label, count }: { label: string; count?: number }) {
 function Spinner() {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', padding: '80px 0' }}>
-      <div className="h-7 w-7 rounded-full border border-violet-500 border-t-transparent animate-spin" />
+      <div className="h-7 w-7 rounded-full border border-blue-500 border-t-transparent animate-spin" />
     </div>
   )
 }
@@ -1457,8 +1455,6 @@ export default function StoriesPage() {
   return (
     <main style={{
       padding: '32px 28px', maxWidth: 1500, margin: '0 auto',
-      backgroundImage: 'radial-gradient(rgba(255,255,255,0.028) 1px, transparent 1px)',
-      backgroundSize: '28px 28px',
     }}>
       <style>{ANIM_CSS}</style>
 
@@ -1470,12 +1466,12 @@ export default function StoriesPage() {
         <div>
           <p className="eyebrow" style={{ marginBottom: 8 }}>Narrative Intelligence</p>
           <h1 style={{
-            color: '#e8e8f0', fontSize: 28, fontWeight: 900,
+            color: '#f4f4f5', fontSize: 28, fontWeight: 800,
             letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 6,
           }}>
             Story Threads
           </h1>
-          <p style={{ color: '#7070a8', fontSize: 14 }}>
+          <p style={{ color: '#a1a1aa', fontSize: 14 }}>
             {loading
               ? 'Loading…'
               : `${total} active thread${total !== 1 ? 's' : ''} · auto-updated from feed`}
@@ -1486,9 +1482,9 @@ export default function StoriesPage() {
           onClick={handleUpdate}
           disabled={updating}
           style={{
-            background: updating ? 'rgba(255,255,255,0.02)' : 'rgba(124,106,255,0.1)',
-            color: updating ? '#5a5a7a' : '#a78bfa',
-            border: '1px solid rgba(124,106,255,0.22)',
+            background: updating ? 'rgba(255,255,255,0.02)' : 'rgba(59,130,246,0.1)',
+            color: updating ? '#71717a' : '#60a5fa',
+            border: '1px solid rgba(59,130,246,0.22)',
             borderRadius: 12, padding: '11px 22px',
             fontSize: 13, fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase',
             cursor: updating ? 'not-allowed' : 'pointer',
@@ -1496,7 +1492,7 @@ export default function StoriesPage() {
           }}
         >
           {updating
-            ? <><span className="inline-block h-3 w-3 rounded-full border border-violet-500 border-t-transparent animate-spin" />Updating…</>
+            ? <><span className="inline-block h-3 w-3 rounded-full border border-blue-500 border-t-transparent animate-spin" />Updating…</>
             : '⟳ Update Now'}
         </button>
       </div>
@@ -1528,20 +1524,20 @@ export default function StoriesPage() {
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
               justifyContent: 'center', minHeight: 320, textAlign: 'center',
-              background: 'rgba(255,255,255,0.015)',
-              border: '1px solid rgba(255,255,255,0.06)',
-              borderRadius: 18, gap: 14,
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              borderRadius: 12, gap: 14,
             }}>
               <p className="eyebrow">No Threads Yet</p>
-              <p style={{ color: '#7070a8', fontSize: 13, maxWidth: 320, lineHeight: 1.7 }}>
+              <p style={{ color: '#a1a1aa', fontSize: 13, maxWidth: 320, lineHeight: 1.7 }}>
                 Click "Update Now" to seed the pinned threads and scan recent feed items for emerging stories.
               </p>
               <button
                 onClick={handleUpdate}
                 disabled={updating}
                 style={{
-                  background: 'rgba(124,106,255,0.1)', color: '#a78bfa',
-                  border: '1px solid rgba(124,106,255,0.25)',
+                  background: 'rgba(59,130,246,0.1)', color: '#60a5fa',
+                  border: '1px solid rgba(59,130,246,0.25)',
                   borderRadius: 10, padding: '10px 22px',
                   fontSize: 13, fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase',
                   cursor: 'pointer',
@@ -1566,7 +1562,7 @@ export default function StoriesPage() {
 
               {/* Grid of remaining stories */}
               {filtered.length === 0 ? (
-                <p style={{ fontSize: 13, color: '#4a4a6a', fontStyle: 'italic', padding: '32px 0' }}>
+                <p style={{ fontSize: 13, color: '#52525b', fontStyle: 'italic', padding: '32px 0' }}>
                   No stories in this category yet.
                 </p>
               ) : gridStories.length > 0 ? (

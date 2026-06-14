@@ -26,9 +26,9 @@ export default async function AdvisorPage() {
         <p className="eyebrow mb-2">Mission Briefing</p>
         <h1
           style={{
-            color: '#e8e8f0',
+            color: '#f4f4f5',
             fontSize: 28,
-            fontWeight: 900,
+            fontWeight: 800,
             letterSpacing: '-0.02em',
             lineHeight: 1.1,
             marginBottom: 6,
@@ -36,7 +36,7 @@ export default async function AdvisorPage() {
         >
           Project Advisor
         </h1>
-        <p style={{ color: '#8080b0', fontSize: 12 }}>
+        <p style={{ color: '#71717a', fontSize: 12 }}>
           trending missions calibrated to your level · or describe your own idea · powered by Claude
         </p>
       </div>

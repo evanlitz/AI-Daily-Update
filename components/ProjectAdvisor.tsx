@@ -12,7 +12,7 @@ interface AdvisorProfile {
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const MISSION_META = [
-  { code: 'M-01', color: '#7c6aff', rgb: '124,106,255' },
+  { code: 'M-01', color: '#3b82f6', rgb: '59,130,246' },
   { code: 'M-02', color: '#38bdf8', rgb: '56,189,248'  },
   { code: 'M-03', color: '#fb923c', rgb: '251,146,60'  },
 ]
@@ -36,7 +36,7 @@ function techMeta(name: string): TechMeta {
     return { color: '#fbbf24', rgb: '251,191,36',   cat: 'DB' }
   if (/docker|vercel|aws|cloud|deploy|github|netlify|railway|fly/.test(n))
     return { color: '#fb923c', rgb: '251,146,60',   cat: 'OPS' }
-  return { color: '#7c6aff', rgb: '124,106,255', cat: '···' }
+  return { color: '#3b82f6', rgb: '59,130,246', cat: '···' }
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ function techMeta(name: string): TechMeta {
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-      <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.22em', color: '#7878a8', textTransform: 'uppercase' }}>
+      <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.22em', color: '#71717a', textTransform: 'uppercase' }}>
         {children}
       </span>
       <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
@@ -100,7 +100,7 @@ function TechFlow({ techs }: { techs: string[] }) {
               }}>
                 {m.cat}
               </span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#d8d8f0' }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#d4d4d8' }}>
                 {tech}
               </span>
             </div>
@@ -192,10 +192,10 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
         borderRadius: 16,
       }}>
         <p className="eyebrow">No missions queued</p>
-        <p style={{ color: '#7878a8', fontSize: 13 }}>Generate project ideas based on what's trending in AI right now.</p>
+        <p style={{ color: '#71717a', fontSize: 13 }}>Generate project ideas based on what's trending in AI right now.</p>
         <button onClick={regenerate} style={{
-          background: 'rgba(124,106,255,0.15)', color: '#a78bfa',
-          border: '1px solid rgba(124,106,255,0.3)',
+          background: 'rgba(59,130,246,0.12)', color: '#60a5fa',
+          border: '1px solid rgba(59,130,246,0.28)',
           borderRadius: 12, padding: '10px 22px',
           fontSize: 12, fontWeight: 700, cursor: 'pointer',
         }}>
@@ -221,20 +221,20 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
           border: '1px solid rgba(255,255,255,0.07)',
           borderRadius: 12, padding: '13px 14px 12px',
         }}>
-          <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.18em', color: '#7878a8', textTransform: 'uppercase', marginBottom: 11 }}>Your Profile</p>
+          <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.18em', color: '#71717a', textTransform: 'uppercase', marginBottom: 11 }}>Your Profile</p>
 
           {/* Level */}
           <div style={{ marginBottom: 10 }}>
-            <p style={{ fontSize: 11, color: '#5a5a7a', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Level</p>
+            <p style={{ fontSize: 11, color: '#52525b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Level</p>
             <div style={{ display: 'flex', gap: 4 }}>
               {(['beginner', 'intermediate', 'advanced'] as const).map(lvl => {
                 const active = profile.level === lvl
                 return (
                   <button key={lvl} onClick={() => saveProfile({ ...profile, level: lvl })} style={{
                     flex: 1, fontSize: 10, fontWeight: 700, padding: '5px 2px', borderRadius: 6,
-                    background: active ? 'rgba(124,106,255,0.16)' : 'transparent',
-                    color: active ? '#a78bfa' : '#5a5a7a',
-                    border: `1px solid ${active ? 'rgba(124,106,255,0.3)' : 'rgba(255,255,255,0.06)'}`,
+                    background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
+                    color: active ? '#60a5fa' : '#52525b',
+                    border: `1px solid ${active ? 'rgba(59,130,246,0.28)' : 'rgba(255,255,255,0.07)'}`,
                     cursor: 'pointer', transition: 'all 0.15s', textTransform: 'capitalize',
                     letterSpacing: '0.02em',
                   }}>
@@ -247,16 +247,16 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
 
           {/* Interests */}
           <div style={{ marginBottom: 10 }}>
-            <p style={{ fontSize: 11, color: '#5a5a7a', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Focus</p>
+            <p style={{ fontSize: 11, color: '#52525b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Focus</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {INTERESTS.map(t => {
                 const active = profile.interests.includes(t)
                 return (
                   <button key={t} onClick={() => toggleInterest(t)} style={{
                     fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 5,
-                    background: active ? 'rgba(167,139,250,0.12)' : 'transparent',
-                    color: active ? '#a78bfa' : '#5a5a7a',
-                    border: `1px solid ${active ? 'rgba(167,139,250,0.26)' : 'rgba(255,255,255,0.06)'}`,
+                    background: active ? 'rgba(96,165,250,0.12)' : 'transparent',
+                    color: active ? '#60a5fa' : '#52525b',
+                    border: `1px solid ${active ? 'rgba(96,165,250,0.26)' : 'rgba(255,255,255,0.07)'}`,
                     cursor: 'pointer', textTransform: 'capitalize', transition: 'all 0.15s',
                   }}>{t}</button>
                 )
@@ -266,7 +266,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
 
           {/* Hours */}
           <div>
-            <p style={{ fontSize: 11, color: '#5a5a7a', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Hrs/week</p>
+            <p style={{ fontSize: 11, color: '#52525b', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 6 }}>Hrs/week</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
                 type="number" min={1} max={40} value={profile.hoursPerWeek}
@@ -275,11 +275,11 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
                   width: 60, background: 'rgba(255,255,255,0.04)',
                   border: '1px solid rgba(255,255,255,0.1)',
                   borderRadius: 6, padding: '4px 8px',
-                  color: '#a78bfa', fontSize: 13, fontWeight: 700, outline: 'none',
+                  color: '#60a5fa', fontSize: 13, fontWeight: 700, outline: 'none',
                   MozAppearance: 'textfield',
                 } as React.CSSProperties}
               />
-              <span style={{ fontSize: 12, color: '#5a5a7a' }}>hours</span>
+              <span style={{ fontSize: 12, color: '#52525b' }}>hours</span>
             </div>
           </div>
         </div>
@@ -287,7 +287,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
         {ideas.map((m, i) => {
           const mm      = MISSION_META[i] ?? MISSION_META[0]
           const active  = activeIdx === i
-          const dc      = DIFF_COLORS[m.difficulty] ?? '#7878a8'
+          const dc      = DIFF_COLORS[m.difficulty] ?? '#71717a'
           return (
             <button
               key={m.id}
@@ -309,7 +309,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
                 <div style={{
                   position: 'absolute', left: 0, top: 0, bottom: 0,
                   width: 3, background: mm.color,
-                  boxShadow: `0 0 12px ${mm.color}`,
+                  boxShadow: 'none',
                 }} />
               )}
 
@@ -317,14 +317,14 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <span style={{
                   fontSize: 13, fontWeight: 900, letterSpacing: '0.18em',
-                  color: active ? mm.color : '#7878a8',
+                  color: active ? mm.color : '#71717a',
                   transition: 'color 0.18s',
                 }}>
                   {mm.code}
                 </span>
                 <span style={{
                   fontSize: 13, fontWeight: 700,
-                  color: active ? '#6060a0' : '#7878a8',
+                  color: '#52525b',
                   background: 'rgba(255,255,255,0.04)',
                   border: '1px solid rgba(255,255,255,0.06)',
                   borderRadius: 5, padding: '1px 7px',
@@ -336,7 +336,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
               {/* Title */}
               <p style={{
                 fontSize: 13, fontWeight: 700, lineHeight: 1.35,
-                color: active ? '#e8e8f0' : '#5a5a7a',
+                color: active ? '#f4f4f5' : '#52525b',
                 marginBottom: 10,
                 transition: 'color 0.18s',
                 display: '-webkit-box',
@@ -370,7 +370,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
           style={{
             marginTop: 4,
             background: 'transparent',
-            color: '#7878a8',
+            color: '#71717a',
             border: '1px solid rgba(255,255,255,0.06)',
             borderRadius: 10, padding: '9px 14px',
             fontSize: 14, fontWeight: 700,
@@ -382,7 +382,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
           }}
         >
           {loading
-            ? <><span className="inline-block h-3 w-3 rounded-full border border-violet-500 border-t-transparent animate-spin" />Generating…</>
+            ? <><span className="inline-block h-3 w-3 rounded-full border border-blue-500 border-t-transparent animate-spin" />Generating…</>
             : '↻ New missions'}
         </button>
       </div>
@@ -421,7 +421,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
                 {meta.code}
               </span>
               <span style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.1)', display: 'inline-block' }} />
-              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.16em', color: '#7878a8', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.16em', color: '#71717a', textTransform: 'uppercase' }}>
                 Mission Briefing
               </span>
             </div>
@@ -430,13 +430,13 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
                 onClick={() => idea && downloadPlan(idea)}
                 style={{
                   fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
-                  color: '#7878a8', background: 'transparent',
+                  color: '#71717a', background: 'transparent',
                   border: '1px solid rgba(255,255,255,0.08)',
                   borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
                   transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => { (e.target as HTMLElement).style.color = '#a78bfa'; (e.target as HTMLElement).style.borderColor = 'rgba(124,106,255,0.3)' }}
-                onMouseLeave={e => { (e.target as HTMLElement).style.color = '#7878a8'; (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)' }}
+                onMouseEnter={e => { (e.target as HTMLElement).style.color = '#60a5fa'; (e.target as HTMLElement).style.borderColor = 'rgba(59,130,246,0.28)' }}
+                onMouseLeave={e => { (e.target as HTMLElement).style.color = '#71717a'; (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)' }}
               >
                 ↓ Save Plan
               </button>
@@ -457,7 +457,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
             {/* Title + stats row */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 20, alignItems: 'start', marginBottom: 24 }}>
               <h2 style={{
-                color: '#e8e8f0', fontSize: 22, fontWeight: 900,
+                color: '#f4f4f5', fontSize: 22, fontWeight: 900,
                 letterSpacing: '-0.02em', lineHeight: 1.25,
               }}>
                 {idea.title}
@@ -472,12 +472,12 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
                 minWidth: 150,
               }}>
                 <div>
-                  <p style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.16em', color: '#7878a8', marginBottom: 6, textTransform: 'uppercase' }}>Difficulty</p>
+                  <p style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.16em', color: '#71717a', marginBottom: 6, textTransform: 'uppercase' }}>Difficulty</p>
                   <DiffMeter level={idea.difficulty} color={diffColor} />
                 </div>
                 <div style={{ height: 1, background: 'rgba(255,255,255,0.05)' }} />
                 <div>
-                  <p style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.16em', color: '#7878a8', marginBottom: 5, textTransform: 'uppercase' }}>ETA</p>
+                  <p style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.16em', color: '#71717a', marginBottom: 5, textTransform: 'uppercase' }}>ETA</p>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     {/* Fuel bar */}
                     <div style={{ flex: 1, height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
@@ -499,7 +499,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
             {/* Objective */}
             <div style={{ marginBottom: 22 }}>
               <SectionLabel>Objective</SectionLabel>
-              <p style={{ color: '#7070a0', fontSize: 14, lineHeight: 1.8 }}>
+              <p style={{ color: '#a1a1aa', fontSize: 14, lineHeight: 1.8 }}>
                 {idea.description}
               </p>
             </div>
@@ -546,7 +546,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
                         style={{
                           display: 'flex', alignItems: 'flex-start', gap: 12,
                           cursor: 'pointer',
-                          background: done ? 'rgba(124,106,255,0.05)' : 'transparent',
+                          background: 'transparent',
                           borderRadius: 10, padding: '9px 10px',
                           transition: 'background 0.2s',
                         }}
@@ -565,7 +565,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
                               <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke={meta.color} strokeWidth={1.5} fill="none" strokeLinecap="round" />
                             </svg>
                           ) : (
-                            <span style={{ fontSize: 12, fontWeight: 900, color: '#7878a8' }}>
+                            <span style={{ fontSize: 12, fontWeight: 900, color: '#71717a' }}>
                               {String(i + 1).padStart(2, '0')}
                             </span>
                           )}
@@ -578,7 +578,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
                         />
                         <span style={{
                           fontSize: 13, lineHeight: 1.65,
-                          color: done ? '#7878a8' : '#9090b0',
+                          color: done ? '#71717a' : '#a1a1aa',
                           textDecoration: done ? 'line-through' : 'none',
                           transition: 'color 0.2s',
                         }}>

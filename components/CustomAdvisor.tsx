@@ -6,7 +6,7 @@ import type { ProjectIdea } from '@/lib/types'
 // ── Shared constants ──────────────────────────────────────────────────────────
 
 const MISSION_META = [
-  { code: 'C-01', color: '#7c6aff', rgb: '124,106,255' },
+  { code: 'C-01', color: '#3b82f6', rgb: '59,130,246' },
   { code: 'C-02', color: '#38bdf8', rgb: '56,189,248'  },
   { code: 'C-03', color: '#fb923c', rgb: '251,146,60'  },
 ]
@@ -28,7 +28,7 @@ function techMeta(name: string): TechMeta {
     return { color: '#fbbf24', rgb: '251,191,36',  cat: 'DB' }
   if (/docker|vercel|aws|cloud|deploy|github|netlify|railway|fly/.test(n))
     return { color: '#fb923c', rgb: '251,146,60',  cat: 'OPS' }
-  return { color: '#7c6aff', rgb: '124,106,255', cat: '···' }
+  return { color: '#3b82f6', rgb: '59,130,246', cat: '···' }
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ function techMeta(name: string): TechMeta {
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-      <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.22em', color: '#7878a8', textTransform: 'uppercase' }}>
+      <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.22em', color: '#71717a', textTransform: 'uppercase' }}>
         {children}
       </span>
       <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
@@ -79,7 +79,7 @@ function TechFlow({ techs }: { techs: string[] }) {
                 fontSize: 14, fontWeight: 900, letterSpacing: '0.1em', color: m.color,
                 background: `rgba(${m.rgb},0.15)`, borderRadius: 3, padding: '1px 4px', textTransform: 'uppercase',
               }}>{m.cat}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#d8d8f0' }}>{tech}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#d4d4d8' }}>{tech}</span>
             </div>
             {i < techs.length - 1 && (
               <svg width={18} height={10} viewBox="0 0 18 10">
@@ -186,7 +186,7 @@ export function CustomAdvisor() {
         border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: 16, padding: '20px 22px',
       }}>
-        <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.18em', color: '#7878a8', textTransform: 'uppercase', marginBottom: 10 }}>
+        <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.18em', color: '#71717a', textTransform: 'uppercase', marginBottom: 10 }}>
           Describe Your Mission
         </p>
 
@@ -202,7 +202,7 @@ export function CustomAdvisor() {
             background: 'rgba(255,255,255,0.03)',
             border: `1px solid ${error ? 'rgba(248,113,113,0.4)' : 'rgba(255,255,255,0.1)'}`,
             borderRadius: 10, padding: '12px 14px',
-            color: '#d8d8f0', fontSize: 14, lineHeight: 1.65,
+            color: '#d4d4d8', fontSize: 14, lineHeight: 1.65,
             outline: 'none', fontFamily: 'inherit',
             transition: 'border-color 0.2s',
             boxSizing: 'border-box',
@@ -218,16 +218,16 @@ export function CustomAdvisor() {
 
           {/* Level */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: '#5a5a7a', textTransform: 'uppercase' }}>Level</span>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: '#52525b', textTransform: 'uppercase' }}>Level</span>
             <div style={{ display: 'flex', gap: 3 }}>
               {(['beginner', 'intermediate', 'advanced'] as const).map(lvl => {
                 const active = level === lvl
                 return (
                   <button key={lvl} onClick={() => { setLevel(lvl); saveProfile({ level: lvl, hoursPerWeek: hours }) }} style={{
                     fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 6,
-                    background: active ? 'rgba(124,106,255,0.16)' : 'transparent',
-                    color: active ? '#a78bfa' : '#5a5a7a',
-                    border: `1px solid ${active ? 'rgba(124,106,255,0.3)' : 'rgba(255,255,255,0.07)'}`,
+                    background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
+                    color: active ? '#60a5fa' : '#52525b',
+                    border: `1px solid ${active ? 'rgba(59,130,246,0.28)' : 'rgba(255,255,255,0.08)'}`,
                     cursor: 'pointer', transition: 'all 0.15s', textTransform: 'capitalize',
                   }}>{lvl}</button>
                 )
@@ -237,7 +237,7 @@ export function CustomAdvisor() {
 
           {/* Hours */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: '#5a5a7a', textTransform: 'uppercase' }}>Hrs/wk</span>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: '#52525b', textTransform: 'uppercase' }}>Hrs/wk</span>
             <input
               type="number" min={1} max={40} value={hours}
               onChange={e => { const v = Math.max(1, Math.min(40, parseInt(e.target.value) || 5)); setHours(v); saveProfile({ level, hoursPerWeek: v }) }}
@@ -245,7 +245,7 @@ export function CustomAdvisor() {
                 width: 52, background: 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.1)',
                 borderRadius: 6, padding: '4px 8px',
-                color: '#a78bfa', fontSize: 13, fontWeight: 700, outline: 'none',
+                color: '#60a5fa', fontSize: 13, fontWeight: 700, outline: 'none',
                 MozAppearance: 'textfield',
               } as React.CSSProperties}
             />
@@ -257,9 +257,9 @@ export function CustomAdvisor() {
             onClick={generate}
             disabled={loading}
             style={{
-              background: loading ? 'rgba(124,106,255,0.08)' : 'rgba(124,106,255,0.15)',
-              color: '#a78bfa',
-              border: '1px solid rgba(124,106,255,0.3)',
+              background: loading ? 'rgba(59,130,246,0.08)' : 'rgba(59,130,246,0.15)',
+              color: '#60a5fa',
+              border: '1px solid rgba(59,130,246,0.28)',
               borderRadius: 10, padding: '9px 20px',
               fontSize: 12, fontWeight: 900, letterSpacing: '0.1em', textTransform: 'uppercase',
               cursor: loading ? 'not-allowed' : 'pointer',
@@ -269,7 +269,7 @@ export function CustomAdvisor() {
             }}
           >
             {loading
-              ? <><span className="inline-block h-3 w-3 rounded-full border border-violet-500 border-t-transparent animate-spin" />Generating…</>
+              ? <><span className="inline-block h-3 w-3 rounded-full border border-blue-500 border-t-transparent animate-spin" />Generating…</>
               : 'Generate → ⌘↵'}
           </button>
         </div>
@@ -284,7 +284,7 @@ export function CustomAdvisor() {
             {ideas.map((m, i) => {
               const mm     = MISSION_META[i] ?? MISSION_META[0]
               const active = activeIdx === i
-              const dc     = DIFF_COLORS[m.difficulty] ?? '#7878a8'
+              const dc     = DIFF_COLORS[m.difficulty] ?? '#71717a'
               return (
                 <button
                   key={m.id}
@@ -300,22 +300,22 @@ export function CustomAdvisor() {
                   {active && (
                     <div style={{
                       position: 'absolute', left: 0, top: 0, bottom: 0,
-                      width: 3, background: mm.color, boxShadow: `0 0 12px ${mm.color}`,
+                      width: 3, background: mm.color,
                     }} />
                   )}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.18em', color: active ? mm.color : '#7878a8', transition: 'color 0.18s' }}>
+                    <span style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.18em', color: active ? mm.color : '#71717a', transition: 'color 0.18s' }}>
                       {mm.code}
                     </span>
                     <span style={{
-                      fontSize: 13, fontWeight: 700, color: active ? '#6060a0' : '#7878a8',
+                      fontSize: 13, fontWeight: 700, color: '#52525b',
                       background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)',
                       borderRadius: 5, padding: '1px 7px',
                     }}>~{m.estimated_hours}h</span>
                   </div>
                   <p style={{
                     fontSize: 13, fontWeight: 700, lineHeight: 1.35,
-                    color: active ? '#e8e8f0' : '#5a5a7a', marginBottom: 10,
+                    color: active ? '#f4f4f5' : '#52525b', marginBottom: 10,
                     transition: 'color 0.18s',
                     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                   }}>{m.title}</p>
@@ -336,7 +336,7 @@ export function CustomAdvisor() {
               onClick={generate}
               disabled={loading}
               style={{
-                marginTop: 4, background: 'transparent', color: '#7878a8',
+                marginTop: 4, background: 'transparent', color: '#71717a',
                 border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '9px 14px',
                 fontSize: 14, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
                 cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.5 : 1,
@@ -345,7 +345,7 @@ export function CustomAdvisor() {
               }}
             >
               {loading
-                ? <><span className="inline-block h-3 w-3 rounded-full border border-violet-500 border-t-transparent animate-spin" />Generating…</>
+                ? <><span className="inline-block h-3 w-3 rounded-full border border-blue-500 border-t-transparent animate-spin" />Generating…</>
                 : '↻ Regenerate'}
             </button>
           </div>
@@ -375,7 +375,7 @@ export function CustomAdvisor() {
                     {meta.code}
                   </span>
                   <span style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.1)', display: 'inline-block' }} />
-                  <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.16em', color: '#7878a8', textTransform: 'uppercase' }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.16em', color: '#71717a', textTransform: 'uppercase' }}>
                     Custom Op
                   </span>
                 </div>
@@ -384,13 +384,13 @@ export function CustomAdvisor() {
                     onClick={() => idea && downloadPlan(idea)}
                     style={{
                       fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
-                      color: '#7878a8', background: 'transparent',
+                      color: '#71717a', background: 'transparent',
                       border: '1px solid rgba(255,255,255,0.08)',
                       borderRadius: 6, padding: '3px 10px', cursor: 'pointer',
                       transition: 'all 0.15s',
                     }}
-                    onMouseEnter={e => { (e.target as HTMLElement).style.color = '#a78bfa'; (e.target as HTMLElement).style.borderColor = 'rgba(124,106,255,0.3)' }}
-                    onMouseLeave={e => { (e.target as HTMLElement).style.color = '#7878a8'; (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)' }}
+                    onMouseEnter={e => { (e.target as HTMLElement).style.color = '#60a5fa'; (e.target as HTMLElement).style.borderColor = 'rgba(59,130,246,0.28)' }}
+                    onMouseLeave={e => { (e.target as HTMLElement).style.color = '#71717a'; (e.target as HTMLElement).style.borderColor = 'rgba(255,255,255,0.08)' }}
                   >
                     ↓ Save Plan
                   </button>
@@ -405,7 +405,7 @@ export function CustomAdvisor() {
               <div style={{ padding: '22px 24px 28px' }}>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 20, alignItems: 'start', marginBottom: 24 }}>
-                  <h2 style={{ color: '#e8e8f0', fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
+                  <h2 style={{ color: '#f4f4f5', fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
                     {idea.title}
                   </h2>
                   <div style={{
@@ -414,12 +414,12 @@ export function CustomAdvisor() {
                     display: 'flex', flexDirection: 'column', gap: 10, minWidth: 150,
                   }}>
                     <div>
-                      <p style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.16em', color: '#7878a8', marginBottom: 6, textTransform: 'uppercase' }}>Difficulty</p>
+                      <p style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.16em', color: '#71717a', marginBottom: 6, textTransform: 'uppercase' }}>Difficulty</p>
                       <DiffMeter level={idea.difficulty} color={diffColor} />
                     </div>
                     <div style={{ height: 1, background: 'rgba(255,255,255,0.05)' }} />
                     <div>
-                      <p style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.16em', color: '#7878a8', marginBottom: 5, textTransform: 'uppercase' }}>ETA</p>
+                      <p style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.16em', color: '#71717a', marginBottom: 5, textTransform: 'uppercase' }}>ETA</p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <div style={{ flex: 1, height: 5, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
                           <div style={{
@@ -435,7 +435,7 @@ export function CustomAdvisor() {
 
                 <div style={{ marginBottom: 22 }}>
                   <SectionLabel>Objective</SectionLabel>
-                  <p style={{ color: '#7070a0', fontSize: 14, lineHeight: 1.8 }}>{idea.description}</p>
+                  <p style={{ color: '#a1a1aa', fontSize: 14, lineHeight: 1.8 }}>{idea.description}</p>
                 </div>
 
                 {idea.tech_stack?.length > 0 && (
@@ -470,7 +470,7 @@ export function CustomAdvisor() {
                         return (
                           <label key={key} style={{
                             display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer',
-                            background: done ? 'rgba(124,106,255,0.05)' : 'transparent',
+                            background: 'transparent',
                             borderRadius: 10, padding: '9px 10px', transition: 'background 0.2s',
                           }}>
                             <div style={{
@@ -485,7 +485,7 @@ export function CustomAdvisor() {
                                   <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke={meta.color} strokeWidth={1.5} fill="none" strokeLinecap="round" />
                                 </svg>
                               ) : (
-                                <span style={{ fontSize: 12, fontWeight: 900, color: '#7878a8' }}>
+                                <span style={{ fontSize: 12, fontWeight: 900, color: '#71717a' }}>
                                   {String(i + 1).padStart(2, '0')}
                                 </span>
                               )}
@@ -494,7 +494,7 @@ export function CustomAdvisor() {
                               onChange={() => setChecked(p => ({ ...p, [key]: !p[key] }))} />
                             <span style={{
                               fontSize: 13, lineHeight: 1.65,
-                              color: done ? '#7878a8' : '#9090b0',
+                              color: done ? '#71717a' : '#a1a1aa',
                               textDecoration: done ? 'line-through' : 'none',
                               transition: 'color 0.2s',
                             }}>{step}</span>
@@ -518,8 +518,8 @@ export function CustomAdvisor() {
           background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.05)',
           borderRadius: 16,
         }}>
-          <p style={{ color: '#7878a8', fontSize: 13 }}>Describe what you want to build above, then hit Generate.</p>
-          <p style={{ color: '#5a5a7a', fontSize: 12 }}>Claude will use current AI trends and tools to tailor ideas to your description.</p>
+          <p style={{ color: '#71717a', fontSize: 13 }}>Describe what you want to build above, then hit Generate.</p>
+          <p style={{ color: '#52525b', fontSize: 12 }}>Claude will use current AI trends and tools to tailor ideas to your description.</p>
         </div>
       )}
     </div>
