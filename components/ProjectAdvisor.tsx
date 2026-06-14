@@ -182,29 +182,6 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
     } finally { setLoading(false) }
   }
 
-  if (ideas.length === 0 && !loading) {
-    return (
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        justifyContent: 'center', minHeight: 360, gap: 16,
-        background: 'rgba(255,255,255,0.015)',
-        border: '1px solid rgba(255,255,255,0.07)',
-        borderRadius: 16,
-      }}>
-        <p className="eyebrow">No missions queued</p>
-        <p style={{ color: '#71717a', fontSize: 13 }}>Generate project ideas based on what's trending in AI right now.</p>
-        <button onClick={regenerate} style={{
-          background: 'rgba(59,130,246,0.12)', color: '#60a5fa',
-          border: '1px solid rgba(59,130,246,0.28)',
-          borderRadius: 12, padding: '10px 22px',
-          fontSize: 12, fontWeight: 700, cursor: 'pointer',
-        }}>
-          Generate missions →
-        </button>
-      </div>
-    )
-  }
-
   const idea = ideas[activeIdx]
   const meta = MISSION_META[activeIdx] ?? MISSION_META[0]
   const diffColor = DIFF_COLORS[idea?.difficulty ?? 3]
@@ -221,7 +198,15 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
           border: '1px solid rgba(255,255,255,0.07)',
           borderRadius: 12, padding: '16px 16px 14px',
         }}>
-          <p style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.18em', color: '#71717a', textTransform: 'uppercase', marginBottom: 14 }}>Your Profile</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <p style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.18em', color: '#71717a', textTransform: 'uppercase' }}>Your Profile</p>
+            <span style={{
+              fontSize: 9, fontWeight: 900, letterSpacing: '0.1em',
+              color: '#3b82f6', background: 'rgba(59,130,246,0.1)',
+              border: '1px solid rgba(59,130,246,0.2)',
+              borderRadius: 3, padding: '1px 6px', textTransform: 'uppercase',
+            }}>Step 1</span>
+          </div>
 
           {/* Level */}
           <div style={{ marginBottom: 10 }}>
@@ -283,6 +268,12 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
             </div>
           </div>
         </div>
+
+        {ideas.length > 0 && (
+          <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.18em', color: '#52525b', textTransform: 'uppercase', margin: '6px 2px 4px' }}>
+            Step 2 · Select Mission
+          </p>
+        )}
 
         {ideas.map((m, i) => {
           const mm      = MISSION_META[i] ?? MISSION_META[0]
@@ -363,27 +354,27 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
           )
         })}
 
-        {/* Regenerate */}
+        {/* Generate / Regenerate */}
         <button
           onClick={regenerate}
           disabled={loading}
           style={{
             marginTop: 4,
-            background: 'transparent',
-            color: '#71717a',
-            border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: 10, padding: '9px 14px',
-            fontSize: 14, fontWeight: 700,
+            background: ideas.length === 0 ? 'rgba(59,130,246,0.12)' : 'transparent',
+            color: ideas.length === 0 ? '#60a5fa' : '#71717a',
+            border: `1px solid ${ideas.length === 0 ? 'rgba(59,130,246,0.28)' : 'rgba(255,255,255,0.06)'}`,
+            borderRadius: 10, padding: '10px 14px',
+            fontSize: ideas.length === 0 ? 13 : 11, fontWeight: 700,
             letterSpacing: '0.06em', textTransform: 'uppercase',
             cursor: loading ? 'not-allowed' : 'pointer',
             opacity: loading ? 0.5 : 1,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            transition: 'opacity 0.2s',
+            transition: 'all 0.2s',
           }}
         >
           {loading
             ? <><span className="inline-block h-3 w-3 rounded-full border border-blue-500 border-t-transparent animate-spin" />Generating…</>
-            : '↻ New missions'}
+            : ideas.length === 0 ? 'Generate missions →' : '↻ New missions'}
         </button>
       </div>
 
@@ -592,7 +583,25 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
             )}
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', minHeight: 360, gap: 12,
+          background: 'rgba(255,255,255,0.012)',
+          border: '1px solid rgba(255,255,255,0.06)',
+          borderRadius: 16,
+        }}>
+          <p style={{ fontSize: 9, fontWeight: 900, letterSpacing: '0.2em', color: '#3f3f46', textTransform: 'uppercase' }}>
+            Step 3 · Briefing
+          </p>
+          <p style={{ color: '#3f3f46', fontSize: 13, textAlign: 'center', maxWidth: 280, lineHeight: 1.65 }}>
+            {loading
+              ? 'Claude is generating missions from this week\'s AI news…'
+              : 'Configure your profile on the left, then hit Generate to see mission briefs here.'}
+          </p>
+          {loading && <span className="inline-block h-4 w-4 rounded-full border border-blue-500 border-t-transparent animate-spin" />}
+        </div>
+      )}
     </div>
   )
 }

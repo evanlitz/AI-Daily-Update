@@ -143,16 +143,11 @@ function Sidebar() {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-4 py-5" style={{ minHeight: 72 }}>
-        <div
-          className="flex shrink-0 items-center justify-center rounded-xl"
-          style={{
-            width: 38, height: 38,
-            background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-            boxShadow: '0 0 16px rgba(59,130,246,0.2)',
-          }}
-        >
-          <span style={{ color: '#fff', fontSize: 13, fontWeight: 900, letterSpacing: '-0.02em' }}>AI</span>
-        </div>
+        <img
+          src="/logo.png"
+          alt="AI Daily Update"
+          style={{ width: 38, height: 38, borderRadius: 10, flexShrink: 0, objectFit: 'contain' }}
+        />
         <span className="sidebar-label font-black tracking-tight" style={{ color: '#e8e8f0', fontSize: 16 }}>
           Daily Update
         </span>
@@ -250,8 +245,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="AI Daily Update" />
-        <link rel="apple-touch-icon" href="/icon.svg" />
-        <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="icon" href="/logo.png" type="image/png" />
       </head>
       <body className={inter.variable}>
         <Sidebar />
