@@ -43,8 +43,8 @@ function techMeta(name: string): TechMeta {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-      <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.22em', color: '#71717a', textTransform: 'uppercase' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+      <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.22em', color: '#71717a', textTransform: 'uppercase' }}>
         {children}
       </span>
       <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
@@ -210,7 +210,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
   const diffColor = DIFF_COLORS[idea?.difficulty ?? 3]
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 20, alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '310px 1fr', gap: 24, alignItems: 'start' }}>
 
       {/* ── LEFT: Mission selector ──────────────────────────────────── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -219,9 +219,9 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
         <div style={{
           background: 'rgba(255,255,255,0.018)',
           border: '1px solid rgba(255,255,255,0.07)',
-          borderRadius: 12, padding: '13px 14px 12px',
+          borderRadius: 12, padding: '16px 16px 14px',
         }}>
-          <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.18em', color: '#71717a', textTransform: 'uppercase', marginBottom: 11 }}>Your Profile</p>
+          <p style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.18em', color: '#71717a', textTransform: 'uppercase', marginBottom: 14 }}>Your Profile</p>
 
           {/* Level */}
           <div style={{ marginBottom: 10 }}>
@@ -231,7 +231,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
                 const active = profile.level === lvl
                 return (
                   <button key={lvl} onClick={() => saveProfile({ ...profile, level: lvl })} style={{
-                    flex: 1, fontSize: 10, fontWeight: 700, padding: '5px 2px', borderRadius: 6,
+                    flex: 1, fontSize: 11, fontWeight: 700, padding: '6px 4px', borderRadius: 6,
                     background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
                     color: active ? '#60a5fa' : '#52525b',
                     border: `1px solid ${active ? 'rgba(59,130,246,0.28)' : 'rgba(255,255,255,0.07)'}`,
@@ -298,7 +298,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
                 background: active ? `rgba(${mm.rgb},0.07)` : 'rgba(255,255,255,0.015)',
                 border: `1px solid ${active ? `rgba(${mm.rgb},0.28)` : 'rgba(255,255,255,0.06)'}`,
                 borderRadius: 14,
-                padding: '16px 16px 14px 20px',
+                padding: '20px 18px 18px 22px',
                 cursor: 'pointer',
                 transition: 'all 0.18s',
                 overflow: 'hidden',
@@ -314,7 +314,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
               )}
 
               {/* Mission code + ETA */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <span style={{
                   fontSize: 13, fontWeight: 900, letterSpacing: '0.18em',
                   color: active ? mm.color : '#71717a',
@@ -335,9 +335,9 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
 
               {/* Title */}
               <p style={{
-                fontSize: 13, fontWeight: 700, lineHeight: 1.35,
+                fontSize: 14, fontWeight: 700, lineHeight: 1.4,
                 color: active ? '#f4f4f5' : '#52525b',
-                marginBottom: 10,
+                marginBottom: 12,
                 transition: 'color 0.18s',
                 display: '-webkit-box',
                 WebkitLineClamp: 2,
@@ -452,13 +452,13 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
             </div>
           </div>
 
-          <div style={{ padding: '22px 24px 28px' }}>
+          <div style={{ padding: '26px 30px 34px' }}>
 
             {/* Title + stats row */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 20, alignItems: 'start', marginBottom: 24 }}>
               <h2 style={{
-                color: '#f4f4f5', fontSize: 22, fontWeight: 900,
-                letterSpacing: '-0.02em', lineHeight: 1.25,
+                color: '#f4f4f5', fontSize: 26, fontWeight: 900,
+                letterSpacing: '-0.02em', lineHeight: 1.2,
               }}>
                 {idea.title}
               </h2>
@@ -497,16 +497,16 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
             </div>
 
             {/* Objective */}
-            <div style={{ marginBottom: 22 }}>
+            <div style={{ marginBottom: 26 }}>
               <SectionLabel>Objective</SectionLabel>
-              <p style={{ color: '#a1a1aa', fontSize: 14, lineHeight: 1.8 }}>
+              <p style={{ color: '#a1a1aa', fontSize: 15, lineHeight: 1.85 }}>
                 {idea.description}
               </p>
             </div>
 
             {/* Tech Stack */}
             {idea.tech_stack?.length > 0 && (
-              <div style={{ marginBottom: 22 }}>
+              <div style={{ marginBottom: 26 }}>
                 <SectionLabel>Tech Stack</SectionLabel>
                 <TechFlow techs={idea.tech_stack} />
               </div>
@@ -514,16 +514,16 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
 
             {/* Skills */}
             {idea.skills_learned.length > 0 && (
-              <div style={{ marginBottom: 22 }}>
+              <div style={{ marginBottom: 26 }}>
                 <SectionLabel>Capabilities Gained</SectionLabel>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
                   {idea.skills_learned.map(s => (
                     <span key={s} style={{
-                      fontSize: 12, fontWeight: 700,
+                      fontSize: 13, fontWeight: 700,
                       color: '#34d399',
                       background: 'rgba(52,211,153,0.08)',
                       border: '1px solid rgba(52,211,153,0.18)',
-                      borderRadius: 8, padding: '5px 12px',
+                      borderRadius: 8, padding: '6px 14px',
                     }}>
                       {s}
                     </span>
@@ -536,7 +536,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
             {idea.starter_checklist.length > 0 && (
               <div>
                 <SectionLabel>Mission Phases</SectionLabel>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {idea.starter_checklist.map((step, i) => {
                     const key  = `${idea.id}-${i}`
                     const done = !!checked[key]
@@ -547,7 +547,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
                           display: 'flex', alignItems: 'flex-start', gap: 12,
                           cursor: 'pointer',
                           background: 'transparent',
-                          borderRadius: 10, padding: '9px 10px',
+                          borderRadius: 10, padding: '10px 12px',
                           transition: 'background 0.2s',
                         }}
                       >
@@ -577,7 +577,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
                           onChange={() => setChecked(p => ({ ...p, [key]: !p[key] }))}
                         />
                         <span style={{
-                          fontSize: 13, lineHeight: 1.65,
+                          fontSize: 14, lineHeight: 1.7,
                           color: done ? '#71717a' : '#a1a1aa',
                           textDecoration: done ? 'line-through' : 'none',
                           transition: 'color 0.2s',

@@ -35,8 +35,8 @@ function techMeta(name: string): TechMeta {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-      <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.22em', color: '#71717a', textTransform: 'uppercase' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+      <span style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.22em', color: '#71717a', textTransform: 'uppercase' }}>
         {children}
       </span>
       <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.06)' }} />
@@ -186,7 +186,7 @@ export function CustomAdvisor() {
         border: '1px solid rgba(255,255,255,0.08)',
         borderRadius: 16, padding: '20px 22px',
       }}>
-        <p style={{ fontSize: 10, fontWeight: 900, letterSpacing: '0.18em', color: '#71717a', textTransform: 'uppercase', marginBottom: 10 }}>
+        <p style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.18em', color: '#71717a', textTransform: 'uppercase', marginBottom: 12 }}>
           Describe Your Mission
         </p>
 
@@ -202,7 +202,7 @@ export function CustomAdvisor() {
             background: 'rgba(255,255,255,0.03)',
             border: `1px solid ${error ? 'rgba(248,113,113,0.4)' : 'rgba(255,255,255,0.1)'}`,
             borderRadius: 10, padding: '12px 14px',
-            color: '#d4d4d8', fontSize: 14, lineHeight: 1.65,
+            color: '#d4d4d8', fontSize: 15, lineHeight: 1.7,
             outline: 'none', fontFamily: 'inherit',
             transition: 'border-color 0.2s',
             boxSizing: 'border-box',
@@ -224,7 +224,7 @@ export function CustomAdvisor() {
                 const active = level === lvl
                 return (
                   <button key={lvl} onClick={() => { setLevel(lvl); saveProfile({ level: lvl, hoursPerWeek: hours }) }} style={{
-                    fontSize: 10, fontWeight: 700, padding: '4px 9px', borderRadius: 6,
+                    fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 6,
                     background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
                     color: active ? '#60a5fa' : '#52525b',
                     border: `1px solid ${active ? 'rgba(59,130,246,0.28)' : 'rgba(255,255,255,0.08)'}`,
@@ -277,7 +277,7 @@ export function CustomAdvisor() {
 
       {/* ── Results ──────────────────────────────────────────────────── */}
       {ideas.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 20, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '310px 1fr', gap: 24, alignItems: 'start' }}>
 
           {/* LEFT: mission selector */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -293,7 +293,7 @@ export function CustomAdvisor() {
                     position: 'relative', textAlign: 'left',
                     background: active ? `rgba(${mm.rgb},0.07)` : 'rgba(255,255,255,0.015)',
                     border: `1px solid ${active ? `rgba(${mm.rgb},0.28)` : 'rgba(255,255,255,0.06)'}`,
-                    borderRadius: 14, padding: '16px 16px 14px 20px',
+                    borderRadius: 14, padding: '20px 18px 18px 22px',
                     cursor: 'pointer', transition: 'all 0.18s', overflow: 'hidden',
                   }}
                 >
@@ -303,7 +303,7 @@ export function CustomAdvisor() {
                       width: 3, background: mm.color,
                     }} />
                   )}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                     <span style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.18em', color: active ? mm.color : '#71717a', transition: 'color 0.18s' }}>
                       {mm.code}
                     </span>
@@ -314,8 +314,8 @@ export function CustomAdvisor() {
                     }}>~{m.estimated_hours}h</span>
                   </div>
                   <p style={{
-                    fontSize: 13, fontWeight: 700, lineHeight: 1.35,
-                    color: active ? '#f4f4f5' : '#52525b', marginBottom: 10,
+                    fontSize: 14, fontWeight: 700, lineHeight: 1.4,
+                    color: active ? '#f4f4f5' : '#52525b', marginBottom: 12,
                     transition: 'color 0.18s',
                     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
                   }}>{m.title}</p>
@@ -402,10 +402,10 @@ export function CustomAdvisor() {
                 </div>
               </div>
 
-              <div style={{ padding: '22px 24px 28px' }}>
+              <div style={{ padding: '26px 30px 34px' }}>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 20, alignItems: 'start', marginBottom: 24 }}>
-                  <h2 style={{ color: '#f4f4f5', fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.25 }}>
+                  <h2 style={{ color: '#f4f4f5', fontSize: 26, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                     {idea.title}
                   </h2>
                   <div style={{
@@ -433,27 +433,27 @@ export function CustomAdvisor() {
                   </div>
                 </div>
 
-                <div style={{ marginBottom: 22 }}>
+                <div style={{ marginBottom: 26 }}>
                   <SectionLabel>Objective</SectionLabel>
-                  <p style={{ color: '#a1a1aa', fontSize: 14, lineHeight: 1.8 }}>{idea.description}</p>
+                  <p style={{ color: '#a1a1aa', fontSize: 15, lineHeight: 1.85 }}>{idea.description}</p>
                 </div>
 
                 {idea.tech_stack?.length > 0 && (
-                  <div style={{ marginBottom: 22 }}>
+                  <div style={{ marginBottom: 26 }}>
                     <SectionLabel>Tech Stack</SectionLabel>
                     <TechFlow techs={idea.tech_stack} />
                   </div>
                 )}
 
                 {idea.skills_learned.length > 0 && (
-                  <div style={{ marginBottom: 22 }}>
+                  <div style={{ marginBottom: 26 }}>
                     <SectionLabel>Capabilities Gained</SectionLabel>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
                       {idea.skills_learned.map(s => (
                         <span key={s} style={{
-                          fontSize: 12, fontWeight: 700, color: '#34d399',
+                          fontSize: 13, fontWeight: 700, color: '#34d399',
                           background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.18)',
-                          borderRadius: 8, padding: '5px 12px',
+                          borderRadius: 8, padding: '6px 14px',
                         }}>{s}</span>
                       ))}
                     </div>
@@ -463,7 +463,7 @@ export function CustomAdvisor() {
                 {idea.starter_checklist.length > 0 && (
                   <div>
                     <SectionLabel>Mission Phases</SectionLabel>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {idea.starter_checklist.map((step, i) => {
                         const key  = `${idea.id}-${i}`
                         const done = !!checked[key]
@@ -471,7 +471,7 @@ export function CustomAdvisor() {
                           <label key={key} style={{
                             display: 'flex', alignItems: 'flex-start', gap: 12, cursor: 'pointer',
                             background: 'transparent',
-                            borderRadius: 10, padding: '9px 10px', transition: 'background 0.2s',
+                            borderRadius: 10, padding: '10px 12px', transition: 'background 0.2s',
                           }}>
                             <div style={{
                               width: 22, height: 22, borderRadius: 6, flexShrink: 0,
@@ -493,7 +493,7 @@ export function CustomAdvisor() {
                             <input type="checkbox" className="sr-only" checked={done}
                               onChange={() => setChecked(p => ({ ...p, [key]: !p[key] }))} />
                             <span style={{
-                              fontSize: 13, lineHeight: 1.65,
+                              fontSize: 14, lineHeight: 1.7,
                               color: done ? '#71717a' : '#a1a1aa',
                               textDecoration: done ? 'line-through' : 'none',
                               transition: 'color 0.2s',
