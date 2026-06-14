@@ -83,31 +83,32 @@ async function getAffinityContext(): Promise<string> {
   } catch { return '' }
 }
 
-async function getPreviousDigest(currentWeekStart: string): Promise<{ week_start: string; highlights: string[] } | null> {
+async function getPriorDigests(currentWeekStart: string): Promise<{ week_start: string; highlights: string[] }[]> {
   try {
     const { rows } = await db.execute({
-      sql: `SELECT week_start, highlights FROM weekly_digest WHERE week_start < ? ORDER BY week_start DESC LIMIT 1`,
+      sql: `SELECT week_start, highlights FROM weekly_digest WHERE week_start < ? ORDER BY week_start DESC LIMIT 3`,
       args: [currentWeekStart],
     })
-    const row = rows[0] as any
-    if (!row) return null
-    return { week_start: row.week_start, highlights: JSON.parse(row.highlights ?? '[]') }
-  } catch { return null }
+    return (rows as any[]).map(row => ({
+      week_start: row.week_start,
+      highlights: JSON.parse(row.highlights ?? '[]'),
+    }))
+  } catch { return [] }
 }
 
 export async function generateWeeklyDigest(): Promise<WeeklyDigest> {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const weekStart = getMondayISO()
 
-  const [{ rows: raw }, storyContext, prevDigest, affinityContext] = await Promise.all([
+  const [{ rows: raw }, storyContext, priorDigests, affinityContext] = await Promise.all([
     db.execute({
       sql: `SELECT id, source, title, raw_content, summary, published_at, velocity_score, topic_tags FROM feed_items WHERE fetched_at >= ? ORDER BY fetched_at DESC LIMIT 200`,
       args: [weekAgo],
     }),
     getStoryContext(),
-    getPreviousDigest(weekStart),
+    getPriorDigests(weekStart),
     getAffinityContext(),
-  ]) as [{ rows: any[] }, string, { week_start: string; highlights: string[] } | null, string]
+  ]) as [{ rows: any[] }, string, { week_start: string; highlights: string[] }[], string]
 
   // Source diversity cap: max 8 per source
   const sourceCounts: Record<string, number> = {}
@@ -142,13 +143,18 @@ export async function generateWeeklyDigest(): Promise<WeeklyDigest> {
     return `${i + 1}.${sourceNote}\n   Title: ${item.title}\n   ${content}`
   }).join('\n\n')
 
-  const prevContext = prevDigest
-    ? `\n\nPREVIOUS WEEK (week of ${prevDigest.week_start}):\n${prevDigest.highlights.map(h => `- ${h}`).join('\n')}\n\nUse this to identify what escalated, what resolved, and what is genuinely new this week.`
+  // Build trajectory context from up to 3 prior weeks — oldest first so Claude reads the arc in order
+  const hasPrior = priorDigests.length > 0
+  const trajectoryContext = hasPrior
+    ? `\n\nPRIOR WEEKS (oldest → newest — use to write The Trajectory and identify changes):\n` +
+      [...priorDigests].reverse().map(d =>
+        `Week of ${d.week_start}:\n${d.highlights.map(h => `- ${h}`).join('\n')}`
+      ).join('\n\n')
     : ''
 
   const response = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 2800,
+    max_tokens: 3800,
     system: [
       {
         type: 'text',
@@ -161,7 +167,10 @@ When an item is marked "covered by N sources", treat it as proportionally more s
     messages: [
       {
         role: 'user',
-        content: `Here are this week's top AI developments (ranked by recency + momentum, multi-source stories flagged):\n\n${itemList}${storyContext}${affinityContext}${prevContext}\n\nWrite a weekly digest with these sections:\n## The Big Moves\n2-3 most important model/company developments. If any story was covered by multiple sources, lead with those. Reference how ongoing story threads have progressed where relevant.${prevDigest ? ' Note if anything from last week escalated or resolved.' : ''}\n## Tools Worth Your Time\nNew dev tools or frameworks worth trying. Be specific about what they do and why a developer should care.\n## Research That Matters\n1-2 papers explained in plain English. What can developers actually do with this?\n## Hot Takes\n2-3 surprising, contrarian, or uncomfortable observations from this week. Not the headline — the implication most people are missing, the bold call that challenges consensus, or the thing the hype cycle is getting wrong.\n## What This Means For You\n3-4 concrete, actionable takeaways. Each must name a specific tool, decision, or experiment: "Try X this week by doing Y" — not "explore the space of Z". No generic advice.\n\nEnd with this exact JSON block on its own line:\n{"highlights":["sentence","sentence","sentence"],"changes":[{"type":"escalated","text":"something from last week that got bigger"},{"type":"resolved","text":"something that concluded"},{"type":"new","text":"something with no prior coverage"}]}${prevDigest ? '\nOnly include changes entries that are genuinely meaningful. Omit the changes array if there is no previous week to compare against.' : '\nOmit the changes array — no previous week to compare against.'}`,
+        content: `Here are this week's top AI developments (ranked by recency + momentum, multi-source stories flagged):\n\n${itemList}${storyContext}${affinityContext}${trajectoryContext}\n\nWrite a weekly digest with these exact sections in this order:\n\n## The Trajectory\n${hasPrior
+  ? `Open with where AI actually is right now in its development arc. Use the prior weeks' highlights above to establish context, then situate this week as a chapter in that story. Be willing to make a real call — "We're in the late innings of X", "This week marks an inflection in Y", "The gap between labs is closing because Z." This is analysis, not summary: what does this week MEAN given where we've been? 2-3 focused paragraphs. This section appears first because it frames everything that follows.`
+  : `A high-level orientation on where AI stands right now and what direction it's heading. 2 paragraphs. Make a real call about the current phase of AI development.`
+}\n\n## The Big Moves\n2-3 most important model/company developments. Lead with multi-source stories. Reference ongoing story threads where relevant.${hasPrior ? ' Note if anything from a prior week escalated or resolved.' : ''}\n\n## Tools Worth Your Time\nNew dev tools or frameworks worth trying. Be specific about what they do and why a developer should care.\n\n## Research That Matters\n3 papers explained in plain English. What can developers actually do with each?\n\n## Hot Takes\nExactly 5 surprising, contrarian, or uncomfortable observations from this week. Not the headline — the implication most people are missing, the bold call that challenges consensus, or the thing the hype cycle is getting wrong.\n\n## What This Means For You\n3-4 concrete, actionable takeaways. Each must name a specific tool, decision, or experiment: "Try X this week by doing Y" — not "explore the space of Z". No generic advice.\n\nEnd with this exact JSON block on its own line:\n{"highlights":["sentence","sentence","sentence"],"changes":[{"type":"escalated","text":"something from a prior week that got bigger"},{"type":"resolved","text":"something that concluded"},{"type":"new","text":"something with no prior coverage"}]}${hasPrior ? '\nOnly include changes entries that are genuinely meaningful.' : '\nOmit the changes array — no prior weeks to compare against.'}`,
       },
     ],
   })

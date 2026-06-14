@@ -596,28 +596,24 @@ function StoryDetailView({
             {detail.topEntities.map(e => {
               const em = ENTITY_COLORS[e.type] ?? { color: '#7c6aff', rgb: '124,106,255' }
               return (
-                <a key={e.id} href={`/entities/${e.id}`} style={{ textDecoration: 'none' }}>
+                <span key={e.id} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 7,
+                  fontSize: 12, fontWeight: 700,
+                  color: em.color,
+                  background: `rgba(${em.rgb},0.1)`,
+                  border: `1px solid rgba(${em.rgb},0.25)`,
+                  borderRadius: 8, padding: '5px 11px',
+                }}>
+                  {e.name}
                   <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 7,
-                    fontSize: 12, fontWeight: 700,
-                    color: em.color,
-                    background: `rgba(${em.rgb},0.1)`,
-                    border: `1px solid rgba(${em.rgb},0.25)`,
-                    borderRadius: 8, padding: '5px 11px',
-                    cursor: 'pointer',
-                    transition: 'background 0.15s',
+                    fontSize: 9, fontWeight: 900,
+                    color: em.color, opacity: 0.65,
+                    background: `rgba(${em.rgb},0.15)`,
+                    borderRadius: 3, padding: '1px 5px',
                   }}>
-                    {e.name}
-                    <span style={{
-                      fontSize: 9, fontWeight: 900,
-                      color: em.color, opacity: 0.65,
-                      background: `rgba(${em.rgb},0.15)`,
-                      borderRadius: 3, padding: '1px 5px',
-                    }}>
-                      {e.item_count}
-                    </span>
+                    {e.item_count}
                   </span>
-                </a>
+                </span>
               )
             })}
           </div>

@@ -25,7 +25,6 @@ async function getHomeData() {
     storiesRes,
     digestRes,
     modelCountRes,
-    radarCountRes,
     pipelineRes,
     predEvidenceRes,
   ] = await Promise.all([
@@ -54,7 +53,6 @@ async function getHomeData() {
     }),
     db.execute({ sql: `SELECT week_start, highlights, created_at FROM weekly_digest ORDER BY created_at DESC LIMIT 1`, args: [] }),
     db.execute({ sql: `SELECT COUNT(*) as count FROM ai_models`, args: [] }),
-    db.execute({ sql: `SELECT COUNT(*) as count FROM tech_radar`, args: [] }),
     db.execute({ sql: `SELECT MAX(fetched_at) as last_fetch, COUNT(*) as recent FROM feed_items WHERE fetched_at >= ?`, args: [since6h] }),
     db.execute({
       sql: `SELECT id, title, category, confidence, evidence, updated_at
@@ -69,7 +67,6 @@ async function getHomeData() {
   const trending    = trendingRes.rows as any[]
   const stories     = storiesRes.rows as any[]
   const modelCount  = (modelCountRes.rows[0] as any)?.count ?? 0
-  const radarCount  = (radarCountRes.rows[0] as any)?.count ?? 0
 
   const digestRow   = digestRes.rows[0] as any ?? null
   let highlights: string[] = []
@@ -93,7 +90,7 @@ async function getHomeData() {
     return { ...r, latestEvidence }
   })
 
-  return { feedToday, trending, stories, digest: digestRow, highlights, modelCount, radarCount, lastFetch, recentCount, freshnessColor, freshnessLabel, predEvidence }
+  return { feedToday, trending, stories, digest: digestRow, highlights, modelCount, lastFetch, recentCount, freshnessColor, freshnessLabel, predEvidence }
 }
 
 
@@ -108,7 +105,7 @@ const CONF_COLOR: Record<string, string> = {
 }
 
 export default async function HomePage() {
-  const { feedToday, trending, stories, digest, highlights, modelCount, radarCount, lastFetch, recentCount, freshnessColor, freshnessLabel, predEvidence } = await getHomeData()
+  const { feedToday, trending, stories, digest, highlights, modelCount, lastFetch, recentCount, freshnessColor, freshnessLabel, predEvidence } = await getHomeData()
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
@@ -157,7 +154,6 @@ export default async function HomePage() {
         <StatCard label="New Today"     value={feedToday}   sub="articles fetched"        href="/feed"        accent="124,106,255" />
         <StatCard label="Active Stories" value={stories.length > 0 ? '✓' : '—'} sub={`${stories.length} threads`} href="/stories" accent="167,139,250" />
         <StatCard label="Models Tracked" value={modelCount}  sub="across all labs"         href="/models"      accent="96,165,250"  />
-        <StatCard label="Radar Signals"  value={radarCount}  sub="technologies tracked"    href="/radar"       accent="52,211,153"  />
         <StatCard label="Weekly Digest"  value={digest ? '✓' : '—'} sub={digest ? `w/o ${digest.week_start}` : 'Not generated'} href="/digest" accent="251,191,36" />
       </div>
 
@@ -426,12 +422,10 @@ export default async function HomePage() {
             { href: '/feed',        label: 'Feed',        desc: 'Latest articles & papers'        },
             { href: '/digest',      label: 'Digest',      desc: 'Weekly AI briefing'              },
             { href: '/stories',     label: 'Stories',     desc: 'Ongoing narrative threads'       },
-            { href: '/radar',       label: 'Radar',       desc: 'Technology tracking signals'     },
             { href: '/models',      label: 'Models',      desc: 'AI model release tracker'        },
             { href: '/repos',       label: 'Repos',       desc: 'Trending GitHub repositories'    },
             { href: '/datasets',    label: 'Datasets',    desc: 'HuggingFace & Kaggle datasets'   },
             { href: '/predictions', label: 'Predictions', desc: 'AI milestone timeline bets'      },
-            { href: '/entities',    label: 'Entities',    desc: 'Companies, models, researchers'  },
             { href: '/advisor',     label: 'Advisor',     desc: 'Personalized AI learning path'   },
             { href: '/timeline',    label: 'Timeline',    desc: 'Historical AI events'            },
           ].map(({ href, label, desc }) => (

@@ -69,18 +69,6 @@ const NAV = [
     ),
   },
   {
-    href: '/radar',
-    label: 'Radar',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" width={22} height={22}>
-        <circle cx="12" cy="12" r="2" strokeWidth="1.75" />
-        <circle cx="12" cy="12" r="6" strokeWidth="1.75" />
-        <circle cx="12" cy="12" r="10" strokeWidth="1.75" />
-        <path d="M12 2v2M12 20v2M2 12h2M20 12h2" strokeWidth="1.75" />
-      </svg>
-    ),
-  },
-  {
     href: '/advisor',
     label: 'Advisor',
     icon: (
@@ -136,20 +124,6 @@ const NAV = [
         <circle cx="12" cy="12" r="2.5" strokeWidth="1.75" />
         <circle cx="12" cy="17" r="2.5" strokeWidth="1.75" />
         <path d="M12 7h4M12 12h5M12 17h3" strokeWidth="1.75" />
-      </svg>
-    ),
-  },
-  {
-    href: '/entities',
-    label: 'Entities',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
-        <circle cx="12" cy="12" r="3" strokeWidth="1.75" />
-        <circle cx="4"  cy="6"  r="2" strokeWidth="1.75" />
-        <circle cx="20" cy="6"  r="2" strokeWidth="1.75" />
-        <circle cx="4"  cy="18" r="2" strokeWidth="1.75" />
-        <circle cx="20" cy="18" r="2" strokeWidth="1.75" />
-        <path d="M6 7l4 4M18 7l-4 4M6 17l4-4M18 17l-4-4" strokeWidth="1.5" />
       </svg>
     ),
   },
