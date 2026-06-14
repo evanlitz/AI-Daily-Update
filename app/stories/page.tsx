@@ -176,14 +176,14 @@ function StoryCard({
         border: '1px solid var(--border)',
         borderLeft: `3px solid ${cat.color}`,
         borderRadius: 10,
-        padding: '18px 20px',
+        padding: '22px 24px',
         cursor: 'pointer',
         transition: 'transform 0.16s ease, box-shadow 0.16s ease, background 0.16s ease, border-color 0.16s ease',
         position: 'relative',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        gap: 10,
+        gap: 12,
       }}
       onMouseEnter={e => {
         const el = e.currentTarget as HTMLDivElement
@@ -251,8 +251,8 @@ function StoryCard({
 
       {/* Title */}
       <p style={{
-        fontSize: 15, fontWeight: 800, color: '#e4e4e7',
-        lineHeight: 1.35, letterSpacing: '-0.015em',
+        fontSize: 16, fontWeight: 700, color: '#e4e4e7',
+        lineHeight: 1.4, letterSpacing: '-0.015em',
       }}>
         {story.title}
       </p>
@@ -260,8 +260,8 @@ function StoryCard({
       {/* Latest update snippet */}
       {story.latest_update && (
         <p style={{
-          fontSize: 13, color: '#a1a1aa', lineHeight: 1.65,
-          display: '-webkit-box', WebkitLineClamp: 3,
+          fontSize: 14, color: '#a1a1aa', lineHeight: 1.7,
+          display: '-webkit-box', WebkitLineClamp: 4,
           WebkitBoxOrient: 'vertical', overflow: 'hidden',
         }}>
           {story.latest_update}
@@ -1571,7 +1571,7 @@ export default function StoriesPage() {
                     label={activeCategory === 'all' ? 'All Stories' : activeCategory}
                     count={gridStories.length}
                   />
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
                     {gridStories.map((story, i) => (
                       <StoryCard
                         key={story.id}
