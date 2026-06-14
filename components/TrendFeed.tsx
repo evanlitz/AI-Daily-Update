@@ -138,7 +138,7 @@ function SummaryBullets({ summary }: { summary: string }) {
       {lines.map((line, i) => (
         <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <span style={{ color: '#60a5fa', fontSize: 12, lineHeight: 1.7, flexShrink: 0, marginTop: 1 }}>▸</span>
-          <span style={{ fontSize: 13, color: '#d4d4d8', lineHeight: 1.7 }}>{line}</span>
+          <span style={{ fontSize: 14, color: '#d4d4d8', lineHeight: 1.7 }}>{line}</span>
         </li>
       ))}
     </ul>
@@ -324,7 +324,7 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
       </div>
 
       {/* ── Main grid: sidebar + feed ───────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 16, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 20, alignItems: 'start' }}>
 
         {/* ── Sidebar ─────────────────────────────────────────── */}
         <div style={{
@@ -334,8 +334,8 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
           borderRadius: 10, overflow: 'hidden',
         }}>
           {/* Header */}
-          <div style={{ padding: '12px 14px 10px', borderBottom: '1px solid var(--border)', background: 'rgba(0,0,0,0.15)' }}>
-            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: '#71717a', textTransform: 'uppercase', marginBottom: 6 }}>Sources</p>
+          <div style={{ padding: '14px 16px 12px', borderBottom: '1px solid var(--border)', background: 'rgba(0,0,0,0.15)' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', color: '#71717a', textTransform: 'uppercase', marginBottom: 6 }}>Sources</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
               <span style={{ fontSize: 12, color: '#22c55e', fontWeight: 700, letterSpacing: '0.08em' }}>
@@ -352,7 +352,7 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
             return (
               <div key={key} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '8px 14px',
+                padding: '10px 16px',
                 borderBottom: '1px solid rgba(255,255,255,0.04)',
                 opacity: active ? 1 : 0.3,
                 transition: 'opacity 0.3s',
@@ -364,10 +364,10 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
                     transition: 'background 0.3s',
                   }} />
                   <div>
-                    <span style={{ display: 'block', fontSize: 12, fontWeight: 700, color: active ? st.color : '#71717a', letterSpacing: '0.06em' }}>
+                    <span style={{ display: 'block', fontSize: 13, fontWeight: 700, color: active ? st.color : '#71717a', letterSpacing: '0.04em' }}>
                       {st.label}
                     </span>
-                    <span style={{ fontSize: 11, color: '#71717a' }}>
+                    <span style={{ fontSize: 12, color: '#71717a' }}>
                       {active ? `${count} items` : 'no signal'}
                     </span>
                   </div>
@@ -380,16 +380,16 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
           {/* Topic breakdown */}
           {topicFreq.length > 0 && (
             <div style={{ padding: '12px 14px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: '#71717a', textTransform: 'uppercase', marginBottom: 10 }}>Topics</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', color: '#71717a', textTransform: 'uppercase', marginBottom: 10 }}>Topics</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
                 {topicFreq.map(({ tag, pct }) => {
                   const m = TOPIC_META[tag]
                   if (!m) return null
                   return (
                     <div key={tag}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: m.color, textTransform: 'capitalize', letterSpacing: '0.04em' }}>{tag}</span>
-                        <span style={{ fontSize: 11, color: '#71717a', fontFamily: 'monospace' }}>{Math.round(pct)}%</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: m.color, textTransform: 'capitalize', letterSpacing: '0.03em' }}>{tag}</span>
+                        <span style={{ fontSize: 12, color: '#71717a', fontFamily: 'monospace' }}>{Math.round(pct)}%</span>
                       </div>
                       <div style={{ height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 1, overflow: 'hidden' }}>
                         <div style={{ height: '100%', width: `${pct}%`, background: m.color, opacity: 0.55, borderRadius: 1 }} />
@@ -422,7 +422,7 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
           {/* Daily volume sparkline */}
           {sparkline.length > 0 && (
             <div style={{ padding: '10px 14px 16px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', color: '#71717a', textTransform: 'uppercase', marginBottom: 10 }}>Daily Volume</p>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', color: '#71717a', textTransform: 'uppercase', marginBottom: 10 }}>Daily Volume</p>
               <SparkChart data={sparkline} />
             </div>
           )}
@@ -452,9 +452,9 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
                 const rgb    = m?.rgb   ?? '96,165,250'
                 return (
                   <button key={tag} onClick={() => changeTag(tag)} style={{
-                    fontSize: 12, fontWeight: 600, letterSpacing: '0.04em',
+                    fontSize: 13, fontWeight: 600, letterSpacing: '0.03em',
                     textTransform: 'capitalize',
-                    padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                    padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
                     background: active ? `rgba(${rgb},0.12)` : 'transparent',
                     color: active ? color : '#71717a',
                     border: `1px solid ${active ? `rgba(${rgb},0.25)` : 'transparent'}`,
@@ -526,8 +526,8 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
                   width: '100%', boxSizing: 'border-box',
                   background: searchFocused ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.03)',
                   border: `1px solid ${searchFocused || search ? 'rgba(59,130,246,0.4)' : 'rgba(255,255,255,0.08)'}`,
-                  borderRadius: 8, padding: '6px 32px 6px 30px',
-                  color: '#e4e4e7', fontSize: 13, outline: 'none',
+                  borderRadius: 8, padding: '7px 32px 7px 32px',
+                  color: '#e4e4e7', fontSize: 14, outline: 'none',
                   transition: 'border-color 0.15s, background 0.15s',
                   boxShadow: searchFocused ? '0 0 0 3px rgba(59,130,246,0.08)' : 'none',
                 }}
@@ -584,9 +584,9 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
                       onClick={() => { setExpandedId(item.id); markRead(item) }}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '64px 1fr 48px',
+                        gridTemplateColumns: '72px 1fr 52px',
                         gap: 14,
-                        padding: '14px 16px 14px 13px',
+                        padding: '16px 18px 16px 14px',
                         cursor: 'pointer',
                         alignItems: 'start',
                       }}
@@ -600,11 +600,11 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
                       {/* Source + time */}
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, paddingTop: 2 }}>
                         <span style={{
-                          fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+                          fontSize: 11, fontWeight: 700, letterSpacing: '0.07em',
                           color: src.color,
                           background: `rgba(${src.rgb},0.1)`,
                           border: `1px solid rgba(${src.rgb},0.2)`,
-                          borderRadius: 5, padding: '3px 7px',
+                          borderRadius: 5, padding: '3px 8px',
                           whiteSpace: 'nowrap',
                         }}>
                           {src.code}
@@ -622,7 +622,7 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
                           rel="noopener noreferrer"
                           onClick={e => e.stopPropagation()}
                           style={{
-                            fontSize: 14, fontWeight: 600, lineHeight: 1.45,
+                            fontSize: 15, fontWeight: 600, lineHeight: 1.45,
                             color: isRead ? '#71717a' : '#e4e4e7',
                             textDecoration: 'none',
                             display: '-webkit-box',
@@ -639,22 +639,25 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
 
                         {item.hook && !isRead && (
                           <p style={{
-                            fontSize: 12, lineHeight: 1.5, margin: '5px 0 0',
+                            fontSize: 13, lineHeight: 1.55, margin: '6px 0 0',
                             color: `rgba(${src.rgb},0.85)`,
-                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                          }}>
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          } as React.CSSProperties}>
                             {item.hook}
                           </p>
                         )}
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 7 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
                           {tag && (
                             <span style={{
-                              fontSize: 11, fontWeight: 600, color: topicM.color,
+                              fontSize: 12, fontWeight: 600, color: topicM.color,
                               background: `rgba(${topicM.rgb},0.08)`,
                               border: `1px solid rgba(${topicM.rgb},0.18)`,
-                              borderRadius: 4, padding: '1px 7px',
-                              textTransform: 'capitalize', letterSpacing: '0.03em',
+                              borderRadius: 4, padding: '2px 8px',
+                              textTransform: 'capitalize', letterSpacing: '0.02em',
                             }}>
                               {tag}
                             </span>
@@ -684,7 +687,7 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
                           {item.summary ? (
                             <div style={{ padding: '14px 16px' }}>
                               <p style={{
-                                fontSize: 10, fontWeight: 700, letterSpacing: '0.12em',
+                                fontSize: 11, fontWeight: 700, letterSpacing: '0.12em',
                                 color: '#60a5fa', textTransform: 'uppercase', marginBottom: 12,
                               }}>
                                 Key Takeaways
@@ -693,8 +696,8 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
                             </div>
                           ) : (
                             <p style={{
-                              fontSize: 13, color: '#a1a1aa', lineHeight: 1.8,
-                              padding: '12px 16px', margin: 0,
+                              fontSize: 14, color: '#a1a1aa', lineHeight: 1.85,
+                              padding: '14px 18px', margin: 0,
                             }}>
                               {item.raw_content!.slice(0, 400)}{(item.raw_content?.length ?? 0) > 400 ? '…' : ''}
                             </p>
