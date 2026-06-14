@@ -13,7 +13,7 @@ const CAT_COLOR: Record<string, { color: string; rgb: string }> = {
   tooling:    { color: '#60a5fa', rgb: '96,165,250'  },
   research:   { color: '#fb923c', rgb: '251,146,60'  },
 }
-const DEFAULT_CAT = { color: '#7c6aff', rgb: '124,106,255' }
+const DEFAULT_CAT = { color: '#3b82f6', rgb: '59,130,246' }
 
 async function getHomeData() {
   const since24h = new Date(Date.now() - 24 * 3600_000).toISOString()
@@ -97,11 +97,11 @@ async function getHomeData() {
 // ── Page ─────��─────────────────────────────────��───────────────────────────
 
 const CONF_COLOR: Record<string, string> = {
-  speculative: '#5a5a7a',
+  speculative: '#71717a',
   low:         '#60a5fa',
   medium:      '#fbbf24',
-  high:        '#34d399',
-  confirmed:   '#7c6aff',
+  high:        '#22c55e',
+  confirmed:   '#3b82f6',
 }
 
 export default async function HomePage() {
@@ -114,13 +114,13 @@ export default async function HomePage() {
 
       {/* Header */}
       <div style={{ marginBottom: 36 }}>
-        <p style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.18em', color: '#5a5a7a', textTransform: 'uppercase', marginBottom: 10 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: '#71717a', textTransform: 'uppercase', marginBottom: 10 }}>
           {today}
         </p>
-        <h1 style={{ fontSize: 34, fontWeight: 900, color: '#e8e8f4', letterSpacing: '-0.025em', lineHeight: 1.1, marginBottom: 8 }}>
+        <h1 style={{ fontSize: 34, fontWeight: 800, color: '#f4f4f5', letterSpacing: '-0.025em', lineHeight: 1.1, marginBottom: 8 }}>
           AI Daily Update
         </h1>
-        <p style={{ fontSize: 15, color: '#6060a0', maxWidth: 520 }}>
+        <p style={{ fontSize: 15, color: '#71717a', maxWidth: 520 }}>
           Your personal command center for tracking the AI landscape — stories, models, papers, and signals.
         </p>
       </div>
@@ -129,30 +129,29 @@ export default async function HomePage() {
       <div style={{
         display: 'flex', alignItems: 'center', gap: 20, marginBottom: 28,
         padding: '9px 16px', borderRadius: 8,
-        background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)',
+        background: 'var(--surface)', border: '1px solid var(--border)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <div style={{
             width: 7, height: 7, borderRadius: '50%', background: freshnessColor, flexShrink: 0,
-            boxShadow: `0 0 6px ${freshnessColor}`,
           }} />
           <span style={{ fontSize: 11, fontWeight: 900, color: freshnessColor, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
             {freshnessLabel}
           </span>
         </div>
         <span style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.08)', flexShrink: 0 }} />
-        <span style={{ fontSize: 12, color: '#5a5a7a' }}>
-          Last fetch: <span style={{ color: '#8080b0', fontWeight: 700 }}>{lastFetch ? relTime(lastFetch) : 'never'}</span>
+        <span style={{ fontSize: 12, color: '#71717a' }}>
+          Last fetch: <span style={{ color: '#a1a1aa', fontWeight: 700 }}>{lastFetch ? relTime(lastFetch) : 'never'}</span>
         </span>
-        <span style={{ fontSize: 12, color: '#5a5a7a' }}>
-          Last 6h: <span style={{ color: '#8080b0', fontWeight: 700 }}>{recentCount} items</span>
+        <span style={{ fontSize: 12, color: '#71717a' }}>
+          Last 6h: <span style={{ color: '#a1a1aa', fontWeight: 700 }}>{recentCount} items</span>
         </span>
       </div>
 
       {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14, marginBottom: 36 }}>
-        <StatCard label="New Today"     value={feedToday}   sub="articles fetched"        href="/feed"        accent="124,106,255" />
-        <StatCard label="Active Stories" value={stories.length > 0 ? '✓' : '—'} sub={`${stories.length} threads`} href="/stories" accent="167,139,250" />
+        <StatCard label="New Today"     value={feedToday}   sub="articles fetched"        href="/feed"        accent="59,130,246"  />
+        <StatCard label="Active Stories" value={stories.length > 0 ? '✓' : '—'} sub={`${stories.length} threads`} href="/stories" accent="96,165,250" />
         <StatCard label="Models Tracked" value={modelCount}  sub="across all labs"         href="/models"      accent="96,165,250"  />
         <StatCard label="Weekly Digest"  value={digest ? '✓' : '—'} sub={digest ? `w/o ${digest.week_start}` : 'Not generated'} href="/digest" accent="251,191,36" />
       </div>
@@ -165,25 +164,25 @@ export default async function HomePage() {
 
           {/* Trending feed items */}
           <section style={{
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: 16, overflow: 'hidden',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 12, overflow: 'hidden',
           }}>
             <div style={{
               padding: '16px 22px 14px',
-              borderBottom: '1px solid rgba(255,255,255,0.05)',
+              borderBottom: '1px solid var(--border)',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
-              <p style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.16em', color: '#5a5a7a', textTransform: 'uppercase' }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: '#71717a', textTransform: 'uppercase' }}>
                 Trending Now
               </p>
-              <Link href="/feed" style={{ fontSize: 12, color: '#5a5a7a', textDecoration: 'none', fontWeight: 700 }}>
+              <Link href="/feed" style={{ fontSize: 12, color: '#71717a', textDecoration: 'none', fontWeight: 600 }}>
                 View all →
               </Link>
             </div>
 
             {trending.length === 0 ? (
-              <p style={{ padding: '20px 22px', fontSize: 13, color: '#4a4a6a', fontStyle: 'italic' }}>
+              <p style={{ padding: '20px 22px', fontSize: 13, color: '#52525b', fontStyle: 'italic' }}>
                 No trending items yet — run a feed fetch to populate.
               </p>
             ) : (
@@ -197,14 +196,14 @@ export default async function HomePage() {
                     style={{
                       textDecoration: 'none', display: 'block',
                       padding: '14px 22px',
-                      borderBottom: i < trending.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none',
+                      borderBottom: i < trending.length - 1 ? '1px solid var(--border)' : 'none',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5 }}>
                       <span style={{
                         fontSize: 9, fontWeight: 900, letterSpacing: '0.1em',
-                        color: '#7c6aff', background: 'rgba(124,106,255,0.1)',
-                        border: '1px solid rgba(124,106,255,0.2)',
+                        color: '#a1a1aa', background: 'rgba(255,255,255,0.05)',
+                        border: '1px solid rgba(255,255,255,0.1)',
                         borderRadius: 3, padding: '1px 6px', textTransform: 'uppercase', flexShrink: 0,
                       }}>
                         {item.source.replace('rss:', '')}
@@ -214,15 +213,15 @@ export default async function HomePage() {
                           HOT
                         </span>
                       )}
-                      <span style={{ fontSize: 10, color: '#4a4a6a', marginLeft: 'auto', flexShrink: 0 }}>
+                      <span style={{ fontSize: 10, color: '#52525b', marginLeft: 'auto', flexShrink: 0 }}>
                         {relTime(item.published_at)}
                       </span>
                     </div>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: '#c8c8e0', lineHeight: 1.4, marginBottom: item.hook ? 4 : 0 }}>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: '#d4d4d8', lineHeight: 1.4, marginBottom: item.hook ? 4 : 0 }}>
                       {item.title}
                     </p>
                     {item.hook && (
-                      <p style={{ fontSize: 12, color: '#5a5a7a', lineHeight: 1.55 }}>
+                      <p style={{ fontSize: 12, color: '#71717a', lineHeight: 1.55 }}>
                         {item.hook.length > 130 ? `${item.hook.slice(0, 130)}…` : item.hook}
                       </p>
                     )}
@@ -234,30 +233,30 @@ export default async function HomePage() {
 
           {/* Digest highlights */}
           <section style={{
-            background: 'rgba(255,255,255,0.02)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            borderRadius: 16, overflow: 'hidden',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+            borderRadius: 12, overflow: 'hidden',
           }}>
             <div style={{
               padding: '16px 22px 14px',
-              borderBottom: '1px solid rgba(255,255,255,0.05)',
+              borderBottom: '1px solid var(--border)',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
-              <p style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.16em', color: '#5a5a7a', textTransform: 'uppercase' }}>
+              <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: '#71717a', textTransform: 'uppercase' }}>
                 This Week's Digest
               </p>
-              <Link href="/digest" style={{ fontSize: 12, color: '#5a5a7a', textDecoration: 'none', fontWeight: 700 }}>
+              <Link href="/digest" style={{ fontSize: 12, color: '#71717a', textDecoration: 'none', fontWeight: 600 }}>
                 Read full →
               </Link>
             </div>
 
             {!digest ? (
-              <p style={{ padding: '20px 22px', fontSize: 13, color: '#4a4a6a', fontStyle: 'italic' }}>
+              <p style={{ padding: '20px 22px', fontSize: 13, color: '#52525b', fontStyle: 'italic' }}>
                 No digest generated yet — go to Digest and click Generate.
               </p>
             ) : (
               <div style={{ padding: '18px 22px' }}>
-                <p style={{ fontSize: 11, color: '#5a5a7a', marginBottom: 14, fontWeight: 700 }}>
+                <p style={{ fontSize: 11, color: '#71717a', marginBottom: 14, fontWeight: 600 }}>
                   Week of {digest.week_start} · {relTime(digest.created_at)}
                 </p>
                 {highlights.length > 0 ? (
@@ -266,15 +265,14 @@ export default async function HomePage() {
                       <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                         <div style={{
                           width: 6, height: 6, borderRadius: '50%',
-                          background: '#7c6aff', flexShrink: 0, marginTop: 6,
-                          boxShadow: '0 0 6px rgba(124,106,255,0.6)',
+                          background: '#3b82f6', flexShrink: 0, marginTop: 6,
                         }} />
-                        <p style={{ fontSize: 14, color: '#9090c0', lineHeight: 1.6 }}>{h}</p>
+                        <p style={{ fontSize: 14, color: '#a1a1aa', lineHeight: 1.6 }}>{h}</p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p style={{ fontSize: 13, color: '#4a4a6a', fontStyle: 'italic' }}>Digest available — open it to read.</p>
+                  <p style={{ fontSize: 13, color: '#52525b', fontStyle: 'italic' }}>Digest available — open it to read.</p>
                 )}
               </div>
             )}
@@ -293,16 +291,16 @@ export default async function HomePage() {
             borderBottom: '1px solid rgba(255,255,255,0.05)',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
-            <p style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.16em', color: '#5a5a7a', textTransform: 'uppercase' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: '#71717a', textTransform: 'uppercase' }}>
               Active Stories
             </p>
-            <Link href="/stories" style={{ fontSize: 12, color: '#5a5a7a', textDecoration: 'none', fontWeight: 700 }}>
+            <Link href="/stories" style={{ fontSize: 12, color: '#71717a', textDecoration: 'none', fontWeight: 600 }}>
               View all →
             </Link>
           </div>
 
           {stories.length === 0 ? (
-            <p style={{ padding: '20px 22px', fontSize: 13, color: '#4a4a6a', fontStyle: 'italic' }}>
+            <p style={{ padding: '20px 22px', fontSize: 13, color: '#52525b', fontStyle: 'italic' }}>
               No story threads yet — go to Stories and click Update Now.
             </p>
           ) : (
@@ -335,14 +333,13 @@ export default async function HomePage() {
                         <span style={{
                           width: 5, height: 5, borderRadius: '50%',
                           background: sigColor, flexShrink: 0,
-                          boxShadow: s.latest_sig === 'high' ? `0 0 5px ${sigColor}` : 'none',
                         }} />
                       )}
-                      <span style={{ fontSize: 10, color: '#4a4a6a', marginLeft: 'auto', flexShrink: 0 }}>
+                      <span style={{ fontSize: 10, color: '#52525b', marginLeft: 'auto', flexShrink: 0 }}>
                         {relTime(s.last_updated)}
                       </span>
                     </div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: '#c0c0dc', lineHeight: 1.4 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: '#d4d4d8', lineHeight: 1.4 }}>
                       {s.title}
                     </p>
                   </Link>
@@ -358,24 +355,24 @@ export default async function HomePage() {
       {predEvidence.length > 0 && (
         <section style={{ marginTop: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <p style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.16em', color: '#5a5a7a', textTransform: 'uppercase' }}>
+            <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: '#71717a', textTransform: 'uppercase' }}>
               Prediction Signals This Week
             </p>
-            <Link href="/predictions" style={{ fontSize: 12, color: '#5a5a7a', textDecoration: 'none', fontWeight: 700 }}>
+            <Link href="/predictions" style={{ fontSize: 12, color: '#71717a', textDecoration: 'none', fontWeight: 600 }}>
               View all →
             </Link>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
             {predEvidence.map((p: any) => {
-              const confColor = CONF_COLOR[p.confidence] ?? '#5a5a7a'
+              const confColor = CONF_COLOR[p.confidence] ?? '#71717a'
               const cat = CAT_COLOR[p.category] ?? DEFAULT_CAT
               return (
                 <Link key={p.id} href="/predictions" style={{ textDecoration: 'none' }}>
                   <div style={{
                     padding: '14px 18px',
-                    background: 'rgba(255,255,255,0.02)',
-                    border: '1px solid rgba(255,255,255,0.06)',
-                    borderRadius: 12,
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 10,
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                       <span style={{
@@ -393,15 +390,15 @@ export default async function HomePage() {
                         {p.confidence}
                       </span>
                     </div>
-                    <p style={{ fontSize: 13, fontWeight: 700, color: '#c0c0dc', lineHeight: 1.4, marginBottom: 8 }}>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: '#d4d4d8', lineHeight: 1.4, marginBottom: 8 }}>
                       {p.title}
                     </p>
                     {p.latestEvidence && (
-                      <p style={{ fontSize: 11, color: '#5a5a7a', lineHeight: 1.5 }}>
+                      <p style={{ fontSize: 11, color: '#71717a', lineHeight: 1.5 }}>
                         New signal: {p.latestEvidence.title?.slice(0, 80) ?? '—'}
                       </p>
                     )}
-                    <p style={{ fontSize: 10, color: '#3a3a5a', marginTop: 6 }}>
+                    <p style={{ fontSize: 10, color: '#3f3f46', marginTop: 6 }}>
                       {relTime(p.updated_at)}
                     </p>
                   </div>
@@ -414,7 +411,7 @@ export default async function HomePage() {
 
       {/* Quick nav */}
       <div style={{ marginTop: 36 }}>
-        <p style={{ fontSize: 11, fontWeight: 900, letterSpacing: '0.16em', color: '#5a5a7a', textTransform: 'uppercase', marginBottom: 16 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: '#71717a', textTransform: 'uppercase', marginBottom: 16 }}>
           All Sections
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
