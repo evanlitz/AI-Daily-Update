@@ -1,90 +1,144 @@
-# AI Daily Update
+# AI Pulse
 
-A personal AI tracking dashboard that aggregates news across the AI ecosystem, tracks model releases, surfaces trending research, and uses Claude to generate narrative story threads, weekly digests, and project ideas.
+A personal AI intelligence dashboard that aggregates 14+ sources, uses Claude to screen for relevance and extract signal, and surfaces what actually matters in the AI landscape — updated twice daily.
 
-## Features
+## What it does
 
-### Feeds & Discovery
-- **Live Feed** — aggregates AI news from ArXiv, Hacker News, GitHub Trending, RSS blogs, and HuggingFace Papers with full-text search (FTS5), tag filtering, and velocity scoring
-- **Trending Repos** — surfaces trending GitHub repositories with language and topic filters
-- **Datasets** — notable HuggingFace datasets with modality and task category metadata
-- **RSS Feeds** — `/feed.rss` and `/radar.rss` for subscribing to feed items and radar changes
-
-### Intelligence Layer (Claude-powered)
-- **Story Threads** — Claude tracks evolving narratives across feed items, building a timeline of developments per story with significance scoring and related-thread detection
-- **Weekly Digest** — structured weekly briefing summarizing top developments, model releases, and radar changes
-- **Tech Radar** — auto-classifies tools and frameworks into adopt / trial / assess / hold with rationale
-- **Project Advisor** — suggests buildable project ideas based on what's trending in the feed
-- **Entity Tracking** — named entity extraction across feed items with mention frequency and detail pages
-- **Benchmark Snapshots** — tracks model performance metrics over time with history API
-
-### Models & Predictions
-- **Models** — AI model releases with benchmarks, costs, context windows, and capability comparisons
-- **Predictions** — AI milestone forecasting with confidence levels, year ranges, and status lifecycle (upcoming → confirmed / failed)
-- **Timeline** — interactive full-screen timeline of AI predictions from 2018 to 2055
+- **Feed** — Articles from arXiv, Hacker News, GitHub, HuggingFace, Reddit, YouTube, RSS feeds, and more. Claude screens each item for relevance and writes a one-sentence hook.
+- **Daily Brief** — A 4-section (Signal / Rising / Watch / Shift) briefing generated each morning.
+- **Stories** — Narrative threads connecting related articles over time, with weekly arc graphs.
+- **Weekly Digest** — Longer-form briefing covering macro trends, research highlights, and a tools roundup.
+- **Models** — Release tracker for major AI models with benchmarks, pricing, and context window data.
+- **Repos** — Trending GitHub repositories in AI/ML ranked by star velocity.
+- **Datasets** — HuggingFace and Kaggle datasets filtered by modality and task type.
+- **Predictions** — AI milestone predictions with confidence levels and automatic evidence tracking.
+- **Advisor** — Claude generates personalized project ideas based on trending developments.
+- **Timeline** — Visual history of AI events and predictions from 2015 through projected 2030+.
 
 ## Stack
 
-- Next.js 15 App Router + TypeScript
-- Tailwind CSS (dark-mode only)
-- SQLite via `@libsql/client` — local file in dev, Turso in production
-- Anthropic Claude API for summarization, entity extraction, story threading, and analysis
-- FTS5 virtual table for full-text search with LIKE fallback
-- Deployed on Vercel (serverless); cron via `vercel.json`
+- **Framework:** Next.js 16, React 19, TypeScript
+- **Styling:** Tailwind CSS 4
+- **Database:** SQLite (local dev) / Turso libsql (production)
+- **AI:** Anthropic Claude — Sonnet 4.6 for analysis, Haiku 4.5 for screening and hooks
+- **Deploy:** Vercel
 
-## Getting Started
+## Local setup
+
+**Prerequisites:** Node.js 18+
 
 ```bash
+git clone <repo-url>
+cd ai-pulse
 npm install
-cp .env.example .env.local
-# fill in your keys in .env.local
+```
+
+Create `.env.local` in the project root:
+
+```env
+ANTHROPIC_API_KEY=sk-ant-...
+CRON_SECRET=any-random-string-you-choose
+
+# Leave these out for local dev — SQLite at data/pulse.db is used automatically
+# TURSO_DATABASE_URL=libsql://...
+# TURSO_AUTH_TOKEN=...
+```
+
+Start the dev server:
+
+```bash
 npm run dev
 ```
 
-Open http://localhost:3000. On first boot the pipeline fetches all sources and populates the database.
+App runs at `http://localhost:3000`. The database and schema are created automatically on first run at `data/pulse.db`.
 
-## Environment Variables
+### Seed the feed
+
+The feed is empty until you trigger the pipeline. With the dev server running:
+
+```bash
+# Step 1: fetch all sources and insert raw items (~5-10s, no Claude calls)
+curl -H "Authorization: Bearer any-random-string-you-choose" \
+  http://localhost:3000/api/cron/fetch-ingest
+
+# Step 2: screen items with Claude and run intelligence tasks (~2-5 min)
+curl -H "Authorization: Bearer any-random-string-you-choose" \
+  http://localhost:3000/api/cron/fetch-intel
+```
+
+On Windows PowerShell:
+
+```powershell
+Invoke-RestMethod -Uri "http://localhost:3000/api/cron/fetch-ingest" `
+  -Headers @{ Authorization = "Bearer any-random-string-you-choose" }
+
+Invoke-RestMethod -Uri "http://localhost:3000/api/cron/fetch-intel" `
+  -Headers @{ Authorization = "Bearer any-random-string-you-choose" }
+```
+
+## Deploying to Vercel
+
+1. Push the repo to GitHub
+2. Import the project at [vercel.com](https://vercel.com)
+3. Set environment variables in the Vercel dashboard:
 
 | Variable | Description |
 |---|---|
-| `ANTHROPIC_API_KEY` | From console.anthropic.com |
-| `TURSO_DATABASE_URL` | Turso database URL (production only) |
-| `TURSO_AUTH_TOKEN` | Turso auth token (production only) |
-| `CRON_SECRET` | Random string to protect the `/api/cron/*` endpoints |
+| `ANTHROPIC_API_KEY` | Your Anthropic API key |
+| `CRON_SECRET` | Any secret string — Vercel uses this automatically when triggering cron routes |
+| `TURSO_DATABASE_URL` | Your Turso database URL (`libsql://...`) |
+| `TURSO_AUTH_TOKEN` | Your Turso auth token |
 
-In local dev without `TURSO_DATABASE_URL`, a SQLite file is created at `data/pulse.db`.
+4. Deploy. Cron jobs run automatically per `vercel.json`.
 
-## Deployment
+### Cron schedule (UTC)
 
-Connect your GitHub repo to Vercel, add the environment variables in the Vercel dashboard, and push to deploy. The `vercel.json` cron triggers `/api/cron/fetch` daily and `/api/cron/digest` weekly.
+| Job | Schedule | What it does |
+|---|---|---|
+| `/api/cron/fetch-ingest` | 8:00am, 8:00pm | Fetches all 14 sources, inserts raw items |
+| `/api/cron/fetch-intel` | 8:10am, 8:10pm | Claude screening + all intelligence tasks |
+| `/api/cron/brief` | 8:45am | Generates the daily brief if not yet done today |
+| `/api/cron/digest` | 9:00am | Generates the weekly digest if not yet done this week |
 
-## Architecture
+The fetch pipeline is split into two cron jobs so each stays within Vercel Hobby's 10-second function timeout. Ingest does HTTP fetches and DB writes only. Intel handles all Claude calls.
+
+## Dev commands
+
+```bash
+npm run dev         # dev server at http://localhost:3000
+npm run build       # production build
+npm start           # start production build
+npx tsc --noEmit    # type-check without building
+```
+
+No test suite.
+
+## Project structure
 
 ```
-lib/
-  pipeline.ts          — orchestrates all source fetches on boot and cron
-  db.ts                — schema, migrations, FTS5 setup
-  utils.ts             — shared helpers (getMondayISO, relTime, safeJSON)
-  intelligence/
-    stories.ts         — Claude story thread detection and event logging
-    hooks.ts           — per-item hook line generation
-    digest.ts          — weekly digest generation
-    radar.ts           — tech radar classification
-    advisor.ts         — project idea generation
-    entities.ts        — named entity extraction
-    benchmarks.ts      — benchmark snapshot ingestion
-    models.ts          — model release enrichment
-    predictions.ts     — prediction nudging and status updates
-
 app/
-  page.tsx             — home dashboard with card summaries
-  feed/                — paginated feed with search, tags, sort
-  stories/             — story thread list and detail timeline
-  models/              — model comparison table
-  predictions/         — prediction tracker
-  timeline/            — full-screen prediction timeline
-  radar/               — tech radar visualization
-  entities/            — entity mention browser
-  digest/              — weekly digest viewer
-  repos/               — trending GitHub repos
+├── api/
+│   ├── cron/          # fetch-ingest, fetch-intel, brief, digest
+│   └── ...            # feed, stories, digest, advisor, etc.
+├── feed/
+├── stories/
+├── digest/
+└── ...                # models, repos, datasets, predictions, advisor, timeline
+
+lib/
+├── pipeline.ts        # fetchIngest() and fetchIntelligence()
+├── db.ts              # libsql client + schema init + migrations
+├── claude.ts          # Anthropic client + model constants
+├── sources/           # one fetcher per source
+└── intelligence/      # Claude-powered enrichment (hooks, stories, digest, ...)
 ```
+
+## Sources
+
+`arxiv` · `hackernews` · `rss` · `github` (trending) · `github_top` · `huggingface` · `hf_models` · `datasets` · `kaggle` · `reddit` · `youtube` · `paperswithcode` · `semanticscholar` · `github_releases`
+
+## Notes
+
+- Local dev uses `data/pulse.db` — no Turso account needed
+- Schema migrations are append-only `ALTER TABLE` blocks in `lib/db.ts` — never drop and recreate tables
+- Items inserted by `fetch-ingest` are hidden from the feed (`screened = 0`) until `fetch-intel` processes them
