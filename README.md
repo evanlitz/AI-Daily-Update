@@ -1,4 +1,4 @@
-# AI Pulse
+# AI Daily Update
 
 A personal AI intelligence dashboard that aggregates 14+ sources, uses Claude to screen for relevance and extract signal, and surfaces what actually matters in the AI landscape — updated twice daily.
 
