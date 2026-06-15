@@ -574,7 +574,7 @@ export async function ensureAllPredictions(): Promise<void> {
 export async function refreshPredictionAnalysis(): Promise<void> {
   const { rows: feedItems } = await db.execute({
     sql: `SELECT id, title, url, source, summary, raw_content
-          FROM feed_items ORDER BY velocity_score DESC, fetched_at DESC LIMIT 30`,
+          FROM feed_items WHERE screened = 1 ORDER BY velocity_score DESC, fetched_at DESC LIMIT 30`,
     args: [],
   }) as { rows: any[] }
 

@@ -132,7 +132,7 @@ export async function backfillEntities(): Promise<void> {
   const { rows: feedRows } = await db.execute({
     sql: `SELECT fi.id, fi.title, fi.source, fi.raw_content
           FROM feed_items fi
-          WHERE NOT EXISTS (
+          WHERE fi.screened = 1 AND NOT EXISTS (
             SELECT 1 FROM entity_mentions em
             WHERE em.source_id = fi.id AND em.source_type = 'feed_item'
           )

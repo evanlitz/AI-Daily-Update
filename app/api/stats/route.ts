@@ -4,8 +4,8 @@ import db from '@/lib/db'
 export async function GET() {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  const { rows: countRows } = await db.execute({ sql: `SELECT COUNT(*) as count FROM feed_items WHERE fetched_at >= ?`, args: [weekAgo] })
-  const { rows: allItems }  = await db.execute({ sql: `SELECT topic_tags, velocity_score FROM feed_items WHERE fetched_at >= ?`, args: [weekAgo] })
+  const { rows: countRows } = await db.execute({ sql: `SELECT COUNT(*) as count FROM feed_items WHERE fetched_at >= ? AND screened = 1`, args: [weekAgo] })
+  const { rows: allItems }  = await db.execute({ sql: `SELECT topic_tags, velocity_score FROM feed_items WHERE fetched_at >= ? AND screened = 1`, args: [weekAgo] })
 
   const tagVelocity: Record<string, number[]> = {}
   for (const item of allItems as any[]) {
@@ -22,8 +22,8 @@ export async function GET() {
     if (avg > topAvg) { topAvg = avg; topTopic = tag }
   }
 
-  const { rows: topRows }   = await db.execute(`SELECT title, velocity_score FROM feed_items ORDER BY velocity_score DESC LIMIT 1`)
-  const { rows: freshRows } = await db.execute(`SELECT MAX(fetched_at) as last_fetch FROM feed_items`)
+  const { rows: topRows }   = await db.execute(`SELECT title, velocity_score FROM feed_items WHERE screened = 1 ORDER BY velocity_score DESC LIMIT 1`)
+  const { rows: freshRows } = await db.execute(`SELECT MAX(fetched_at) as last_fetch FROM feed_items WHERE screened = 1`)
   const topItem    = topRows[0] as any
   const lastFetch  = (freshRows[0] as any)?.last_fetch as string | null
   const staleHours = lastFetch ? (Date.now() - new Date(lastFetch).getTime()) / 3_600_000 : null

@@ -89,8 +89,8 @@ export async function GET(req: NextRequest) {
   // ── Full-text search — no affinity applied (query intent overrides preference) ──
   if (q) {
     const tagWhere = tagList.length > 0
-      ? ` AND (${tagList.map(() => `f.topic_tags LIKE ?`).join(' OR ')})`
-      : ''
+      ? ` AND f.screened = 1 AND (${tagList.map(() => `f.topic_tags LIKE ?`).join(' OR ')})`
+      : ` AND f.screened = 1`
     try {
       const ftsQ = q.replace(/["()]/g, ' ').trim()
       const { rows } = await db.execute({
@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
         : ''
       const { rows } = await db.execute({
         sql: `SELECT * FROM feed_items
-              WHERE (title LIKE ? OR hook LIKE ? OR raw_content LIKE ?)${tagWhereLike}
+              WHERE screened = 1 AND (title LIKE ? OR hook LIKE ? OR raw_content LIKE ?)${tagWhereLike}
               ORDER BY published_at DESC LIMIT ? OFFSET ?`,
         args: [`%${q}%`, `%${q}%`, `%${q}%`, ...tagArgs, pageSize, offset],
       })
@@ -119,8 +119,8 @@ export async function GET(req: NextRequest) {
   const { affinityBoost, hasAffinity } = await loadAffinity()
 
   const tagCondStr = tagList.length > 0
-    ? ` WHERE (${tagList.map(() => `topic_tags LIKE ?`).join(' OR ')})`
-    : ''
+    ? ` WHERE screened = 1 AND (${tagList.map(() => `topic_tags LIKE ?`).join(' OR ')})`
+    : ` WHERE screened = 1`
 
   // ── Velocity sort: blend velocity (60%) + affinity (40%) ─────────────────
   if (sort === 'velocity') {

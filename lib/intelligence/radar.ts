@@ -113,7 +113,7 @@ export async function classifyForRadar(items: FeedItem[]): Promise<void> {
 }
 
 export async function scanAllFeedItems(): Promise<number> {
-  const { rows } = await db.execute(`SELECT title, raw_content FROM feed_items ORDER BY fetched_at DESC LIMIT 500`)
+  const { rows } = await db.execute(`SELECT title, raw_content FROM feed_items WHERE screened = 1 ORDER BY fetched_at DESC LIMIT 500`)
   await classifyForRadar(rows as unknown as FeedItem[])
   const { rows: countRows } = await db.execute(`SELECT COUNT(*) as c FROM tech_radar`)
   return (countRows[0] as any).c
@@ -133,7 +133,7 @@ export async function reclassifyStaleTools(): Promise<void> {
   const staleNames = new Set((staleRows as any[]).map(r => (r.name as string).toLowerCase()))
 
   const { rows: feedRows } = await db.execute({
-    sql: `SELECT title, raw_content FROM feed_items WHERE fetched_at >= ? ORDER BY velocity_score DESC LIMIT 200`,
+    sql: `SELECT title, raw_content FROM feed_items WHERE fetched_at >= ? AND screened = 1 ORDER BY velocity_score DESC LIMIT 200`,
     args: [recent],
   })
 

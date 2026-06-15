@@ -97,7 +97,7 @@ export async function screenAndHook(candidates: FeedItem[]): Promise<ScreenResul
 // Backfill hooks for any items already in the DB that slipped through without one.
 export async function generateHooks(): Promise<void> {
   const { rows } = await db.execute({
-    sql: `SELECT id, title, source, raw_content FROM feed_items WHERE hook IS NULL ORDER BY fetched_at DESC LIMIT 30`,
+    sql: `SELECT id, title, source, raw_content FROM feed_items WHERE hook IS NULL AND screened = 1 ORDER BY fetched_at DESC LIMIT 30`,
     args: [],
   })
 
@@ -136,4 +136,99 @@ export async function generateHooks(): Promise<void> {
   } catch (err) {
     console.error('[hooks] backfill error:', err)
   }
+}
+
+// Screen all unscreened items from the DB (screened = 0).
+// Deletes irrelevant items, marks relevant ones screened = 1, and sets their hook.
+// Returns the kept items + entityMap + toolNames for downstream intel tasks.
+export async function screenPendingItems(): Promise<ScreenResult> {
+  const { rows } = await db.execute({
+    sql: `SELECT id, source, title, url, summary, raw_content, velocity_score FROM feed_items WHERE screened = 0 ORDER BY fetched_at DESC LIMIT 200`,
+    args: [],
+  })
+
+  if (!rows.length) return { items: [], entityMap: {}, toolNames: [] }
+
+  const candidates = rows as any[]
+  const BATCH = 30
+  const keptRows: { item: any; hook?: string }[] = []
+  const entityMap: Record<string, ExtractedEntity[]> = {}
+  const toolsSeen = new Map<string, string>()
+  const toDelete: string[] = []
+
+  for (let i = 0; i < candidates.length; i += BATCH) {
+    const batch = candidates.slice(i, i + BATCH)
+    const prompt = batch.map((item, n) => {
+      const snippet = item.raw_content ? `\n   ${String(item.raw_content).slice(0, 200)}` : ''
+      return `${n + 1}. (${item.source}) ${item.title}${snippet}`
+    }).join('\n')
+
+    try {
+      const resp = await anthropic.messages.create({
+        model: MODEL_FAST,
+        max_tokens: 2800,
+        system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+        messages: [{
+          role: 'user',
+          content: `Screen each item, write a hook for relevant ones, and extract entities and tools. Return ONLY a JSON array (one entry per item, in order):\n[{"n":1,"relevant":true,"hook":"...","entities":[{"name":"Anthropic","type":"company"}],"tools":["LangGraph","vLLM"]},{"n":2,"relevant":false,"entities":[]},...]` +
+            `\n\n${prompt}`,
+        }],
+      })
+
+      const text = resp.content[0].type === 'text' ? resp.content[0].text : ''
+      const match = text.match(/\[[\s\S]*\]/)
+      if (!match) {
+        console.error('[hooks] no JSON in response')
+        keptRows.push(...batch.map(item => ({ item })))
+        continue
+      }
+
+      const parsed: { n: number; relevant: boolean; hook?: string; entities?: ExtractedEntity[]; tools?: string[] }[] = safeJSON(match[0])
+      let kept = 0, dropped = 0
+      for (const entry of parsed) {
+        const item = batch[entry.n - 1]
+        if (!item) continue
+        if (Array.isArray(entry.entities) && entry.entities.length) {
+          entityMap[item.id] = entry.entities.filter((e: ExtractedEntity) => e.name && e.type)
+        }
+        if (entry.relevant === false) { toDelete.push(item.id); dropped++; continue }
+        if (Array.isArray(entry.tools)) {
+          for (const t of entry.tools) {
+            if (typeof t === 'string' && t.length > 1) {
+              const key = normalizeToolKey(t)
+              if (!toolsSeen.has(key)) toolsSeen.set(key, t)
+            }
+          }
+        }
+        keptRows.push({ item, hook: entry.hook ? entry.hook.slice(0, 120) : undefined })
+        kept++
+      }
+      console.log(`[hooks] pending batch ${Math.floor(i / BATCH) + 1}: kept ${kept}, dropped ${dropped}`)
+    } catch (err) {
+      console.error('[hooks] screen error:', err)
+      keptRows.push(...batch.map(item => ({ item })))
+    }
+  }
+
+  // Delete irrelevant items
+  if (toDelete.length > 0) {
+    const CHUNK = 100
+    for (let i = 0; i < toDelete.length; i += CHUNK) {
+      const chunk = toDelete.slice(i, i + CHUNK)
+      await db.execute({ sql: `DELETE FROM feed_items WHERE id IN (${chunk.map(() => '?').join(',')})`, args: chunk })
+    }
+    console.log(`[hooks] deleted ${toDelete.length} irrelevant items`)
+  }
+
+  // Mark relevant items screened = 1 and write their hooks
+  if (keptRows.length > 0) {
+    await db.batch(keptRows.map(({ item, hook }) => ({
+      sql: `UPDATE feed_items SET screened = 1, hook = COALESCE(?, hook) WHERE id = ?`,
+      args: [hook ?? null, item.id],
+    })))
+    console.log(`[hooks] marked ${keptRows.length} items screened`)
+  }
+
+  const items = keptRows.map(({ item }) => item as unknown as FeedItem)
+  return { items, entityMap, toolNames: [...toolsSeen.values()] }
 }

@@ -18,7 +18,7 @@ Bad: "The video covers exciting new developments in large language models"`
 export async function generateYoutubeSummaries(): Promise<void> {
   const { rows } = await db.execute({
     sql: `SELECT id, title, source, raw_content FROM feed_items
-          WHERE source LIKE 'youtube:%' AND (summary IS NULL OR summary = '')
+          WHERE source LIKE 'youtube:%' AND (summary IS NULL OR summary = '') AND screened = 1
           ORDER BY fetched_at DESC LIMIT 20`,
     args: [],
   })

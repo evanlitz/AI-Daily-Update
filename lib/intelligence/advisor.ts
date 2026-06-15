@@ -13,7 +13,7 @@ export async function generateCustomProjectIdeas(userInput: string, context?: Ad
   const day14 = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
 
   const [{ rows: recentItems }, { rows: radarRows }] = await Promise.all([
-    db.execute({ sql: `SELECT title FROM feed_items WHERE fetched_at >= ? AND velocity_score > 0 ORDER BY velocity_score DESC LIMIT 12`, args: [day14] }),
+    db.execute({ sql: `SELECT title FROM feed_items WHERE fetched_at >= ? AND velocity_score > 0 AND screened = 1 ORDER BY velocity_score DESC LIMIT 12`, args: [day14] }),
     db.execute(`SELECT name, category, quadrant FROM tech_radar WHERE quadrant IN ('adopt', 'trial') ORDER BY quadrant ASC, name ASC`),
   ])
 
@@ -70,7 +70,7 @@ export async function generateProjectIdeas(context?: AdvisorContext): Promise<Pr
   const day30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
   const [{ rows: recentItems }, { rows: existingIdeas }, { rows: radarRows }] = await Promise.all([
-    db.execute({ sql: `SELECT title FROM feed_items WHERE fetched_at >= ? AND velocity_score > 0 ORDER BY velocity_score DESC LIMIT 10`, args: [day14] }),
+    db.execute({ sql: `SELECT title FROM feed_items WHERE fetched_at >= ? AND velocity_score > 0 AND screened = 1 ORDER BY velocity_score DESC LIMIT 10`, args: [day14] }),
     db.execute({ sql: `SELECT title FROM project_ideas WHERE created_at >= ?`, args: [day30] }),
     db.execute(`SELECT name, category, quadrant FROM tech_radar WHERE quadrant IN ('adopt', 'trial') ORDER BY quadrant ASC, name ASC`),
   ])

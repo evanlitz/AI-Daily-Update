@@ -50,7 +50,7 @@ export async function generateDailyBrief(): Promise<DailyBrief | null> {
     db.execute({
       sql: `SELECT title, hook, source, velocity_score
             FROM feed_items
-            WHERE fetched_at >= ? AND hook IS NOT NULL
+            WHERE fetched_at >= ? AND hook IS NOT NULL AND screened = 1
             ORDER BY velocity_score DESC LIMIT 15`,
       args: [since24h],
     }),

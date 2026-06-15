@@ -102,7 +102,7 @@ export async function generateWeeklyDigest(): Promise<WeeklyDigest> {
 
   const [{ rows: raw }, storyContext, priorDigests, affinityContext] = await Promise.all([
     db.execute({
-      sql: `SELECT id, source, title, raw_content, summary, published_at, velocity_score, topic_tags FROM feed_items WHERE fetched_at >= ? ORDER BY fetched_at DESC LIMIT 200`,
+      sql: `SELECT id, source, title, raw_content, summary, published_at, velocity_score, topic_tags FROM feed_items WHERE fetched_at >= ? AND screened = 1 ORDER BY fetched_at DESC LIMIT 200`,
       args: [weekAgo],
     }),
     getStoryContext(),

@@ -17,7 +17,7 @@ import type { Dataset, FeedItem, GithubRepo } from './types'
 import { updateVelocityScores, updateAccelerationScores } from './intelligence/velocity'
 import { classifyForRadar, classifyToolNames, seedRadarIfEmpty, reclassifyStaleTools } from './intelligence/radar'
 import { ensureAllModels, refreshModelsFromFeed } from './intelligence/models'
-import { screenAndHook, generateHooks } from './intelligence/hooks'
+import { screenPendingItems, generateHooks } from './intelligence/hooks'
 import { updateStoryThreads, linkThreads } from './intelligence/stories'
 import { backfillPredictionEvidence } from './intelligence/predictions'
 import { saveEntityMentions, backfillEntities } from './intelligence/entities'
@@ -27,7 +27,7 @@ async function insertItems(items: FeedItem[]): Promise<{ count: number; newItems
   if (!items.length) return { count: 0, newItems: [] }
   const results = await db.batch(
     items.map(item => ({
-      sql: `INSERT OR IGNORE INTO feed_items (id, source, title, url, summary, raw_content, published_at, fetched_at, topic_tags, velocity_score, is_read, hook) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT OR IGNORE INTO feed_items (id, source, title, url, summary, raw_content, published_at, fetched_at, topic_tags, velocity_score, is_read, hook, screened) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
       args: [item.id, item.source, item.title, item.url, item.summary ?? null, item.raw_content ?? null, item.published_at ?? null, item.fetched_at, JSON.stringify(item.topic_tags), item.velocity_score, item.is_read, item.hook ?? null],
     }))
   )
@@ -118,11 +118,11 @@ async function pruneOldFeedItems(): Promise<void> {
   if (rowsAffected > 0) console.log(`[pipeline] pruned ${rowsAffected} old feed items`)
 }
 
-export async function fetchAll(): Promise<number> {
-  console.log('[pipeline] starting fetch...')
+// Phase 1 of the pipeline: fetch all sources and insert raw items (screened = 0).
+// No Claude calls — designed to complete within Vercel Hobby's 10s function limit.
+export async function fetchIngest(): Promise<number> {
+  console.log('[pipeline] starting ingest...')
 
-  // Pre-load known YouTube URLs so fetchYoutube can skip up-to-date channels
-  // and avoid fetching transcripts for videos already in the DB
   const { rows: ytRows } = await db.execute(
     `SELECT url FROM feed_items WHERE source LIKE 'youtube:%'`
   )
@@ -141,7 +141,6 @@ export async function fetchAll(): Promise<number> {
 
   const allFeedItems = [...arxiv, ...hn, ...rss, ...github, ...huggingface, ...reddit, ...pwc, ...hfModels, ...youtube, ...semanticScholar, ...ghReleases]
 
-  // Record per-source item counts for health monitoring
   const sourceCounts = new Map<string, number>()
   for (const item of allFeedItems) {
     sourceCounts.set(item.source, (sourceCounts.get(item.source) ?? 0) + 1)
@@ -152,33 +151,49 @@ export async function fetchAll(): Promise<number> {
   await recordSourceRuns(sourceCounts).catch(console.error)
 
   const newCandidates = await filterNewItems(allFeedItems)
-  console.log(`[pipeline] ${newCandidates.length}/${allFeedItems.length} are new — screening...`)
-  const { items: screened, entityMap, toolNames } = await screenAndHook(newCandidates)
-  console.log(`[pipeline] ${screened.length}/${newCandidates.length} passed relevance screen`)
+  console.log(`[pipeline] ${newCandidates.length}/${allFeedItems.length} are new — inserting raw`)
 
-  const { count: newItemCount, newItems } = await insertItems(screened)
+  const { count } = await insertItems(newCandidates)
   await Promise.all([insertRepos(githubTop), insertDatasets(allDatasets)])
 
-  console.log(`[pipeline] inserted ${newItemCount} feed items, ${githubTop.length} repos, ${allDatasets.length} datasets`)
+  console.log(`[pipeline] inserted ${count} raw feed items, ${githubTop.length} repos, ${allDatasets.length} datasets`)
 
   await updateVelocityScores()
   await ensureAllModels()
 
-  // Phase 1: parallel intelligence tasks — all awaited so Vercel doesn't kill them early
+  return count
+}
+
+// Phase 2 of the pipeline: screen pending items and run all intelligence tasks.
+// Runs 10 minutes after fetchIngest to give ingest time to complete.
+export async function fetchIntelligence(): Promise<void> {
+  console.log('[pipeline] starting intelligence phase...')
+
+  const { items: newItems, entityMap, toolNames } = await screenPendingItems()
+  console.log(`[pipeline] ${newItems.length} items passed relevance screen`)
+
+  // Recompute velocity now that newly screened items are visible
+  await updateVelocityScores()
+
+  // Query recent screened items for model refresh context
+  const { rows: recentRows } = await db.execute({
+    sql: `SELECT id, source, title, url, summary, raw_content, published_at, fetched_at, topic_tags, velocity_score, is_read, hook FROM feed_items WHERE screened = 1 ORDER BY fetched_at DESC LIMIT 200`,
+    args: [],
+  })
+  const recentItems = (recentRows as any[]).map(r => ({
+    ...r,
+    topic_tags: JSON.parse(r.topic_tags ?? '[]'),
+  })) as FeedItem[]
+
   const phase1: Promise<void>[] = [generateHooks(), generateYoutubeSummaries()]
-  if (allFeedItems.length > 0) {
-    phase1.push(refreshModelsFromFeed(allFeedItems))
-  }
-  if (toolNames.length > 0) {
-    phase1.push(classifyToolNames(toolNames))
-  }
+  if (recentItems.length > 0) phase1.push(refreshModelsFromFeed(recentItems))
+  if (toolNames.length > 0) phase1.push(classifyToolNames(toolNames))
   if (newItems.length > 0) {
     phase1.push(updateStoryThreads(newItems, entityMap))
     phase1.push(saveEntityMentions(newItems, entityMap))
   }
   await Promise.all(phase1.map(p => p.catch(console.error)))
 
-  // Phase 2: tasks that benefit from phase 1 completing (linkThreads needs updated story state)
   await Promise.all([
     linkThreads(),
     backfillPredictionEvidence(),
@@ -188,6 +203,11 @@ export async function fetchAll(): Promise<number> {
     pruneOldFeedItems(),
     updateAccelerationScores(),
   ].map(p => p.catch(console.error)))
+}
 
-  return newItemCount
+// Convenience wrapper for manual triggering (calls both phases sequentially).
+export async function fetchAll(): Promise<number> {
+  const count = await fetchIngest()
+  await fetchIntelligence()
+  return count
 }
