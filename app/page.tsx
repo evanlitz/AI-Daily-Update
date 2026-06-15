@@ -2,6 +2,8 @@ import Link from 'next/link'
 import db from '@/lib/db'
 import { relTime } from '@/lib/utils'
 import { StatCard, PageCard } from '@/components/HomeCards'
+import { getTodaysBrief } from '@/lib/intelligence/brief'
+import type { DailyBrief } from '@/lib/intelligence/brief'
 
 // ── Page directory ────────────────────────────────────────────────────────────
 
@@ -175,11 +177,14 @@ function SectionDivider({ label, href, linkLabel }: { label: string; href?: stri
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function HomePage() {
-  const {
-    feedToday, trending, stories, digest, highlights,
-    modelCount, lastFetch, recentCount, freshnessColor, freshnessLabel,
-    predEvidence, totalStories, totalPreds,
-  } = await getHomeData()
+  const [
+    {
+      feedToday, trending, stories, digest, highlights,
+      modelCount, lastFetch, recentCount, freshnessColor, freshnessLabel,
+      predEvidence, totalStories, totalPreds,
+    },
+    brief,
+  ] = await Promise.all([getHomeData(), getTodaysBrief()])
 
   return (
     <main style={{ padding: '36px 48px', maxWidth: 1600, margin: '0 auto' }}>
@@ -203,18 +208,47 @@ export default async function HomePage() {
         </div>
         <h1 style={{
           fontSize: 44, fontWeight: 900, color: '#f4f4f5',
-          letterSpacing: '-0.03em', lineHeight: 1.05, marginBottom: 18,
+          letterSpacing: '-0.03em', lineHeight: 1.05, marginBottom: 24,
         }}>
           AI Daily Update
         </h1>
-        <p style={{
-          fontSize: 16, color: '#a1a1aa', maxWidth: 620,
-          lineHeight: 1.7, marginBottom: 26,
-        }}>
-          An automated intelligence system that synthesizes the AI landscape daily. Claude
-          reads 12+ sources, separates signal from noise, threads narratives across time,
-          and surfaces what actually matters — so you don't have to.
-        </p>
+
+        {brief ? (
+          <div style={{ maxWidth: 680, marginBottom: 26 }}>
+            {([
+              { key: 'signal', label: 'Signal',  text: brief.signal },
+              { key: 'rising', label: 'Rising',  text: brief.rising },
+              { key: 'watch',  label: 'Watch',   text: brief.watch  },
+              { key: 'shift',  label: 'Shift',   text: brief.shift  },
+            ] as { key: keyof DailyBrief; label: string; text: string }[]).map(({ key, label, text }, i) => (
+              <div key={key} style={{
+                paddingTop:    i === 0 ? 0 : 16,
+                paddingBottom: 16,
+                borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.05)' : 'none',
+              }}>
+                <span style={{
+                  fontSize: 9, fontWeight: 900, letterSpacing: '0.16em',
+                  color: '#3b82f6', textTransform: 'uppercase', display: 'block',
+                  marginBottom: 6,
+                }}>
+                  {label}
+                </span>
+                <p style={{ fontSize: 15, color: '#a1a1aa', lineHeight: 1.75, margin: 0 }}>
+                  {text}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{
+            fontSize: 16, color: '#a1a1aa', maxWidth: 620,
+            lineHeight: 1.7, marginBottom: 26,
+          }}>
+            An automated intelligence system that synthesizes the AI landscape daily. Claude
+            reads 12+ sources, separates signal from noise, threads narratives across time,
+            and surfaces what actually matters — so you don&apos;t have to.
+          </p>
+        )}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {[
             { label: 'Powered by Claude Sonnet', color: '#a78bfa', rgb: '167,139,250' },

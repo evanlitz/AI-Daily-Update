@@ -263,6 +263,18 @@ try { await db.execute(`
 `) } catch {}
 try { await db.execute(`ALTER TABLE story_events ADD COLUMN source TEXT NOT NULL DEFAULT 'pipeline'`) } catch {}
 try { await db.execute(`ALTER TABLE story_events ADD COLUMN source_url TEXT`) } catch {}
+try { await db.execute(`ALTER TABLE story_threads ADD COLUMN acceleration_score REAL DEFAULT 0`) } catch {}
+try { await db.execute(`
+  CREATE TABLE IF NOT EXISTS daily_briefs (
+    id         TEXT PRIMARY KEY,
+    date       TEXT NOT NULL UNIQUE,
+    signal     TEXT NOT NULL,
+    rising     TEXT NOT NULL,
+    watch      TEXT NOT NULL,
+    shift      TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )
+`) } catch {}
 try {
   await db.execute(`DROP INDEX IF EXISTS idx_story_events_thread_week_sig`)
   await db.execute(`

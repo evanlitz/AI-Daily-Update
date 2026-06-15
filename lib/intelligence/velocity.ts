@@ -54,3 +54,34 @@ export async function updateVelocityScores(): Promise<void> {
   const allVels = scored.map(s => s.vel)
   console.log(`[velocity] ${freshMode ? 'fresh' : 'mature'} · ${items.length} items · max ${Math.max(...allVels).toFixed(2)} · avg ${(allVels.reduce((s, v) => s + v, 0) / allVels.length).toFixed(2)}`)
 }
+
+// For each active story thread, compute how many events landed in the last 7 days
+// versus the prior 7 days and store the ratio as acceleration_score.
+// Score > 1 = heating up, < 1 = slowing down, 0 = dormant.
+export async function updateAccelerationScores(): Promise<void> {
+  const { rows } = await db.execute(`
+    SELECT
+      thread_id,
+      COUNT(CASE WHEN created_at >= datetime('now', '-7 days')  THEN 1 END) AS recent,
+      COUNT(CASE WHEN created_at >= datetime('now', '-14 days')
+                  AND created_at <  datetime('now', '-7 days')  THEN 1 END) AS prior
+    FROM story_events
+    GROUP BY thread_id
+  `)
+
+  if (!rows.length) return
+
+  const updates = (rows as unknown as { thread_id: string; recent: number; prior: number }[])
+    .map(r => ({
+      id: r.thread_id,
+      score: Math.min(r.recent / Math.max(r.prior, 1), 5.0),
+    }))
+
+  await db.batch(updates.map(u => ({
+    sql: `UPDATE story_threads SET acceleration_score = ? WHERE id = ?`,
+    args: [u.score, u.id],
+  })))
+
+  const rising = updates.filter(u => u.score >= 1.5).length
+  console.log(`[velocity] acceleration updated · ${updates.length} threads · ${rising} rising`)
+}

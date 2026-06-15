@@ -19,6 +19,7 @@ interface StoryThread {
   latest_update: string | null
   latest_significance: string | null
   latest_week: string | null
+  acceleration_score: number | null
 }
 
 interface StoryEvent {
@@ -234,6 +235,17 @@ function StoryCard({
             borderRadius: 3, padding: '1px 6px', textTransform: 'uppercase', flexShrink: 0,
           }}>
             HOT
+          </span>
+        )}
+
+        {(story.acceleration_score ?? 0) >= 1.5 && (
+          <span style={{
+            fontSize: 9, fontWeight: 900, letterSpacing: '0.1em',
+            color: '#fb923c', background: 'rgba(251,146,60,0.1)',
+            border: '1px solid rgba(251,146,60,0.25)',
+            borderRadius: 3, padding: '1px 6px', textTransform: 'uppercase', flexShrink: 0,
+          }}>
+            ↑ RISING
           </span>
         )}
 

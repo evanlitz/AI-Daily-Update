@@ -30,18 +30,37 @@ function stripTrackingParams(rawUrl: string): string {
 }
 
 const FEEDS = [
-  { url: 'https://blog.google/innovation-and-ai/technology/ai/rss/', source: 'rss:google-ai', tags: ['models'] },
-  { url: 'https://importai.substack.com/feed', source: 'rss:import-ai', tags: ['industry'] },
-  { url: 'https://techcrunch.com/category/artificial-intelligence/feed/', source: 'rss:techcrunch-ai', tags: ['industry'] },
-  { url: 'https://www.technologyreview.com/feed/', source: 'rss:mit-tech-review', tags: ['research'] },
-  { url: 'https://research.google/blog/rss', source: 'rss:google-research', tags: ['research'] },
-  { url: 'https://simonwillison.net/atom/everything/', source: 'rss:simon-willison', tags: ['tools'] },
-  { url: 'https://sebastianraschka.com/rss_feed.xml', source: 'rss:raschka', tags: ['research'] },
-  { url: 'https://www.interconnects.ai/feed', source: 'rss:interconnects', tags: ['research'] },
-  { url: 'https://openai.com/blog/rss.xml', source: 'rss:openai', tags: ['models', 'industry'] },
-  { url: 'https://huggingface.co/blog/feed.xml', source: 'rss:huggingface-blog', tags: ['tools', 'models'] },
-  { url: 'https://thegradient.pub/rss/', source: 'rss:the-gradient', tags: ['research'] },
-  { url: 'https://newsletter.theaiedge.io/feed', source: 'rss:ai-edge', tags: ['research', 'tools'] },
+  // ── Official AI Lab Blogs ────────────────────────────────────────────────────
+  { url: 'https://openai.com/blog/rss.xml',                              source: 'rss:openai',              tags: ['models', 'industry'] },
+  { url: 'https://www.anthropic.com/rss.xml',                            source: 'rss:anthropic',           tags: ['models', 'safety', 'industry'] },
+  { url: 'https://deepmind.google/blog/rss.xml',                         source: 'rss:deepmind',            tags: ['research', 'models'] },
+  { url: 'https://ai.meta.com/blog/rss/',                                source: 'rss:meta-ai',             tags: ['research', 'models', 'industry'] },
+  { url: 'https://mistral.ai/news/rss/',                                 source: 'rss:mistral',             tags: ['models', 'industry'] },
+  { url: 'https://cohere.com/blog/rss',                                  source: 'rss:cohere',              tags: ['models', 'industry'] },
+
+  // ── Big Tech AI Blogs ────────────────────────────────────────────────────────
+  { url: 'https://blog.google/innovation-and-ai/technology/ai/rss/',     source: 'rss:google-ai',           tags: ['models'] },
+  { url: 'https://research.google/blog/rss',                             source: 'rss:google-research',     tags: ['research'] },
+  { url: 'https://www.microsoft.com/en-us/research/blog/feed/',          source: 'rss:microsoft-research',  tags: ['research'] },
+  { url: 'https://blogs.microsoft.com/ai/feed/',                         source: 'rss:microsoft-ai',        tags: ['industry', 'tools'] },
+  { url: 'https://developer.nvidia.com/blog/feed/',                      source: 'rss:nvidia',              tags: ['infrastructure', 'tools'] },
+  { url: 'https://machinelearning.apple.com/rss.xml',                    source: 'rss:apple-ml',            tags: ['research', 'models'] },
+  { url: 'https://aws.amazon.com/blogs/machine-learning/feed/',          source: 'rss:aws-ml',              tags: ['infrastructure', 'tools'] },
+
+  // ── Curated AI Newsletters ───────────────────────────────────────────────────
+  { url: 'https://importai.substack.com/feed',                           source: 'rss:import-ai',           tags: ['industry'] },
+  { url: 'https://www.interconnects.ai/feed',                            source: 'rss:interconnects',       tags: ['research'] },
+  { url: 'https://sebastianraschka.com/rss_feed.xml',                    source: 'rss:raschka',             tags: ['research'] },
+  { url: 'https://thegradient.pub/rss/',                                 source: 'rss:the-gradient',        tags: ['research'] },
+  { url: 'https://newsletter.theaiedge.io/feed',                         source: 'rss:ai-edge',             tags: ['research', 'tools'] },
+  { url: 'https://www.latent.space/feed',                                source: 'rss:latent-space',        tags: ['research', 'tools'] },
+  { url: 'https://tldr.tech/ai/rss',                                     source: 'rss:tldr-ai',             tags: ['industry', 'tools'] },
+  { url: 'https://simonwillison.net/atom/everything/',                   source: 'rss:simon-willison',      tags: ['tools'] },
+  { url: 'https://huggingface.co/blog/feed.xml',                         source: 'rss:huggingface-blog',    tags: ['tools', 'models'] },
+
+  // ── Tech News ────────────────────────────────────────────────────────────────
+  { url: 'https://techcrunch.com/category/artificial-intelligence/feed/', source: 'rss:techcrunch-ai',      tags: ['industry'] },
+  { url: 'https://www.technologyreview.com/feed/',                        source: 'rss:mit-tech-review',    tags: ['research'] },
 ]
 
 function timeout(ms: number): Promise<never> {

@@ -10,9 +10,11 @@ import { fetchKaggleDatasets } from './sources/kaggle'
 import { fetchReddit } from './sources/reddit'
 import { fetchYoutube } from './sources/youtube'
 import { fetchPapersWithCode } from './sources/paperswithcode'
+import { fetchSemanticScholar } from './sources/semanticscholar'
+import { fetchGithubReleases } from './sources/github_releases'
 import { fetchHFModels } from './sources/hf_models'
 import type { Dataset, FeedItem, GithubRepo } from './types'
-import { updateVelocityScores } from './intelligence/velocity'
+import { updateVelocityScores, updateAccelerationScores } from './intelligence/velocity'
 import { classifyForRadar, classifyToolNames, seedRadarIfEmpty, reclassifyStaleTools } from './intelligence/radar'
 import { ensureAllModels, refreshModelsFromFeed } from './intelligence/models'
 import { screenAndHook, generateHooks } from './intelligence/hooks'
@@ -126,17 +128,18 @@ export async function fetchAll(): Promise<number> {
   )
   const knownYoutubeUrls = new Set((ytRows as any[]).map(r => r.url as string))
 
-  const [arxiv, hn, rss, github, huggingface, githubTop, hfDatasets, kaggleDatasets, reddit, pwc, hfModels, youtube] = await Promise.all([
+  const [arxiv, hn, rss, github, huggingface, githubTop, hfDatasets, kaggleDatasets, reddit, pwc, hfModels, youtube, semanticScholar, ghReleases] = await Promise.all([
     fetchArxiv(), fetchHackerNews(), fetchRSS(), fetchGithubTrending(),
     fetchHuggingFace(), fetchGithubTop(), fetchDatasets(), fetchKaggleDatasets(),
     fetchReddit(), fetchPapersWithCode(), fetchHFModels(), fetchYoutube(knownYoutubeUrls),
+    fetchSemanticScholar(), fetchGithubReleases(),
   ])
 
   const allDatasets = [...hfDatasets]
   const seenDatasets = new Set(hfDatasets.map(d => d.full_name))
   for (const d of kaggleDatasets) { if (!seenDatasets.has(d.full_name)) { seenDatasets.add(d.full_name); allDatasets.push(d) } }
 
-  const allFeedItems = [...arxiv, ...hn, ...rss, ...github, ...huggingface, ...reddit, ...pwc, ...hfModels, ...youtube]
+  const allFeedItems = [...arxiv, ...hn, ...rss, ...github, ...huggingface, ...reddit, ...pwc, ...hfModels, ...youtube, ...semanticScholar, ...ghReleases]
 
   // Record per-source item counts for health monitoring
   const sourceCounts = new Map<string, number>()
@@ -183,6 +186,7 @@ export async function fetchAll(): Promise<number> {
     seedRadarIfEmpty(),
     reclassifyStaleTools(),
     pruneOldFeedItems(),
+    updateAccelerationScores(),
   ].map(p => p.catch(console.error)))
 
   return newItemCount
