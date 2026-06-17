@@ -26,6 +26,34 @@ export const db = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 })
 
+// SQLite (and Turso's underlying engine) can reject a write with SQLITE_BUSY when
+// another write is already in flight against the same database — e.g. two cron
+// invocations overlapping. This is transient, not a logic error, so retry with
+// backoff instead of failing the whole request. Patches the client in place so
+// every db.execute()/db.batch() call across the app gets this for free.
+function isBusyError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return /SQLITE_BUSY|database is locked/i.test(msg)
+}
+
+async function withBusyRetry<T>(fn: () => Promise<T>): Promise<T> {
+  const ATTEMPTS = 5
+  for (let i = 0; i < ATTEMPTS; i++) {
+    try {
+      return await fn()
+    } catch (err) {
+      if (!isBusyError(err) || i === ATTEMPTS - 1) throw err
+      await new Promise(r => setTimeout(r, 200 * (i + 1)))
+    }
+  }
+  throw new Error('unreachable')
+}
+
+const rawExecute = db.execute.bind(db)
+const rawBatch = db.batch.bind(db)
+db.execute = ((...args: Parameters<typeof rawExecute>) => withBusyRetry(() => rawExecute(...args))) as typeof db.execute
+db.batch = ((...args: Parameters<typeof rawBatch>) => withBusyRetry(() => rawBatch(...args))) as typeof db.batch
+
 // Helper: run multiple statements at startup
 async function exec(sql: string) {
   const statements = sql.split(';').map(s => s.trim()).filter(Boolean)
