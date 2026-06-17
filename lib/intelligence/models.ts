@@ -720,7 +720,7 @@ Rules:
     const match = text.match(/\[[\s\S]*\]/)
     if (!match) return
 
-    const extracted: ExtractedModel[] = safeJSON(match[0])
+    const extracted: ExtractedModel[] = safeJSON(match[0], [])
     if (!Array.isArray(extracted) || extracted.length === 0) return
 
     const now = new Date().toISOString()

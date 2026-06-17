@@ -29,71 +29,6 @@ function normalizeToolKey(s: string): string {
   return s.toLowerCase().replace(/[\s\-_.]+/g, '')
 }
 
-// Screen a batch of candidate items before DB insertion.
-// Returns relevant items (with hooks), an entity map for ALL items, and
-// tool names extracted by Claude (replaces the regex in radar.ts for new items).
-export async function screenAndHook(candidates: FeedItem[]): Promise<ScreenResult> {
-  if (candidates.length === 0) return { items: [], entityMap: {}, toolNames: [] }
-
-  const BATCH = 30
-  const results: FeedItem[] = []
-  const entityMap: Record<string, ExtractedEntity[]> = {}
-  const toolsSeen = new Map<string, string>() // normalizedKey -> canonical name
-
-  for (let i = 0; i < candidates.length; i += BATCH) {
-    const batch = candidates.slice(i, i + BATCH)
-    const prompt = batch.map((item, n) => {
-      const snippet = item.raw_content ? `\n   ${String(item.raw_content).slice(0, 200)}` : ''
-      return `${n + 1}. (${item.source}) ${item.title}${snippet}`
-    }).join('\n')
-
-    try {
-      const resp = await anthropic.messages.create({
-        model: MODEL_FAST,
-        max_tokens: 2800,
-        system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-        messages: [{
-          role: 'user',
-          content: `Screen each item, write a hook for relevant ones, and extract entities and tools. Return ONLY a JSON array (one entry per item, in order):\n[{"n":1,"relevant":true,"hook":"...","entities":[{"name":"Anthropic","type":"company"}],"tools":["LangGraph","vLLM"]},{"n":2,"relevant":false,"entities":[]},...]` +
-            `\n\n${prompt}`,
-        }],
-      })
-
-      const text = resp.content[0].type === 'text' ? resp.content[0].text : ''
-      const match = text.match(/\[[\s\S]*\]/)
-      if (!match) { console.error('[hooks] no JSON in response'); results.push(...batch); continue }
-
-      const parsed: { n: number; relevant: boolean; hook?: string; entities?: ExtractedEntity[]; tools?: string[] }[] = safeJSON(match[0])
-      let kept = 0, dropped = 0
-      for (const entry of parsed) {
-        const item = batch[entry.n - 1]
-        if (!item) continue
-        if (Array.isArray(entry.entities) && entry.entities.length) {
-          entityMap[item.id] = entry.entities.filter(e => e.name && e.type)
-        }
-        if (entry.relevant === false) { dropped++; continue }
-        // Collect tool names from relevant items only
-        if (Array.isArray(entry.tools)) {
-          for (const t of entry.tools) {
-            if (typeof t === 'string' && t.length > 1) {
-              const key = normalizeToolKey(t)
-              if (!toolsSeen.has(key)) toolsSeen.set(key, t)
-            }
-          }
-        }
-        results.push({ ...item, hook: entry.hook ? entry.hook.slice(0, 120) : item.hook })
-        kept++
-      }
-      console.log(`[hooks] batch ${Math.floor(i / BATCH) + 1}: kept ${kept}, dropped ${dropped}`)
-    } catch (err) {
-      console.error('[hooks] screen error:', err)
-      results.push(...batch)
-    }
-  }
-
-  return { items: results, entityMap, toolNames: [...toolsSeen.values()] }
-}
-
 // Backfill hooks for any items already in the DB that slipped through without one.
 export async function generateHooks(): Promise<void> {
   const { rows } = await db.execute({
@@ -124,7 +59,7 @@ export async function generateHooks(): Promise<void> {
     const match = text.match(/\[[\s\S]*\]/)
     if (!match) { console.error('[hooks] no JSON in backfill response'); return }
 
-    const parsed: { n: number; hook: string }[] = safeJSON(match[0])
+    const parsed: { n: number; hook: string }[] = safeJSON(match[0], [])
     let updated = 0
     for (const { n, hook } of parsed) {
       const item = items[n - 1]
@@ -183,7 +118,7 @@ export async function screenPendingItems(): Promise<ScreenResult> {
         continue
       }
 
-      const parsed: { n: number; relevant: boolean; hook?: string; entities?: ExtractedEntity[]; tools?: string[] }[] = safeJSON(match[0])
+      const parsed: { n: number; relevant: boolean; hook?: string; entities?: ExtractedEntity[]; tools?: string[] }[] = safeJSON(match[0], [])
       let kept = 0, dropped = 0
       for (const entry of parsed) {
         const item = batch[entry.n - 1]

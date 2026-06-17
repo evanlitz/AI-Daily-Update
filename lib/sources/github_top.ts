@@ -25,39 +25,45 @@ async function searchRepos(q: string): Promise<any[]> {
     })
     return res.data.items ?? []
   } catch (err) {
-    console.error('[github_top] search error:', err)
+    console.error('[github_top] search error:', err instanceof Error ? err.message : err)
     return []
   }
 }
 
 export async function fetchGithubTop(): Promise<GithubRepo[]> {
-  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const now = new Date().toISOString()
+  try {
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const now = new Date().toISOString()
 
-  const results = await Promise.all(TOPICS.map(t => searchRepos(`topic:${t} pushed:>${dayAgo}`)))
+    const results = await Promise.all(TOPICS.map(t => searchRepos(`topic:${t} pushed:>${dayAgo}`)))
 
-  const map = new Map<string, GithubRepo>()
+    const map = new Map<string, GithubRepo>()
 
-  for (const repos of results) {
-    for (const repo of repos) {
-      if (map.has(repo.html_url)) continue
-      const name = (repo.full_name as string).split('/')[1] ?? repo.full_name
-      map.set(repo.html_url, {
-        id: stableId(repo.html_url),
-        name,
-        full_name: repo.full_name as string,
-        url: repo.html_url as string,
-        description: (repo.description as string | null)?.slice(0, 300) ?? undefined,
-        language: (repo.language as string | null) ?? undefined,
-        stars_total: repo.stargazers_count as number,
-        stars_today: 0,
-        topics: (repo.topics as string[] | undefined) ?? [],
-        fetched_at: now,
-      })
+    for (const repos of results) {
+      for (const repo of repos) {
+        if (!repo?.html_url || !repo?.full_name) continue
+        if (map.has(repo.html_url)) continue
+        const name = (repo.full_name as string).split('/')[1] ?? repo.full_name
+        map.set(repo.html_url, {
+          id: stableId(repo.html_url),
+          name,
+          full_name: repo.full_name as string,
+          url: repo.html_url as string,
+          description: (repo.description as string | null)?.slice(0, 300) ?? undefined,
+          language: (repo.language as string | null) ?? undefined,
+          stars_total: repo.stargazers_count as number,
+          stars_today: 0,
+          topics: (repo.topics as string[] | undefined) ?? [],
+          fetched_at: now,
+        })
+      }
     }
-  }
 
-  const repos = Array.from(map.values()).sort((a, b) => b.stars_total - a.stars_total)
-  console.log(`[github_top] ${repos.length} repos via API`)
-  return repos
+    const repos = Array.from(map.values()).sort((a, b) => b.stars_total - a.stars_total)
+    console.log(`[github_top] ${repos.length} repos via API`)
+    return repos
+  } catch (err) {
+    console.error('[github_top] fetch failed:', err instanceof Error ? err.message : err)
+    return []
+  }
 }

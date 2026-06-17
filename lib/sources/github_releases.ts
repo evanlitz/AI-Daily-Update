@@ -88,7 +88,7 @@ async function fetchReleases(repo: string, cutoff: number): Promise<FeedItem[]> 
         } as FeedItem
       })
   } catch (err) {
-    console.error(`[github-releases] ${repo}:`, err)
+    console.error(`[github-releases] ${repo}:`, err instanceof Error ? err.message : err)
     return []
   }
 }

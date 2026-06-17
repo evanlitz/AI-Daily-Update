@@ -145,7 +145,7 @@ Generate the daily brief now.`
       return null
     }
 
-    const parsed = safeJSON(match[0]) as { signal?: string; rising?: string; watch?: string; shift?: string }
+    const parsed = safeJSON(match[0], {}) as { signal?: string; rising?: string; watch?: string; shift?: string }
     if (!parsed?.signal || !parsed?.rising || !parsed?.watch || !parsed?.shift) {
       console.error('[brief] incomplete JSON from Claude:', parsed)
       return null

@@ -45,8 +45,23 @@ export async function saveEntityMentions(
     }
   }
 
+  // Bucket existing keys by length so fuzzy match only scans plausible neighbors
+  // (Levenshtein <= 2 means length can differ by at most 2) instead of the full table.
+  const byLength = new Map<number, string[]>()
+  for (const key of nameToId.keys()) {
+    if (key.length < 5) continue
+    const bucket = byLength.get(key.length) ?? []
+    bucket.push(key)
+    byLength.set(key.length, bucket)
+  }
+
   const now = new Date().toISOString()
   let created = 0, linked = 0
+
+  const aliasUpdates = new Map<string, string[]>() // entityId -> aliases array
+  const newEntities: { id: string; name: string; type: string }[] = []
+  const mentionInserts: { entityId: string; itemId: string }[] = []
+  const mentionCounts = new Map<string, number>()
 
   for (const item of items) {
     const entities = entityMap[item.id] ?? []
@@ -56,56 +71,80 @@ export async function saveEntityMentions(
 
       let entityId = nameToId.get(key)
 
-      if (!entityId) {
-        // Fuzzy-match against existing normalized names (Levenshtein ≤ 2, min length 5)
-        if (key.length >= 5) {
-          for (const [existingKey, id] of nameToId.entries()) {
-            if (existingKey.length >= 5 && levenshtein(key, existingKey) <= 2) {
-              entityId = id
-              // Register this form as an alias
-              const entity = existingRows.find(e => e.id === id)
-              if (entity) {
-                const aliases: string[] = JSON.parse(entity.aliases ?? '[]')
-                if (!aliases.includes(name)) {
-                  aliases.push(name)
-                  await db.execute({
-                    sql: `UPDATE entities SET aliases = ? WHERE id = ?`,
-                    args: [JSON.stringify(aliases), id],
-                  })
-                }
-              }
-              nameToId.set(key, id)
+      if (!entityId && key.length >= 5) {
+        // Fuzzy-match only against existing keys of similar length (Levenshtein <= 2)
+        for (let len = key.length - 2; len <= key.length + 2; len++) {
+          const bucket = byLength.get(len)
+          if (!bucket) continue
+          for (const existingKey of bucket) {
+            if (levenshtein(key, existingKey) <= 2) {
+              entityId = nameToId.get(existingKey)
               break
             }
           }
+          if (entityId) break
+        }
+        if (entityId) {
+          const entity = existingRows.find(e => e.id === entityId)
+          if (entity) {
+            const aliases: string[] = aliasUpdates.get(entityId) ?? JSON.parse(entity.aliases ?? '[]')
+            if (!aliases.includes(name)) {
+              aliases.push(name)
+              aliasUpdates.set(entityId, aliases)
+            }
+          }
+          nameToId.set(key, entityId)
         }
       }
 
       if (!entityId) {
-        // Create new entity
         entityId = crypto.randomUUID()
-        await db.execute({
-          sql: `INSERT OR IGNORE INTO entities (id, name, type, aliases, first_seen, mention_count) VALUES (?, ?, ?, '[]', ?, 0)`,
-          args: [entityId, name, type, now],
-        })
+        newEntities.push({ id: entityId, name, type })
         nameToId.set(key, entityId)
         existingRows.push({ id: entityId, name, aliases: '[]' })
+        const bucket = byLength.get(key.length) ?? []
+        bucket.push(key)
+        byLength.set(key.length, bucket)
         created++
       }
 
-      // Insert mention; increment count only on new rows
-      const result = await db.execute({
-        sql: `INSERT OR IGNORE INTO entity_mentions (entity_id, source_type, source_id, created_at) VALUES (?, 'feed_item', ?, ?)`,
-        args: [entityId, item.id, now],
-      })
-      if (result.rowsAffected > 0) {
-        await db.execute({
-          sql: `UPDATE entities SET mention_count = mention_count + 1 WHERE id = ?`,
-          args: [entityId],
-        })
+      mentionInserts.push({ entityId, itemId: item.id })
+    }
+  }
+
+  if (newEntities.length > 0) {
+    await db.batch(newEntities.map(e => ({
+      sql: `INSERT OR IGNORE INTO entities (id, name, type, aliases, first_seen, mention_count) VALUES (?, ?, ?, '[]', ?, 0)`,
+      args: [e.id, e.name, e.type, now],
+    })))
+  }
+
+  if (aliasUpdates.size > 0) {
+    await db.batch([...aliasUpdates.entries()].map(([id, aliases]) => ({
+      sql: `UPDATE entities SET aliases = ? WHERE id = ?`,
+      args: [JSON.stringify(aliases), id],
+    })))
+  }
+
+  if (mentionInserts.length > 0) {
+    const results = await db.batch(mentionInserts.map(({ entityId, itemId }) => ({
+      sql: `INSERT OR IGNORE INTO entity_mentions (entity_id, source_type, source_id, created_at) VALUES (?, 'feed_item', ?, ?)`,
+      args: [entityId, itemId, now],
+    })))
+    for (let i = 0; i < results.length; i++) {
+      if (results[i].rowsAffected > 0) {
+        const entityId = mentionInserts[i].entityId
+        mentionCounts.set(entityId, (mentionCounts.get(entityId) ?? 0) + 1)
         linked++
       }
     }
+  }
+
+  if (mentionCounts.size > 0) {
+    await db.batch([...mentionCounts.entries()].map(([id, count]) => ({
+      sql: `UPDATE entities SET mention_count = mention_count + ? WHERE id = ?`,
+      args: [count, id],
+    })))
   }
 
   if (created + linked > 0) {
@@ -168,7 +207,7 @@ export async function backfillEntities(): Promise<void> {
       const match = text.match(/\[[\s\S]*\]/)
       if (!match) continue
 
-      const parsed: { n: number; entities: ExtractedEntity[] }[] = safeJSON(match[0])
+      const parsed: { n: number; entities: ExtractedEntity[] }[] = safeJSON(match[0], [])
       for (const entry of parsed) {
         const item = batch[entry.n - 1]
         if (!item || !Array.isArray(entry.entities)) continue

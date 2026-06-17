@@ -25,43 +25,49 @@ async function searchRepos(q: string): Promise<any[]> {
     })
     return res.data.items ?? []
   } catch (err) {
-    console.error('[github] search error:', err)
+    console.error('[github] search error:', err instanceof Error ? err.message : err)
     return []
   }
 }
 
 export async function fetchGithubTrending(): Promise<FeedItem[]> {
-  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
-  const now = new Date().toISOString()
+  try {
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const now = new Date().toISOString()
 
-  const results = await Promise.all(TOPICS.map(t => searchRepos(`topic:${t} pushed:>${weekAgo}`)))
+    const results = await Promise.all(TOPICS.map(t => searchRepos(`topic:${t} pushed:>${weekAgo}`)))
 
-  const seen = new Set<string>()
-  const items: FeedItem[] = []
+    const seen = new Set<string>()
+    const items: FeedItem[] = []
 
-  for (const repos of results) {
-    for (const repo of repos) {
-      if (seen.has(repo.html_url)) continue
-      seen.add(repo.html_url)
-      const parts = [
-        repo.description ?? '',
-        repo.topics?.length ? `Topics: ${(repo.topics as string[]).slice(0, 8).join(', ')}` : '',
-      ].filter(Boolean)
-      items.push({
-        id: stableId(repo.html_url),
-        source: 'github',
-        title: repo.full_name as string,
-        url: repo.html_url as string,
-        raw_content: parts.join(' | ').slice(0, 1000) || undefined,
-        published_at: (repo.pushed_at as string) ?? now,
-        fetched_at: now,
-        topic_tags: ['tools'],
-        velocity_score: 0,
-        is_read: 0,
-      })
+    for (const repos of results) {
+      for (const repo of repos) {
+        if (!repo?.html_url || !repo?.full_name) continue
+        if (seen.has(repo.html_url)) continue
+        seen.add(repo.html_url)
+        const parts = [
+          repo.description ?? '',
+          repo.topics?.length ? `Topics: ${(repo.topics as string[]).slice(0, 8).join(', ')}` : '',
+        ].filter(Boolean)
+        items.push({
+          id: stableId(repo.html_url),
+          source: 'github',
+          title: repo.full_name as string,
+          url: repo.html_url as string,
+          raw_content: parts.join(' | ').slice(0, 1000) || undefined,
+          published_at: (repo.pushed_at as string) ?? now,
+          fetched_at: now,
+          topic_tags: ['tools'],
+          velocity_score: 0,
+          is_read: 0,
+        })
+      }
     }
-  }
 
-  console.log(`[github] ${items.length} repos via API`)
-  return items
+    console.log(`[github] ${items.length} repos via API`)
+    return items
+  } catch (err) {
+    console.error('[github] fetch failed:', err instanceof Error ? err.message : err)
+    return []
+  }
 }

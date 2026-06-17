@@ -1,7 +1,12 @@
-// Strip trailing commas before ] or } — Claude occasionally emits them
-export function safeJSON<T>(text: string): T {
+// Strip trailing commas before ] or } — Claude occasionally emits them.
+// Returns `fallback` instead of throwing on malformed input.
+export function safeJSON<T>(text: string, fallback: T): T {
   const cleaned = text.replace(/,(\s*[}\]])/g, '$1')
-  return JSON.parse(cleaned) as T
+  try {
+    return JSON.parse(cleaned) as T
+  } catch {
+    return fallback
+  }
 }
 
 export function getMondayISO(date?: string | Date): string {

@@ -2,14 +2,7 @@ import axios from 'axios'
 import he from 'he'
 import type { FeedItem } from '../types'
 import { extractPageContent } from '../extract-content'
-
-function getTopicTags(title: string): string[] {
-  const t = title.toLowerCase()
-  if (/paper|arxiv|research|study|benchmark/.test(t)) return ['research']
-  if (/gpt|claude|gemini|llama|mistral|model|openai|anthropic|deepmind|o3|o4/.test(t)) return ['models']
-  if (/tool|framework|library|sdk|api|open.?source|github|release|launch/.test(t)) return ['tools']
-  return ['industry']
-}
+import { getTopicTags } from './_topic-tags'
 
 function stripTrackingParams(rawUrl: string): string {
   try {
@@ -67,7 +60,7 @@ export async function fetchHackerNews(): Promise<FeedItem[]> {
           raw_content: hit.story_text ? he.decode(hit.story_text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 1500) : undefined,
           published_at: hit.created_at ? new Date(hit.created_at).toISOString() : now,
           fetched_at: now,
-          topic_tags: getTopicTags(hit.title ?? ''),
+          topic_tags: getTopicTags(hit.title ?? '', ['industry']),
           velocity_score: 0,
           is_read: 0,
         })

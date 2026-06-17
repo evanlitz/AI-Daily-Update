@@ -624,7 +624,7 @@ Return a JSON array only. No markdown fences. Only include predictions where the
   let updated: any[] = []
   try {
     const match = text.match(/\[[\s\S]*\]/)
-    if (match) updated = safeJSON(match[0])
+    if (match) updated = safeJSON(match[0], [])
   } catch {
     console.error('[predictions] failed to parse Claude response')
     return
@@ -751,7 +751,7 @@ Example: event "o3 scores 87% on ARC-AGI" → nudge=true for "AI near-human on n
     })
     const text = resp.content[0].type === 'text' ? resp.content[0].text : '[]'
     const match = text.match(/\[[\s\S]*\]/)
-    if (match) results = safeJSON(match[0])
+    if (match) results = safeJSON(match[0], [])
   } catch (err) {
     console.error('[predictions] applyStoryEvidence Claude call failed:', err)
     return

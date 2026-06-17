@@ -51,7 +51,7 @@ export async function generateYoutubeSummaries(): Promise<void> {
       const match = text.match(/\[[\s\S]*\]/)
       if (!match) { console.error('[youtube-summaries] no JSON in response'); continue }
 
-      const parsed: { n: number; summary: string }[] = safeJSON(match[0])
+      const parsed: { n: number; summary: string }[] = safeJSON(match[0], [])
       let updated = 0
       for (const { n, summary } of parsed) {
         const item = batch[n - 1]

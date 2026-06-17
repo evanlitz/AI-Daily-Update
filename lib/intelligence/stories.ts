@@ -268,7 +268,7 @@ Rules:
     })
     const text = response.content[0].type === 'text' ? response.content[0].text : '{}'
     const match = text.match(/\{[\s\S]*\}/)
-    if (match) parsed = safeJSON(match[0])
+    if (match) parsed = safeJSON(match[0], {})
   } catch (err) {
     console.error('[stories] Claude call failed:', err)
     return
@@ -453,7 +453,7 @@ export async function linkThreads(): Promise<void> {
     })
     const text  = resp.content[0].type === 'text' ? resp.content[0].text : '[]'
     const match = text.match(/\[[\s\S]*\]/)
-    if (match) confirmed = safeJSON(match[0])
+    if (match) confirmed = safeJSON(match[0], [])
   } catch (err) {
     console.error('[stories] linkThreads Claude call failed:', err)
     // On error: upsert all candidates by keyword overlap alone, without labels

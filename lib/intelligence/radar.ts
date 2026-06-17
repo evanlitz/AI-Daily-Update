@@ -85,7 +85,7 @@ export async function seedRadarIfEmpty(): Promise<void> {
   await classifyBatch(SEED_TOOLS)
 }
 
-// Classify tool names extracted by Claude during screenAndHook.
+// Classify tool names extracted by Claude during screening.
 // Skips any name already in the radar; classifies the rest in batches of 20.
 export async function classifyToolNames(names: string[]): Promise<void> {
   if (!names.length) return

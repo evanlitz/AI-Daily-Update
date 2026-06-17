@@ -3,6 +3,7 @@ import he from 'he'
 import crypto from 'crypto'
 import type { FeedItem } from '../types'
 import { extractPageContent } from '../extract-content'
+import { getTopicTags } from './_topic-tags'
 
 const SUBREDDITS = [
   { name: 'MachineLearning', minScore: 50,  tags: ['research'] as string[], filterKeywords: false },
@@ -18,16 +19,13 @@ function stableId(s: string): string {
   return crypto.createHash('sha1').update(s).digest('hex').slice(0, 16)
 }
 
-function stripHtml(str: string): string {
-  return str.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+function safeIsoDate(epochSeconds: number, fallback: string): string {
+  const d = new Date(epochSeconds * 1000)
+  return Number.isNaN(d.getTime()) ? fallback : d.toISOString()
 }
 
-function getTopicTags(title: string, base: string[]): string[] {
-  const t = title.toLowerCase()
-  if (/paper|arxiv|research|study|benchmark/.test(t)) return ['research']
-  if (/gpt|claude|gemini|llama|mistral|model|openai|anthropic|deepmind/.test(t)) return ['models']
-  if (/tool|framework|library|sdk|api|open.?source|github|release/.test(t)) return ['tools']
-  return base
+function stripHtml(str: string): string {
+  return str.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 async function fetchSubreddit(sub: typeof SUBREDDITS[number]): Promise<FeedItem[]> {
@@ -65,7 +63,7 @@ async function fetchSubreddit(sub: typeof SUBREDDITS[number]): Promise<FeedItem[
         title: he.decode(p.title),
         url: externalUrl,
         raw_content: content || undefined,
-        published_at: new Date(p.created_utc * 1000).toISOString(),
+        published_at: safeIsoDate(p.created_utc, now),
         fetched_at: now,
         topic_tags: getTopicTags(p.title, sub.tags),
         velocity_score: 0,
