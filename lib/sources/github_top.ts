@@ -51,7 +51,7 @@ export async function fetchGithubTop(): Promise<GithubRepo[]> {
           url: repo.html_url as string,
           description: (repo.description as string | null)?.slice(0, 300) ?? undefined,
           language: (repo.language as string | null) ?? undefined,
-          stars_total: repo.stargazers_count as number,
+          stars_total: (repo.stargazers_count as number | undefined) ?? 0,
           stars_today: 0,
           topics: (repo.topics as string[] | undefined) ?? [],
           fetched_at: now,
