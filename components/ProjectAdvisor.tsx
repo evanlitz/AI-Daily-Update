@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import type { ProjectIdea } from '@/lib/types'
+import { RefineChat } from './RefineChat'
 
 interface AdvisorProfile {
   level: 'beginner' | 'intermediate' | 'advanced'
@@ -180,6 +181,10 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
       })
       if (res.ok) { setIdeas(await res.json()); setActiveIdx(0); setChecked({}) }
     } finally { setLoading(false) }
+  }
+
+  function handleRefine(updated: ProjectIdea) {
+    setIdeas(prev => prev.map(i => i.id === updated.id ? updated : i))
   }
 
   const idea = ideas[activeIdx]
@@ -581,6 +586,8 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
                 </div>
               </div>
             )}
+
+            <RefineChat idea={idea} onUpdate={handleRefine} />
           </div>
         </div>
       ) : (

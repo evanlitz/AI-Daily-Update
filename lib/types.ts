@@ -43,6 +43,12 @@ export interface TechRadarItem {
   ring_history?: RadarRingEvent[]
 }
 
+export interface IdeaRefinementMessage {
+  role: 'user' | 'assistant'
+  content: string
+  at: string
+}
+
 export interface ProjectIdea {
   id: string
   title: string
@@ -53,6 +59,7 @@ export interface ProjectIdea {
   starter_checklist: string[]
   tech_stack: string[]
   created_at: string
+  refinement_log?: IdeaRefinementMessage[]
 }
 
 export interface Dataset {

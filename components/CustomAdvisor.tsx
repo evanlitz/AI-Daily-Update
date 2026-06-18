@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import type { ProjectIdea } from '@/lib/types'
+import { RefineChat } from './RefineChat'
 
 // ── Shared constants ──────────────────────────────────────────────────────────
 
@@ -171,6 +172,10 @@ export function CustomAdvisor() {
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) generate()
+  }
+
+  function handleRefine(updated: ProjectIdea) {
+    setIdeas(prev => prev.map(i => i.id === updated.id ? updated : i))
   }
 
   const idea = ideas[activeIdx]
@@ -504,6 +509,8 @@ export function CustomAdvisor() {
                     </div>
                   </div>
                 )}
+
+                <RefineChat idea={idea} onUpdate={handleRefine} />
               </div>
             </div>
           )}

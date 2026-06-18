@@ -363,5 +363,7 @@ try {
 } catch (err) {
   console.warn('[db] FTS5 setup skipped (search falls back to LIKE):', err)
 }
+try { await db.execute(`ALTER TABLE project_ideas ADD COLUMN refinement_log TEXT DEFAULT '[]'`) } catch {}
+try { await db.execute(`ALTER TABLE project_ideas ADD COLUMN source TEXT NOT NULL DEFAULT 'trending'`) } catch {}
 
 export default db

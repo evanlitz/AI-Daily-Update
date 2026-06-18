@@ -6,12 +6,13 @@ import { checkCooldown } from '@/lib/rateLimiter'
 export const maxDuration = 60
 
 async function getStoredIdeas() {
-  const { rows } = await db.execute(`SELECT * FROM project_ideas ORDER BY created_at DESC LIMIT 3`)
+  const { rows } = await db.execute(`SELECT * FROM project_ideas WHERE source = 'trending' ORDER BY created_at DESC LIMIT 3`)
   return (rows as any[]).map(idea => ({
     ...idea,
     skills_learned:    JSON.parse(idea.skills_learned    ?? '[]'),
     starter_checklist: JSON.parse(idea.starter_checklist ?? '[]'),
     tech_stack:        JSON.parse(idea.tech_stack        ?? '[]'),
+    refinement_log:    JSON.parse(idea.refinement_log    ?? '[]'),
   }))
 }
 
