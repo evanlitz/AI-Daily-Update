@@ -38,7 +38,8 @@ async function step<T>(label: string, fn: () => Promise<T>): Promise<T> {
 // db.batch() is all-or-nothing — if one statement is rejected (e.g. Turso's stricter
 // remote type validation vs local SQLite), the whole batch fails with a generic
 // "SERVER_ERROR: ... 400" that doesn't say which row caused it. On failure, retry
-// each statement individually so the error names the specific offending row.
+// each statement individually, log + skip whichever row is rejected, and let the
+// rest of the batch (and the pipeline) continue.
 async function batchWithDiagnostics(
   statements: { sql: string; args: unknown[] }[],
   rowLabel: (i: number) => string
@@ -46,16 +47,18 @@ async function batchWithDiagnostics(
   try {
     return await db.batch(statements as any)
   } catch (batchErr) {
+    const results: { rowsAffected: number }[] = []
     for (let i = 0; i < statements.length; i++) {
       try {
-        await db.execute(statements[i] as any)
+        const result = await db.execute(statements[i] as any)
+        results.push(result)
       } catch (rowErr) {
         const msg = rowErr instanceof Error ? rowErr.message : String(rowErr)
-        throw new Error(`row ${rowLabel(i)} rejected: ${msg}`)
+        console.error(`[pipeline] row ${rowLabel(i)} rejected, skipping: ${msg}`)
+        results.push({ rowsAffected: 0 })
       }
     }
-    // Every statement succeeded individually — re-throw the original batch error.
-    throw batchErr
+    return results
   }
 }
 

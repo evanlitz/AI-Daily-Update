@@ -1,6 +1,7 @@
 import axios from 'axios'
 import crypto from 'crypto'
 import type { GithubRepo } from '../types'
+import { sanitizeText } from '../utils'
 
 const HEADERS: Record<string, string> = {
   'Accept': 'application/vnd.github+json',
@@ -49,7 +50,7 @@ export async function fetchGithubTop(): Promise<GithubRepo[]> {
           name,
           full_name: repo.full_name as string,
           url: repo.html_url as string,
-          description: (repo.description as string | null)?.slice(0, 300) ?? undefined,
+          description: sanitizeText((repo.description as string | null)?.slice(0, 300)) ?? undefined,
           language: (repo.language as string | null) ?? undefined,
           stars_total: (repo.stargazers_count as number | undefined) ?? 0,
           stars_today: 0,
