@@ -27,9 +27,13 @@ import { generateYoutubeSummaries } from './intelligence/youtube_summaries'
 // errors (e.g. "SERVER_ERROR: Server returned HTTP status 400") don't say which
 // statement failed on their own.
 async function step<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  const start = Date.now()
   try {
-    return await fn()
+    const result = await fn()
+    console.log(`[timing] ${label}: ${Date.now() - start}ms`)
+    return result
   } catch (err) {
+    console.log(`[timing] ${label}: ${Date.now() - start}ms (failed)`)
     const msg = err instanceof Error ? err.message : String(err)
     throw new Error(`[${label}] ${msg}`)
   }
