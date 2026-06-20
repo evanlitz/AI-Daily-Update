@@ -21,6 +21,8 @@ function stableId(paperId: string): string {
 }
 
 async function searchQuery(query: string, dateFrom: string): Promise<any[]> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 10000)
   try {
     const params = new URLSearchParams({
       query,
@@ -30,6 +32,7 @@ async function searchQuery(query: string, dateFrom: string): Promise<any[]> {
     })
     const res = await fetch(`${BASE}/paper/search?${params}`, {
       headers: { 'User-Agent': 'AIPulse/1.0' },
+      signal: controller.signal,
     })
     if (!res.ok) {
       console.error(`[semanticscholar] search failed for "${query}": ${res.status}`)
@@ -40,6 +43,8 @@ async function searchQuery(query: string, dateFrom: string): Promise<any[]> {
   } catch (err) {
     console.error(`[semanticscholar] error for "${query}":`, err)
     return []
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -55,13 +60,15 @@ export async function fetchSemanticScholar(): Promise<FeedItem[]> {
     const dateFrom = cutoff.toISOString().split('T')[0]
     const now = new Date().toISOString()
 
-    const allPapers: any[] = []
-    for (const query of QUERIES) {
-      const papers = await searchQuery(query, dateFrom)
-      allPapers.push(...papers)
-      // 300ms stagger — public tier limit is 100 req/5min
-      await new Promise(r => setTimeout(r, 300))
-    }
+    // Stagger start times (public tier limit is 100 req/5min) but run concurrently
+    // so one slow query doesn't serialize against the rest.
+    const results = await Promise.all(
+      QUERIES.map(async (query, i) => {
+        await new Promise(r => setTimeout(r, i * 300))
+        return searchQuery(query, dateFrom)
+      })
+    )
+    const allPapers = results.flat()
 
     // Deduplicate by Semantic Scholar paperId
     const seen = new Set<string>()
