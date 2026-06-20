@@ -1,6 +1,7 @@
 import axios from 'axios'
 import crypto from 'crypto'
 import type { Dataset } from '../types'
+import { sanitizeText } from '../utils'
 
 // Tags on Kaggle datasets that indicate AI/ML relevance
 const AI_TAGS = new Set([
@@ -77,7 +78,7 @@ async function fetchPage(sort: string): Promise<Dataset[]> {
         id: crypto.createHash('sha1').update(fullName).digest('hex').slice(0, 16),
         full_name: fullName,
         url: item.url ?? `https://www.kaggle.com/datasets/${ref}`,
-        description: (item.subtitle || item.description || '').slice(0, 300),
+        description: sanitizeText((item.subtitle || item.description || '').slice(0, 300)),
         task_categories: mapTaskCategories(tags),
         modalities: [],
         size_category,

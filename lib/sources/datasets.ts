@@ -1,6 +1,7 @@
 import axios from 'axios'
 import crypto from 'crypto'
 import type { Dataset } from '../types'
+import { sanitizeText } from '../utils'
 
 // Task categories we care about — filters out generic/unrelated datasets
 const RELEVANT_TASKS = new Set([
@@ -79,7 +80,7 @@ function parseTags(tags: string[]): {
 function cleanDescription(desc: string | undefined): string {
   if (!desc) return ''
   // Strip markdown headers, links, HTML
-  return desc
+  const cleaned = desc
     .replace(/!\[.*?\]\(.*?\)/g, '')
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
     .replace(/<[^>]+>/g, ' ')
@@ -87,6 +88,7 @@ function cleanDescription(desc: string | undefined): string {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 300)
+  return sanitizeText(cleaned)
 }
 
 async function fetchPage(url: string): Promise<Dataset[]> {

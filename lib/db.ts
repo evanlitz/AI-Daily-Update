@@ -366,4 +366,11 @@ try {
 try { await db.execute(`ALTER TABLE project_ideas ADD COLUMN refinement_log TEXT DEFAULT '[]'`) } catch {}
 try { await db.execute(`ALTER TABLE project_ideas ADD COLUMN source TEXT NOT NULL DEFAULT 'trending'`) } catch {}
 
+// feed_items has grown large enough that the ingest pipeline's first query
+// (lookup by source prefix) was doing a full table scan — index the columns
+// every cron run actually filters/sorts on.
+try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_feed_items_source ON feed_items (source)`) } catch {}
+try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_feed_items_fetched_at ON feed_items (fetched_at)`) } catch {}
+try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_feed_items_screened ON feed_items (screened)`) } catch {}
+
 export default db
