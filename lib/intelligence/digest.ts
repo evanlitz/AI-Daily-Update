@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import db from '../db'
 import { anthropic, MODEL } from '../claude'
-import type { WeeklyDigest } from '../types'
+import type { WeeklyDigest, DigestChange } from '../types'
 import { getMondayISO } from '../utils'
 
 // Extract meaningful words from a title for overlap comparison
@@ -96,9 +96,18 @@ async function getPriorDigests(currentWeekStart: string): Promise<{ week_start: 
   } catch { return [] }
 }
 
-export async function generateWeeklyDigest(): Promise<WeeklyDigest> {
+export interface DigestContext {
+  raw: any[]
+  storyContext: string
+  priorDigests: { week_start: string; highlights: string[] }[]
+  affinityContext: string
+}
+
+// DB-touching half of digest generation — kept separate from buildAndRunDigest
+// so the eval harness can snapshot a context once and replay it against the
+// (DB-free) prompt-building logic without needing a live database.
+export async function fetchDigestContext(weekStart: string): Promise<DigestContext> {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-  const weekStart = getMondayISO()
 
   const [{ rows: raw }, storyContext, priorDigests, affinityContext] = await Promise.all([
     db.execute({
@@ -110,6 +119,16 @@ export async function generateWeeklyDigest(): Promise<WeeklyDigest> {
     getAffinityContext(),
   ]) as [{ rows: any[] }, string, { week_start: string; highlights: string[] }[], string]
 
+  return { raw, storyContext, priorDigests, affinityContext }
+}
+
+// Pure prompt-building + Claude call — no DB access. Reused by both the live
+// pipeline (generateWeeklyDigest) and the eval harness (replaying a frozen
+// DigestContext fixture).
+export async function buildAndRunDigest(
+  { raw, storyContext, priorDigests, affinityContext }: DigestContext,
+  weekStart: string
+): Promise<{ content: string; highlights: string[]; changes: DigestChange[]; sourceMaterial: string }> {
   // Source diversity cap: max 8 per source
   const sourceCounts: Record<string, number> = {}
   const diverse = raw.filter(item => {
@@ -178,7 +197,7 @@ When an item is marked "covered by N sources", treat it as proportionally more s
   const content = response.content[0].type === 'text' ? response.content[0].text : ''
 
   let highlights: string[] = []
-  let changes: { type: 'escalated' | 'resolved' | 'new'; text: string }[] = []
+  let changes: DigestChange[] = []
   try {
     // Match the last JSON object in the response (the trailing metadata block)
     const match = content.match(/(\{"highlights":[\s\S]*?\})(?:\s*)$/)
@@ -188,6 +207,20 @@ When an item is marked "covered by N sources", treat it as proportionally more s
       changes    = parsed.changes    ?? []
     }
   } catch { highlights = [] }
+
+  // Everything the digest was actually grounded in — itemList (this week's
+  // items) plus storyContext and trajectoryContext (prior weeks). Narrowing
+  // this to itemList alone made the groundedness judge flag legitimate
+  // cross-week references (e.g. in "The Trajectory") as fabricated.
+  const sourceMaterial = `${itemList}${storyContext}${trajectoryContext}`
+
+  return { content, highlights, changes, sourceMaterial }
+}
+
+export async function generateWeeklyDigest(): Promise<WeeklyDigest> {
+  const weekStart = getMondayISO()
+  const context = await fetchDigestContext(weekStart)
+  const { content, highlights, changes } = await buildAndRunDigest(context, weekStart)
 
   const id  = crypto.randomUUID()
   const now = new Date().toISOString()

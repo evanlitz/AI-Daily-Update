@@ -26,6 +26,18 @@ const STATUS = ['all', 'past', 'imminent', 'upcoming'] as const
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+const NOW_YEAR = new Date().getFullYear() + new Date().getMonth() / 12
+
+// 'past' is backend-driven (only the resolution checker can set it — it
+// requires real evidence, not just a date passing). 'imminent' vs 'upcoming'
+// is purely "how soon," so it's computed live here rather than trusted from
+// the stored status field, which is only set once at creation and never
+// updated as time passes — same threshold the timeline page already uses.
+function effectiveStatus(p: AIPrediction): 'past' | 'imminent' | 'upcoming' {
+  if (p.status === 'past') return 'past'
+  return p.year_guess - NOW_YEAR <= 1.5 ? 'imminent' : 'upcoming'
+}
+
 function confidenceDots(confidence: string) {
   const order = ['speculative', 'low', 'medium', 'high', 'confirmed']
   const idx   = order.indexOf(confidence)
@@ -94,11 +106,11 @@ function PredCard({ p }: { p: AIPrediction }) {
             {!isPast && (
               <span style={{
                 fontSize: 10, fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase',
-                color: p.status === 'imminent' ? '#fbbf24' : '#52525b',
-                background: p.status === 'imminent' ? 'rgba(251,191,36,0.08)' : 'transparent',
-                border: `1px solid ${p.status === 'imminent' ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.07)'}`,
+                color: effectiveStatus(p) === 'imminent' ? '#fbbf24' : '#52525b',
+                background: effectiveStatus(p) === 'imminent' ? 'rgba(251,191,36,0.08)' : 'transparent',
+                border: `1px solid ${effectiveStatus(p) === 'imminent' ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.07)'}`,
                 borderRadius: 4, padding: '2px 8px',
-              }}>{p.status}</span>
+              }}>{effectiveStatus(p)}</span>
             )}
           </div>
 
@@ -188,13 +200,13 @@ export default function PredictionsPage() {
 
   const filtered = useMemo(() => predictions.filter(p => {
     if (activeCat !== 'all' && p.category !== activeCat) return false
-    if (activeStatus !== 'all' && p.status !== activeStatus) return false
+    if (activeStatus !== 'all' && effectiveStatus(p) !== activeStatus) return false
     return true
   }), [predictions, activeCat, activeStatus])
 
-  const past     = filtered.filter(p => p.status === 'past').reverse()
-  const imminent = filtered.filter(p => p.status === 'imminent')
-  const upcoming = filtered.filter(p => p.status === 'upcoming')
+  const past     = filtered.filter(p => effectiveStatus(p) === 'past').reverse()
+  const imminent = filtered.filter(p => effectiveStatus(p) === 'imminent')
+  const upcoming = filtered.filter(p => effectiveStatus(p) === 'upcoming')
 
   const totalPast = predictions.filter(p => p.status === 'past').length
   const totalFuture = predictions.filter(p => p.status !== 'past').length

@@ -571,7 +571,15 @@ export async function ensureAllPredictions(): Promise<void> {
   }
 }
 
-export async function refreshPredictionAnalysis(): Promise<void> {
+export interface PredictionContext {
+  feedItems: any[]
+  predictions: any[]
+}
+
+// DB-touching half — kept separate from buildAndRunPredictionRefresh so the
+// eval harness can snapshot a context once and replay it against the
+// (DB-free) prompt-building logic without needing a live database.
+export async function fetchPredictionContext(): Promise<PredictionContext> {
   const { rows: feedItems } = await db.execute({
     sql: `SELECT id, title, url, source, summary, raw_content
           FROM feed_items WHERE screened = 1 ORDER BY velocity_score DESC, fetched_at DESC LIMIT 30`,
@@ -583,6 +591,15 @@ export async function refreshPredictionAnalysis(): Promise<void> {
     args: [],
   }) as { rows: any[] }
 
+  return { feedItems, predictions }
+}
+
+// Pure prompt-building + Claude call — no DB access. Reused by both the live
+// pipeline (refreshPredictionAnalysis) and the eval harness (replaying a
+// frozen PredictionContext fixture).
+export async function buildAndRunPredictionRefresh(
+  { feedItems, predictions }: PredictionContext
+): Promise<{ updated: any[]; feedList: string }> {
   const feedList = feedItems
     .map((item, i) => `${i + 1}. [${item.source}] "${item.title}" — ${(item.summary ?? item.raw_content ?? '').slice(0, 200)}`)
     .join('\n')
@@ -627,8 +644,14 @@ Return a JSON array only. No markdown fences. Only include predictions where the
     if (match) updated = safeJSON(match[0], [])
   } catch {
     console.error('[predictions] failed to parse Claude response')
-    return
   }
+
+  return { updated, feedList }
+}
+
+export async function refreshPredictionAnalysis(): Promise<void> {
+  const context = await fetchPredictionContext()
+  const { updated } = await buildAndRunPredictionRefresh(context)
 
   const now = new Date().toISOString()
   for (const u of updated) {
@@ -652,6 +675,150 @@ Return a JSON array only. No markdown fences. Only include predictions where the
     })
   }
   console.log(`[predictions] refreshed ${updated.length} future prediction analyses`)
+}
+
+// ── Resolution checker ─────────────────────────────────────────────────────
+// Hybrid evidence: pass 1 checks the (free) feed pool already fetched for
+// refreshPredictionAnalysis; pass 2 falls back to live web search, but only
+// for predictions whose year_max has already passed and that pass 1 didn't
+// resolve — keeps the expensive path rare and bounded.
+
+const MAX_WEB_SEARCH_CHECKS = 5
+
+interface ResolvedPrediction {
+  id: string
+  evidence_title: string
+  evidence_url: string
+  rationale: string
+  source: 'feed' | 'web'
+}
+
+async function checkFeedForResolutions(context: PredictionContext): Promise<ResolvedPrediction[]> {
+  const { feedItems, predictions } = context
+  if (!predictions.length) return []
+
+  const feedList = feedItems
+    .map((item, i) => `${i + 1}. [${item.source}] "${item.title}" — ${(item.summary ?? item.raw_content ?? '').slice(0, 200)}`)
+    .join('\n')
+  const predList = predictions
+    .map(p => `{"id":"${p.id}","title":"${p.title}","description":"${(p.description ?? '').slice(0, 200)}"}`)
+    .join('\n')
+
+  const systemPrompt = `You are checking whether AI predictions in a personal forecasting timeline have been fully realized — not just progressed toward — based on a recent AI news feed.
+
+Default to NOT resolved unless the feed contains clear, specific evidence the predicted event has actually, fully occurred. Partial progress, related-but-different announcements, or "on track" signals do not count as resolution — only the specific described outcome happening counts.
+
+Only include predictions you found resolving evidence for. Omit every prediction with no resolving evidence at all — do not list them as unresolved, just leave them out.`
+
+  const userPrompt = `Recent AI news feed:\n${feedList}\n\nPredictions to check:\n${predList}\n\nReturn ONLY a JSON array of resolved predictions (omit everything else):\n[{"id":"...","evidence_title":"...","evidence_url":"...","rationale":"one sentence citing the feed item"}]`
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 1500,
+    system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: userPrompt }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
+  const match = text.match(/\[[\s\S]*\]/)
+  const found = safeJSON<any[]>(match ? match[0] : '[]', [])
+  return found.filter(r => r.id).map(r => ({ ...r, source: 'feed' as const }))
+}
+
+async function checkResolutionViaWebSearch(prediction: any): Promise<ResolvedPrediction | null> {
+  const systemPrompt = `You are verifying whether a specific AI/technology prediction has actually happened, using web search. Search for current, verifiable evidence. Default to NOT resolved unless you find clear evidence the specific described outcome has occurred — a related or similar event happening doesn't count.`
+
+  const userPrompt = `Prediction: "${prediction.title}"\nDescription: ${prediction.description ?? ''}\nExpected window: ${prediction.year_min}-${prediction.year_max}\n\nSearch the web to determine whether this has actually happened yet. Return ONLY a JSON object:\n{"resolved":true|false,"evidence_title":"...","evidence_url":"...","rationale":"one sentence"}`
+
+  let response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    tools: [{ type: 'web_search_20260209', name: 'web_search' }],
+    system: [{ type: 'text', text: systemPrompt }],
+    messages: [{ role: 'user', content: userPrompt }],
+  })
+
+  // Server-side search loop can pause if it hits the iteration cap — resend
+  // once to let it finish; one retry is plenty for a single-prediction check.
+  if (response.stop_reason === 'pause_turn') {
+    response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 1024,
+      tools: [{ type: 'web_search_20260209', name: 'web_search' }],
+      system: [{ type: 'text', text: systemPrompt }],
+      messages: [
+        { role: 'user', content: userPrompt },
+        { role: 'assistant', content: response.content },
+      ],
+    })
+  }
+
+  const textBlock = response.content.find(b => b.type === 'text')
+  const text = textBlock && textBlock.type === 'text' ? textBlock.text : '{}'
+  const match = text.match(/\{[\s\S]*\}/)
+  const result = safeJSON<any>(match ? match[0] : '{}', { resolved: false })
+
+  if (!result.resolved) return null
+  return {
+    id: prediction.id,
+    evidence_title: result.evidence_title ?? '',
+    evidence_url: result.evidence_url ?? '',
+    rationale: result.rationale ?? '',
+    source: 'web',
+  }
+}
+
+export async function checkPredictionResolution(): Promise<void> {
+  const context = await fetchPredictionContext()
+  const currentYear = new Date().getFullYear()
+
+  const resolvedByFeed = await checkFeedForResolutions(context)
+  const resolvedIds = new Set(resolvedByFeed.map(r => r.id))
+
+  // Eligible for the web-search fallback: overdue (year_max already passed)
+  // and not already resolved by the free feed pass. Context.predictions is
+  // already ordered by year_max ASC, so the most overdue come first.
+  const overdueUnresolved = context.predictions
+    .filter(p => p.year_max < currentYear && !resolvedIds.has(p.id))
+    .slice(0, MAX_WEB_SEARCH_CHECKS)
+
+  const resolvedByWeb: ResolvedPrediction[] = []
+  for (const p of overdueUnresolved) {
+    try {
+      const result = await checkResolutionViaWebSearch(p)
+      if (result) resolvedByWeb.push(result)
+    } catch (err) {
+      console.error(`[predictions] web search resolution check failed for ${p.id}:`, err)
+    }
+  }
+
+  const resolved = [...resolvedByFeed, ...resolvedByWeb]
+  const nowDate = new Date()
+  const now = nowDate.toISOString()
+  // Move year_guess/month_guess/date_guess to when it actually resolved —
+  // otherwise a prediction originally guessed for e.g. 2029 that resolves
+  // today stays chronologically stranded at 2029 (sorts and displays as a
+  // future event everywhere that orders by year_guess, even though it's done).
+  const resolvedYearGuess = nowDate.getFullYear()
+  const resolvedMonthGuess = nowDate.getMonth() + 1
+  const resolvedDateGuess = nowDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+
+  for (const r of resolved) {
+    const { rows } = await db.execute({ sql: `SELECT evidence FROM ai_predictions WHERE id = ?`, args: [r.id] }) as { rows: any[] }
+    if (!rows.length) continue
+    const evidence: EvidenceLink[] = safeJSON(rows[0].evidence ?? '[]', [])
+    evidence.push({ title: r.evidence_title || r.rationale, url: r.evidence_url || '', source: r.source === 'web' ? 'web_search' : 'feed_pipeline' })
+
+    await db.execute({
+      sql: `UPDATE ai_predictions SET
+              status = 'past', confidence = 'confirmed', evidence = ?,
+              year_guess = ?, month_guess = ?, date_guess = ?, updated_at = ?
+            WHERE id = ?`,
+      args: [JSON.stringify(evidence), resolvedYearGuess, resolvedMonthGuess, resolvedDateGuess, now, r.id],
+    })
+  }
+
+  console.log(`[predictions] resolution check: ${resolvedByFeed.length} resolved via feed, ${resolvedByWeb.length} resolved via web search (${overdueUnresolved.length} checked)`)
 }
 
 // ── Phase 3: Story-event evidence linking ─────────────────────────────────────
@@ -812,6 +979,138 @@ export async function backfillPredictionEvidence(): Promise<void> {
   }))
   await applyStoryEvidence(events, { skipNudge: true })
   console.log(`[predictions] backfilled evidence from ${rows.length} high-significance events`)
+}
+
+// ── New-prediction generator ───────────────────────────────────────────────
+// Same selectivity philosophy as stories.ts's thread creation: a single
+// announcement is an event, not a forecast-worthy prediction. Confidence is
+// clamped in code (not just prompted) — auto-generated predictions never
+// insert above 'low', same defensive pattern as nudgeUp() never auto-setting
+// 'confirmed'. Dedup reuses the same title-token-overlap heuristic digest.ts's
+// clusterItems() uses for story clustering, applied to prediction titles.
+
+const MAX_NEW_PREDICTIONS_PER_RUN = 2
+const GENERATOR_STOPWORDS = new Set(['a','an','the','of','in','on','for','to','with','and','or','is','are','will','can','that','this','from','by','at','as'])
+
+function titleTokens(title: string): Set<string> {
+  return new Set(
+    title.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 3 && !GENERATOR_STOPWORDS.has(w))
+  )
+}
+
+// Rejects a candidate if it shares 2+ significant words with any existing
+// prediction title — same threshold digest.ts's clusterItems() uses to treat
+// two feed items as "the same story."
+function isDuplicateTitle(candidateTitle: string, existingTitles: string[]): boolean {
+  const candidateTokens = titleTokens(candidateTitle)
+  return existingTitles.some(existing => {
+    const overlap = [...candidateTokens].filter(t => titleTokens(existing).has(t)).length
+    return overlap >= 2
+  })
+}
+
+export interface NewPredictionContext {
+  threads: any[]
+  radarTools: any[]
+  existingTitles: string[]
+}
+
+export async function fetchNewPredictionCandidates(): Promise<NewPredictionContext> {
+  const cutoff = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString()
+
+  const [{ rows: threads }, { rows: radarTools }, { rows: existing }] = await Promise.all([
+    db.execute({
+      sql: `SELECT st.title, st.category, st.current_summary, st.watch_for
+            FROM story_threads st
+            JOIN story_events se ON se.thread_id = st.id
+            WHERE st.status = 'active' AND se.significance = 'high' AND se.created_at >= ?
+            GROUP BY st.id ORDER BY st.last_updated DESC LIMIT 10`,
+      args: [cutoff],
+    }),
+    db.execute(`SELECT name, category, rationale FROM tech_radar WHERE quadrant = 'adopt' ORDER BY name ASC LIMIT 15`),
+    db.execute(`SELECT title FROM ai_predictions`),
+  ]) as [{ rows: any[] }, { rows: any[] }, { rows: any[] }]
+
+  return {
+    threads,
+    radarTools,
+    existingTitles: existing.map(r => r.title),
+  }
+}
+
+export async function buildAndRunNewPredictions(context: NewPredictionContext): Promise<any[]> {
+  const { threads, radarTools, existingTitles } = context
+  if (!threads.length && !radarTools.length) return []
+
+  const threadList = threads
+    .map(t => `- ${t.title} (${t.category}): ${t.current_summary ?? ''} | Watch for: ${t.watch_for ?? ''}`)
+    .join('\n') || 'None.'
+  const radarList = radarTools
+    .map(r => `- ${r.name} (${r.category}): ${r.rationale ?? ''}`)
+    .join('\n') || 'None.'
+  const existingList = existingTitles.join(', ')
+
+  const systemPrompt = `You are a cautious AI forecasting analyst proposing NEW entries for a personal AI predictions timeline. You only propose a new prediction when there is a genuine, multi-month-or-longer forecast to make — a real forward uncertainty about whether/when something will happen. A single product announcement or news event is not a prediction; it already happened, there's nothing to forecast.
+
+Be selective. Most runs should propose 0-2 predictions, not 3. Only propose something if it's clearly NOT a near-duplicate of an existing tracked prediction (titles below) — if something is already covered, don't repeat it under a slightly different title.
+
+Always set confidence to "speculative" or "low" — these are fresh, unverified forecasts, not established trends.`
+
+  const userPrompt = `Recent high-significance story threads:\n${threadList}\n\nTools/models currently in the "adopt" radar quadrant:\n${radarList}\n\nAlready-tracked prediction titles (do not duplicate):\n${existingList}\n\nPropose 0-2 new predictions. Return ONLY a JSON array (empty array if nothing genuinely new is worth forecasting):\n[{"title":"...","category":"capability|safety|science|society|infrastructure","year_min":2026,"year_max":2028,"year_guess":2027,"month_guess":1-12,"date_guess":"Month Year","confidence":"speculative"|"low","description":"1-2 sentences","rationale":"2-3 sentences citing the specific thread/tool above that motivated this"}]`
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 1500,
+    system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: userPrompt }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
+  const match = text.match(/\[[\s\S]*\]/)
+  const candidates = safeJSON<any[]>(match ? match[0] : '[]', [])
+
+  return candidates.filter(c => c.title && !isDuplicateTitle(c.title, existingTitles))
+}
+
+export async function generateNewPredictions(): Promise<void> {
+  const context = await fetchNewPredictionCandidates()
+  const candidates = (await buildAndRunNewPredictions(context)).slice(0, MAX_NEW_PREDICTIONS_PER_RUN)
+  if (!candidates.length) {
+    console.log('[predictions] generateNewPredictions: nothing new to propose')
+    return
+  }
+
+  const now = new Date().toISOString()
+  const currentYear = new Date().getFullYear()
+  let inserted = 0
+
+  for (const c of candidates) {
+    // Confidence clamp enforced in code, not just prompted
+    const confidence: AIPrediction['confidence'] = c.confidence === 'low' ? 'low' : 'speculative'
+    // Matches the same 1.5-year threshold both frontend pages use to
+    // recompute imminent/upcoming live — this stored value is just the
+    // sensible initial state, not relied on to stay fresh (the frontend
+    // recalculates it from year_guess on every render).
+    const status: AIPrediction['status'] = (c.year_guess ?? currentYear + 2) - currentYear <= 1.5 ? 'imminent' : 'upcoming'
+
+    await db.execute({
+      sql: `INSERT OR IGNORE INTO ai_predictions
+              (id, title, category, year_min, year_max, year_guess, month_guess, date_guess, confidence, description, rationale, evidence, status, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?, ?)`,
+      args: [
+        crypto.randomUUID(), c.title, c.category ?? 'capability',
+        c.year_min ?? currentYear + 1, c.year_max ?? currentYear + 3, c.year_guess ?? currentYear + 2,
+        c.month_guess ?? 6, c.date_guess ?? String(c.year_guess ?? currentYear + 2),
+        confidence, c.description ?? '', c.rationale ?? '', status, now, now,
+      ],
+    })
+    inserted++
+  }
+
+  console.log(`[predictions] generateNewPredictions: proposed ${inserted} new prediction(s)`)
 }
 
 export async function getAllPredictions(): Promise<AIPrediction[]> {

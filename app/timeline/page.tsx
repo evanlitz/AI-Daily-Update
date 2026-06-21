@@ -94,7 +94,7 @@ function EventSlide({
   const color  = CAT_COLOR[p.category] ?? '#3b82f6'
   const rgb    = CAT_RGB[p.category]   ?? '59,130,246'
   const conf   = CONF_META[p.confidence] ?? CONF_META.low
-  const isPast = p.year_guess < NOW_YEAR
+  const isPast = p.status === 'past'
 
   return (
     <div style={{
@@ -191,7 +191,7 @@ function EventSlide({
             background: isPast ? 'rgba(52,211,153,0.12)' : 'rgba(251,191,36,0.1)',
             color: isPast ? '#34d399' : '#fbbf24',
           }}>
-            {isPast ? '✓ confirmed past' : p.year_guess <= NOW_YEAR + 1 ? '⚡ imminent' : 'upcoming'}
+            {isPast ? '✓ confirmed past' : p.year_guess - NOW_YEAR <= 1.5 ? '⚡ imminent' : 'upcoming'}
           </span>
         </div>
 
@@ -503,7 +503,7 @@ function ListView({ events, onSelect }: { events: AIPrediction[]; onSelect: (i: 
           const color  = CAT_COLOR[p.category] ?? '#3b82f6'
           const rgb    = CAT_RGB[p.category]   ?? '59,130,246'
           const conf   = CONF_META[p.confidence] ?? CONF_META.low
-          const isPast = p.year_guess < NOW_YEAR
+          const isPast = p.status === 'past'
           const isHov  = hov === p.id
           const prevYear = i > 0 ? events[i - 1].year_guess : null
 

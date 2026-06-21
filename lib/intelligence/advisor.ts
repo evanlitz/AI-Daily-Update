@@ -3,6 +3,7 @@ import db from '../db'
 import { anthropic, MODEL } from '../claude'
 import { safeJSON } from '../utils'
 import { gatherAdvisorContext } from './advisor-context'
+import type { AdvisorSourceContext } from './advisor-context'
 import type { ProjectIdea, IdeaRefinementMessage } from '../types'
 
 export interface AdvisorContext {
@@ -86,7 +87,15 @@ ${ctx.radar}`
   return Promise.all(ideas.slice(0, 3).map(i => persistIdea(i, 'custom')))
 }
 
-export async function generateProjectIdeas(context?: AdvisorContext): Promise<ProjectIdea[]> {
+export interface TrendingAdvisorContext {
+  ctx: AdvisorSourceContext
+  existingTitles: string
+}
+
+// DB-touching half — kept separate from buildAndRunTrendingIdeas so the eval
+// harness can snapshot a context once and replay it against the (DB-free)
+// prompt-building logic without needing a live database.
+export async function fetchTrendingAdvisorContext(): Promise<TrendingAdvisorContext> {
   const day30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
   const [ctx, { rows: existingIdeas }] = await Promise.all([
@@ -95,7 +104,15 @@ export async function generateProjectIdeas(context?: AdvisorContext): Promise<Pr
   ])
 
   const existingTitles = (existingIdeas as any[]).map(i => i.title).join(', ')
+  return { ctx, existingTitles }
+}
 
+// Pure prompt-building + Claude call — no DB access, no persistence. Reused
+// by generateProjectIdeas (live pipeline) and the eval harness (frozen context).
+export async function buildAndRunTrendingIdeas(
+  { ctx, existingTitles }: TrendingAdvisorContext,
+  context?: AdvisorContext
+): Promise<any[]> {
   const contextLines = [
     context?.level ? `Experience level: ${context.level}.` : '',
     context?.interests?.length ? `Interested in: ${context.interests.join(', ')}.` : '',
@@ -129,7 +146,13 @@ ${ctx.radar}`
   let ideas: any[] = []
   try { const m = content.match(/\[[\s\S]*\]/); if (m) ideas = JSON.parse(m[0]) } catch {}
 
-  return Promise.all(ideas.slice(0, 3).map(i => persistIdea(i, 'trending')))
+  return ideas.slice(0, 3)
+}
+
+export async function generateProjectIdeas(context?: AdvisorContext): Promise<ProjectIdea[]> {
+  const trendingContext = await fetchTrendingAdvisorContext()
+  const ideas = await buildAndRunTrendingIdeas(trendingContext, context)
+  return Promise.all(ideas.map(i => persistIdea(i, 'trending')))
 }
 
 // ── Refinement ────────────────────────────────────────────────────────────

@@ -2,10 +2,17 @@
   "name": "ai-pulse",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "node --max-old-space-size=4096 node_modules/next/dist/bin/next dev",
     "build": "node --max-old-space-size=4096 node_modules/next/dist/bin/next build",
-    "start": "next start"
+    "start": "next start",
+    "eval:capture": "node --env-file=.env.local --import tsx scripts/eval/capture-golden-set.mts",
+    "eval:run": "node --env-file=.env.local --import tsx scripts/eval/run-eval.mts",
+    "eval:advisor:capture": "node --env-file=.env.local --import tsx scripts/eval/capture-advisor-golden-set.mts",
+    "eval:advisor:run": "node --env-file=.env.local --import tsx scripts/eval/run-eval-advisor.mts",
+    "eval:prediction:capture": "node --env-file=.env.local --import tsx scripts/eval/capture-prediction-golden-set.mts",
+    "eval:prediction:run": "node --env-file=.env.local --import tsx scripts/eval/run-eval-prediction.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
@@ -33,6 +40,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }
