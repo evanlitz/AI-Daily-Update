@@ -2,8 +2,11 @@ import Link from 'next/link'
 import db from '@/lib/db'
 import { relTime } from '@/lib/utils'
 import { StatCard, PageCard } from '@/components/HomeCards'
-import { getTodaysBrief } from '@/lib/intelligence/brief'
+import { getLatestBrief } from '@/lib/intelligence/brief'
 import type { DailyBrief } from '@/lib/intelligence/brief'
+import { BriefAudio } from '@/components/BriefAudio'
+
+export const dynamic = 'force-dynamic'
 
 // ── Page directory ────────────────────────────────────────────────────────────
 
@@ -184,7 +187,7 @@ export default async function HomePage() {
       predEvidence, totalStories, totalPreds,
     },
     brief,
-  ] = await Promise.all([getHomeData(), getTodaysBrief()])
+  ] = await Promise.all([getHomeData(), getLatestBrief()])
 
   return (
     <main style={{ padding: '36px 48px', maxWidth: 1600, margin: '0 auto' }}>
@@ -214,30 +217,52 @@ export default async function HomePage() {
         </h1>
 
         {brief ? (
-          <div style={{ maxWidth: 680, marginBottom: 26 }}>
-            {([
-              { key: 'signal', label: 'Signal',  text: brief.signal },
-              { key: 'rising', label: 'Rising',  text: brief.rising },
-              { key: 'watch',  label: 'Watch',   text: brief.watch  },
-              { key: 'shift',  label: 'Shift',   text: brief.shift  },
-            ] as { key: keyof DailyBrief; label: string; text: string }[]).map(({ key, label, text }, i) => (
-              <div key={key} style={{
-                paddingTop:    i === 0 ? 0 : 16,
-                paddingBottom: 16,
-                borderBottom: i < 3 ? '1px solid rgba(255,255,255,0.05)' : 'none',
-              }}>
-                <span style={{
-                  fontSize: 9, fontWeight: 900, letterSpacing: '0.16em',
-                  color: '#3b82f6', textTransform: 'uppercase', display: 'block',
-                  marginBottom: 6,
-                }}>
-                  {label}
-                </span>
-                <p style={{ fontSize: 15, color: '#a1a1aa', lineHeight: 1.75, margin: 0 }}>
-                  {text}
-                </p>
+          <div style={{
+            maxWidth: 820, marginBottom: 26, position: 'relative', overflow: 'hidden',
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 16, padding: '26px 30px 28px',
+          }}>
+            <div style={{
+              position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+              background: 'linear-gradient(90deg, #3b82f6, #34d399, #fbbf24, #a78bfa)',
+            }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: '#71717a', textTransform: 'uppercase' }}>
+                Today&apos;s Briefing
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <div style={{ position: 'relative', display: 'flex', width: 7, height: 7 }}>
+                    <span className="ping-slow" style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'rgba(52,211,153,0.5)' }} />
+                    <span style={{ position: 'relative', width: 7, height: 7, borderRadius: '50%', background: '#34d399' }} />
+                  </div>
+                  <span style={{ fontSize: 11, color: '#71717a', fontWeight: 600 }}>
+                    Generated {relTime(brief.created_at)}
+                  </span>
+                </div>
+                <BriefAudio signal={brief.signal} rising={brief.rising} watch={brief.watch} shift={brief.shift} />
               </div>
-            ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '22px 30px' }}>
+              {([
+                { key: 'signal', label: 'Signal', text: brief.signal, accent: '59,130,246',  color: '#60a5fa' },
+                { key: 'rising', label: 'Rising', text: brief.rising, accent: '52,211,153',  color: '#34d399' },
+                { key: 'watch',  label: 'Watch',  text: brief.watch,  accent: '251,191,36',  color: '#fbbf24' },
+                { key: 'shift',  label: 'Shift',  text: brief.shift,  accent: '167,139,250', color: '#a78bfa' },
+              ] as { key: keyof DailyBrief; label: string; text: string; accent: string; color: string }[]).map(({ key, label, text, accent, color }) => (
+                <div key={key} style={{ borderLeft: `2.5px solid rgba(${accent},0.5)`, paddingLeft: 16 }}>
+                  <span style={{
+                    fontSize: 10, fontWeight: 900, letterSpacing: '0.14em',
+                    color, textTransform: 'uppercase', display: 'block', marginBottom: 8,
+                  }}>
+                    {label}
+                  </span>
+                  <p style={{ fontSize: 14.5, color: '#d4d4d8', lineHeight: 1.7, margin: 0 }}>
+                    {text}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <p style={{

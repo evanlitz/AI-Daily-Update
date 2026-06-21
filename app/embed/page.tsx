@@ -3,6 +3,8 @@ import { ProjectAdvisor } from '@/components/ProjectAdvisor'
 import db from '@/lib/db'
 import type { FeedItem, ProjectIdea } from '@/lib/types'
 
+export const dynamic = 'force-dynamic'
+
 export default async function EmbedPage() {
   const [feedRows, ideaRows] = await Promise.all([
     db.execute({ sql: `SELECT * FROM feed_items ORDER BY velocity_score DESC LIMIT 40`, args: [] }).catch(() => ({ rows: [] })),

@@ -2,6 +2,8 @@ import { TrendFeed } from '@/components/TrendFeed'
 import db from '@/lib/db'
 import type { FeedItem } from '@/lib/types'
 
+export const dynamic = 'force-dynamic'
+
 function interleave(items: FeedItem[], limit: number): FeedItem[] {
   const bySource: Record<string, FeedItem[]> = {}
   for (const item of items) {

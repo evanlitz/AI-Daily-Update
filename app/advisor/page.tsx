@@ -2,6 +2,8 @@ import { AdvisorTabs } from '@/components/AdvisorTabs'
 import db from '@/lib/db'
 import type { ProjectIdea } from '@/lib/types'
 
+export const dynamic = 'force-dynamic'
+
 async function getIdeas(): Promise<ProjectIdea[]> {
   try {
     const { rows } = await db.execute({

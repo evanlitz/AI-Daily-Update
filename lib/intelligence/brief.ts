@@ -168,11 +168,10 @@ Generate the daily brief now.`
   }
 }
 
-export async function getTodaysBrief(): Promise<DailyBrief | null> {
-  const today = new Date().toISOString().split('T')[0]
+export async function getLatestBrief(): Promise<DailyBrief | null> {
   const { rows } = await db.execute({
-    sql: `SELECT * FROM daily_briefs WHERE date = ? LIMIT 1`,
-    args: [today],
+    sql: `SELECT * FROM daily_briefs ORDER BY date DESC LIMIT 1`,
+    args: [],
   })
   return (rows[0] as unknown as DailyBrief) ?? null
 }
