@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { generateWeeklyDigest } from '@/lib/intelligence/digest'
-import { refreshPredictionAnalysis, checkPredictionResolution, generateNewPredictions } from '@/lib/intelligence/predictions'
 import { getMondayISO } from '@/lib/utils'
 
 export const maxDuration = 300
@@ -23,9 +22,5 @@ export async function GET(req: Request) {
   }
 
   const digest = await generateWeeklyDigest()
-  // Refresh, resolve, and grow prediction timelines once per week alongside the digest
-  await refreshPredictionAnalysis().catch(console.error)
-  await checkPredictionResolution().catch(console.error)
-  await generateNewPredictions().catch(console.error)
   return NextResponse.json({ ok: true, weekStart: digest.week_start })
 }
