@@ -112,6 +112,11 @@ export async function generateHooks(): Promise<void> {
 
 // Items that match a recently-screened item closely enough to fast-track:
 // copy the match's hook, mark screened, skip the Claude call entirely.
+// Each lookup is an independent network round-trip to Turso — run them
+// concurrently in bounded chunks rather than one at a time, since up to 200
+// candidates would otherwise serialize 200 round-trips before screening starts.
+const DEDUP_LOOKUP_CONCURRENCY = 10
+
 async function fastTrackDuplicates(
   candidates: any[],
   tallies: Map<string, SourceTally>
@@ -120,19 +125,28 @@ async function fastTrackDuplicates(
   const remaining: any[] = []
   const fastTracked: { item: any; hook: string | null }[] = []
 
+  const toCheck = candidates.filter(item =>
+    !DEDUP_EXCLUDED_SOURCE_PREFIXES.some(p => (item.source as string).startsWith(p))
+  )
   for (const item of candidates) {
-    const isExcluded = DEDUP_EXCLUDED_SOURCE_PREFIXES.some(p => (item.source as string).startsWith(p))
-    if (isExcluded) { remaining.push(item); continue }
+    if (DEDUP_EXCLUDED_SOURCE_PREFIXES.some(p => (item.source as string).startsWith(p))) remaining.push(item)
+  }
 
-    const match = await findRecentDuplicateFeedItem(item.id, {
+  for (let i = 0; i < toCheck.length; i += DEDUP_LOOKUP_CONCURRENCY) {
+    const chunk = toCheck.slice(i, i + DEDUP_LOOKUP_CONCURRENCY)
+    const matches = await Promise.all(chunk.map(item => findRecentDuplicateFeedItem(item.id, {
       sinceISO,
       excludeSourcePrefixes: DEDUP_EXCLUDED_SOURCE_PREFIXES,
-    })
-    if (match && match.distance < DEDUP_DISTANCE_THRESHOLD) {
-      fastTracked.push({ item, hook: match.hook })
-      bumpTally(tallies, item.source, 'fastTracked')
-    } else {
-      remaining.push(item)
+    })))
+    for (let j = 0; j < chunk.length; j++) {
+      const item = chunk[j]
+      const match = matches[j]
+      if (match && match.distance < DEDUP_DISTANCE_THRESHOLD) {
+        fastTracked.push({ item, hook: match.hook })
+        bumpTally(tallies, item.source, 'fastTracked')
+      } else {
+        remaining.push(item)
+      }
     }
   }
   return { remaining, fastTracked }
@@ -146,7 +160,7 @@ export async function screenPendingItems(): Promise<ScreenResult> {
   const tallies = new Map<string, SourceTally>()
 
   const { rows } = await db.execute({
-    sql: `SELECT id, source, title, url, summary, raw_content, velocity_score FROM feed_items WHERE screened = 0 ORDER BY fetched_at DESC LIMIT 200`,
+    sql: `SELECT id, source, title, url, summary, raw_content, velocity_score FROM feed_items WHERE screened = 0 ORDER BY fetched_at ASC LIMIT 200`,
     args: [],
   })
 
