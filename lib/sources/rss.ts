@@ -59,6 +59,7 @@ const FEEDS = [
   { url: 'https://huggingface.co/blog/feed.xml',                         source: 'rss:huggingface-blog',    tags: ['tools', 'models'] },
   { url: 'https://www.oneusefulthing.org/feed',                          source: 'rss:one-useful-thing',    tags: ['industry'] },
   { url: 'https://thezvi.substack.com/feed',                             source: 'rss:zvi',                 tags: ['industry', 'research'] },
+  { url: 'https://www.bensbites.com/feed',                               source: 'rss:bens-bites',          tags: ['industry'] },
 
   // ── Academic / Research Labs ─────────────────────────────────────────────────
   { url: 'https://bair.berkeley.edu/blog/feed.xml',                      source: 'rss:bair',                tags: ['research'] },
@@ -72,6 +73,7 @@ const FEEDS = [
   { url: 'https://www.technologyreview.com/feed/',                        source: 'rss:mit-tech-review',    tags: ['research'] },
   { url: 'https://venturebeat.com/category/ai/feed',                      source: 'rss:venturebeat-ai',     tags: ['industry'] },
   { url: 'https://www.marktechpost.com/feed/',                            source: 'rss:marktechpost',       tags: ['research', 'industry'] },
+  { url: 'https://techcrunch.com/category/venture/feed/',                 source: 'rss:techcrunch-venture',  tags: ['industry'] },
 ]
 
 function timeout(ms: number): Promise<never> {
