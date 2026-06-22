@@ -1,8 +1,14 @@
 import crypto from 'crypto'
 import db from '../db'
 import { anthropic, MODEL } from '../claude'
+import { recall, rememberEntity } from '../memory'
 import type { AIPrediction, EvidenceLink } from '../types'
 import { safeJSON } from '../utils'
+
+// Distance below which a new candidate prediction is treated as a semantic
+// duplicate of an existing one (Voyage cosine distance, 0 = identical).
+// Starting value — tune after watching real skip logs for a few weeks.
+const SEMANTIC_DUPLICATE_THRESHOLD = 0.15
 
 interface SeedPrediction {
   title: string
@@ -552,13 +558,15 @@ const ALL_SEEDS = [...PAST_PREDICTIONS, ...FUTURE_PREDICTIONS]
 
 export async function ensureAllPredictions(): Promise<void> {
   const now = new Date().toISOString()
+  const toRemember: { id: string; p: SeedPrediction }[] = []
   for (const p of ALL_SEEDS) {
-    await db.execute({
+    const id = crypto.randomUUID()
+    const { rowsAffected } = await db.execute({
       sql: `INSERT OR IGNORE INTO ai_predictions
         (id, title, category, year_min, year_max, year_guess, month_guess, date_guess, confidence, description, rationale, evidence, status, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
-        crypto.randomUUID(), p.title, p.category,
+        id, p.title, p.category,
         p.year_min, p.year_max, p.year_guess, p.month_guess, p.date_guess,
         p.confidence, p.description, p.rationale, '[]', p.status, now, now,
       ],
@@ -568,7 +576,16 @@ export async function ensureAllPredictions(): Promise<void> {
             WHERE title = ? AND (date_guess IS NULL OR date_guess = '')`,
       args: [p.date_guess, p.month_guess, p.title],
     })
+    if (rowsAffected > 0) toRemember.push({ id, p })
   }
+  await Promise.all(toRemember.map(({ id, p }) =>
+    rememberEntity({
+      kind: 'prediction',
+      refId: id,
+      text: `${p.title}. ${p.description} ${p.rationale}`,
+      metadata: { category: p.category, confidence: p.confidence },
+    }).catch(err => console.error('[predictions] rememberEntity seed failed:', err))
+  ))
 }
 
 export interface PredictionContext {
@@ -654,6 +671,8 @@ export async function refreshPredictionAnalysis(): Promise<void> {
   const { updated } = await buildAndRunPredictionRefresh(context)
 
   const now = new Date().toISOString()
+  const predById = new Map(context.predictions.map((p: any) => [p.id, p]))
+  const toRemember: any[] = []
   for (const u of updated) {
     if (!u.id) continue
     if (u.unchanged) continue
@@ -673,7 +692,16 @@ export async function refreshPredictionAnalysis(): Promise<void> {
         u.id,
       ],
     })
+    toRemember.push(u)
   }
+  await Promise.all(toRemember.map(u =>
+    rememberEntity({
+      kind: 'prediction',
+      refId: u.id,
+      text: `${predById.get(u.id)?.title ?? ''}. ${u.rationale ?? ''}`,
+      metadata: { confidence: u.confidence },
+    }).catch(err => console.error('[predictions] rememberEntity refresh failed:', err))
+  ))
   console.log(`[predictions] refreshed ${updated.length} future prediction analyses`)
 }
 
@@ -884,12 +912,35 @@ export async function applyStoryEvidence(
 
   // Pre-filter: any pair sharing >= 2 keywords
   const candidates: { ei: number; pi: number; shared: string[] }[] = []
+  const seenPairs = new Set<string>()
   for (let ei = 0; ei < events.length; ei++) {
     for (let pi = 0; pi < predRows.length; pi++) {
       const shared = sharedWords(eventKws[ei], predKws[pi])
-      if (shared.length >= 2) candidates.push({ ei, pi, shared })
+      if (shared.length >= 2) {
+        candidates.push({ ei, pi, shared })
+        seenPairs.add(`${ei}:${pi}`)
+      }
     }
   }
+
+  // Semantic candidates alongside the keyword filter, not instead of it — a
+  // recall() failure (e.g. Voyage outage) degrades to keyword-only behavior
+  // instead of silently finding nothing.
+  const predIndexById = new Map(predRows.map((p, pi) => [p.id, pi]))
+  const semanticHits = await Promise.all(
+    events.map(e => recall(`${e.threadTitle} ${e.eventText}`, { kind: 'prediction', k: 5 }).catch(() => []))
+  )
+  for (let ei = 0; ei < events.length; ei++) {
+    for (const hit of semanticHits[ei]) {
+      const pi = hit.refId ? predIndexById.get(hit.refId) : undefined
+      if (pi === undefined) continue
+      const key = `${ei}:${pi}`
+      if (seenPairs.has(key)) continue
+      seenPairs.add(key)
+      candidates.push({ ei, pi, shared: ['semantic'] })
+    }
+  }
+
   if (!candidates.length) return
 
   const prompt = candidates
@@ -1085,9 +1136,20 @@ export async function generateNewPredictions(): Promise<void> {
 
   const now = new Date().toISOString()
   const currentYear = new Date().getFullYear()
-  let inserted = 0
+  let inserted = 0, skippedSemanticDup = 0
 
   for (const c of candidates) {
+    // Semantic dedup alongside the keyword-overlap check already applied in
+    // buildAndRunNewPredictions() — catches a duplicate phrased differently
+    // (e.g. "Models pass the Turing test" vs "AI consistently fools human
+    // evaluators"), which 2-shared-word overlap misses entirely.
+    const semanticMatch = await recall(`${c.title} ${c.description ?? ''}`, { kind: 'prediction', k: 1 }).catch(() => [])
+    if (semanticMatch[0] && semanticMatch[0].distance < SEMANTIC_DUPLICATE_THRESHOLD) {
+      console.log(`[predictions] skipping likely semantic duplicate: "${c.title}" ~ "${semanticMatch[0].text.slice(0, 80)}" (distance ${semanticMatch[0].distance.toFixed(3)})`)
+      skippedSemanticDup++
+      continue
+    }
+
     // Confidence clamp enforced in code, not just prompted
     const confidence: AIPrediction['confidence'] = c.confidence === 'low' ? 'low' : 'speculative'
     // Matches the same 1.5-year threshold both frontend pages use to
@@ -1095,22 +1157,31 @@ export async function generateNewPredictions(): Promise<void> {
     // sensible initial state, not relied on to stay fresh (the frontend
     // recalculates it from year_guess on every render).
     const status: AIPrediction['status'] = (c.year_guess ?? currentYear + 2) - currentYear <= 1.5 ? 'imminent' : 'upcoming'
+    const id = crypto.randomUUID()
 
-    await db.execute({
+    const { rowsAffected } = await db.execute({
       sql: `INSERT OR IGNORE INTO ai_predictions
               (id, title, category, year_min, year_max, year_guess, month_guess, date_guess, confidence, description, rationale, evidence, status, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?, ?)`,
       args: [
-        crypto.randomUUID(), c.title, c.category ?? 'capability',
+        id, c.title, c.category ?? 'capability',
         c.year_min ?? currentYear + 1, c.year_max ?? currentYear + 3, c.year_guess ?? currentYear + 2,
         c.month_guess ?? 6, c.date_guess ?? String(c.year_guess ?? currentYear + 2),
         confidence, c.description ?? '', c.rationale ?? '', status, now, now,
       ],
     })
-    inserted++
+    if (rowsAffected > 0) {
+      inserted++
+      await rememberEntity({
+        kind: 'prediction',
+        refId: id,
+        text: `${c.title}. ${c.description ?? ''} ${c.rationale ?? ''}`,
+        metadata: { category: c.category ?? 'capability', confidence },
+      }).catch(err => console.error('[predictions] rememberEntity new-prediction failed:', err))
+    }
   }
 
-  console.log(`[predictions] generateNewPredictions: proposed ${inserted} new prediction(s)`)
+  console.log(`[predictions] generateNewPredictions: proposed ${inserted} new prediction(s), skipped ${skippedSemanticDup} semantic duplicate(s)`)
 }
 
 export async function getAllPredictions(): Promise<AIPrediction[]> {

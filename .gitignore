@@ -45,3 +45,5 @@ AGENTS.md
 next-env.d.ts
 data/
 .env.local
+
+.vercel

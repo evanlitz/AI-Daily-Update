@@ -373,4 +373,26 @@ try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_feed_items_source ON feed
 try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_feed_items_fetched_at ON feed_items (fetched_at)`) } catch {}
 try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_feed_items_screened ON feed_items (screened)`) } catch {}
 
+// Memory layer: Claude's own past outputs (digest highlights, etc.), embedded
+// via Voyage AI for semantic recall (lib/memory.ts). kind namespaces entries
+// so future intelligence modules can share this table without collisions.
+try { await db.execute(`
+  CREATE TABLE IF NOT EXISTS memories (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    ref_id TEXT,
+    text TEXT NOT NULL,
+    metadata TEXT DEFAULT '{}',
+    embedding F32_BLOB(512) NOT NULL,
+    created_at TEXT NOT NULL
+  )
+`) } catch {}
+try { await db.execute(`CREATE INDEX IF NOT EXISTS memories_vec_idx ON memories(libsql_vector_idx(embedding, 'metric=cosine'))`) } catch {}
+try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_memories_kind ON memories (kind)`) } catch {}
+
+// feed_items: embedding column for semantic recall of raw ingested content
+// (populated post-screening in lib/pipeline.ts — see lib/memory.ts).
+try { await db.execute(`ALTER TABLE feed_items ADD COLUMN embedding F32_BLOB(512)`) } catch {}
+try { await db.execute(`CREATE INDEX IF NOT EXISTS feed_items_vec_idx ON feed_items(libsql_vector_idx(embedding, 'metric=cosine'))`) } catch {}
+
 export default db

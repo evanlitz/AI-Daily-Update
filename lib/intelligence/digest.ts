@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import db from '../db'
 import { anthropic, MODEL } from '../claude'
+import { recall, remember } from '../memory'
 import type { WeeklyDigest, DigestChange } from '../types'
 import { getMondayISO } from '../utils'
 
@@ -171,6 +172,19 @@ export async function buildAndRunDigest(
       ).join('\n\n')
     : ''
 
+  // Semantic recall: find past highlights related to THIS week's actual topics,
+  // regardless of how many weeks ago they ran — getPriorDigests() above only
+  // looks back 3 calendar weeks, so a relevant callout from 2 months ago
+  // (e.g. the same model family resurfacing) would otherwise be invisible.
+  const recalledHighlights = await recall(top.slice(0, 5).map(c => c.representative.title).join('; '), {
+    kind: 'digest_highlight',
+    k: 5,
+  }).catch(() => [])
+  const relatedPastCoverage = recalledHighlights.length
+    ? `\n\nRELATED PAST COVERAGE (semantically related, may be older than 3 weeks — reference only if it adds real continuity, don't force it):\n` +
+      recalledHighlights.map(r => `- (week of ${r.metadata.week_start ?? '?'}) ${r.text}`).join('\n')
+    : ''
+
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 3800,
@@ -186,7 +200,7 @@ When an item is marked "covered by N sources", treat it as proportionally more s
     messages: [
       {
         role: 'user',
-        content: `Here are this week's top AI developments (ranked by recency + momentum, multi-source stories flagged):\n\n${itemList}${storyContext}${affinityContext}${trajectoryContext}\n\nWrite a weekly digest with these exact sections in this order:\n\n## The Trajectory\n${hasPrior
+        content: `Here are this week's top AI developments (ranked by recency + momentum, multi-source stories flagged):\n\n${itemList}${storyContext}${affinityContext}${trajectoryContext}${relatedPastCoverage}\n\nWrite a weekly digest with these exact sections in this order:\n\n## The Trajectory\n${hasPrior
   ? `Open with where AI actually is right now in its development arc. Use the prior weeks' highlights above to establish context, then situate this week as a chapter in that story. Be willing to make a real call — "We're in the late innings of X", "This week marks an inflection in Y", "The gap between labs is closing because Z." This is analysis, not summary: what does this week MEAN given where we've been? 2-3 focused paragraphs. This section appears first because it frames everything that follows.`
   : `A high-level orientation on where AI stands right now and what direction it's heading. 2 paragraphs. Make a real call about the current phase of AI development.`
 }\n\n## The Big Moves\n2-3 most important model/company developments. Lead with multi-source stories. Reference ongoing story threads where relevant.${hasPrior ? ' Note if anything from a prior week escalated or resolved.' : ''}\n\n## Tools Worth Your Time\nNew dev tools or frameworks worth trying. Be specific about what they do and why a developer should care.\n\n## Research That Matters\n3 papers explained in plain English. What can developers actually do with each?\n\n## Hot Takes\nExactly 5 surprising, contrarian, or uncomfortable observations from this week. Not the headline — the implication most people are missing, the bold call that challenges consensus, or the thing the hype cycle is getting wrong.\n\n## What This Means For You\n3-4 concrete, actionable takeaways. Each must name a specific tool, decision, or experiment: "Try X this week by doing Y" — not "explore the space of Z". No generic advice.\n\nEnd with this exact JSON block on its own line:\n{"highlights":["sentence","sentence","sentence"],"changes":[{"type":"escalated","text":"something from a prior week that got bigger"},{"type":"resolved","text":"something that concluded"},{"type":"new","text":"something with no prior coverage"}]}${hasPrior ? '\nOnly include changes entries that are genuinely meaningful.' : '\nOmit the changes array — no prior weeks to compare against.'}`,
@@ -199,8 +213,10 @@ When an item is marked "covered by N sources", treat it as proportionally more s
   let highlights: string[] = []
   let changes: DigestChange[] = []
   try {
-    // Match the last JSON object in the response (the trailing metadata block)
-    const match = content.match(/(\{"highlights":[\s\S]*?\})(?:\s*)$/)
+    // Match the last JSON object in the response (the trailing metadata block).
+    // Claude sometimes wraps it in a ```json fence despite the prompt not asking
+    // for one — tolerate an optional trailing fence before the end of string.
+    const match = content.match(/(\{"highlights":[\s\S]*?\})(?:\s*```)?\s*$/)
     if (match) {
       const parsed = JSON.parse(match[1])
       highlights = parsed.highlights ?? []
@@ -212,7 +228,7 @@ When an item is marked "covered by N sources", treat it as proportionally more s
   // items) plus storyContext and trajectoryContext (prior weeks). Narrowing
   // this to itemList alone made the groundedness judge flag legitimate
   // cross-week references (e.g. in "The Trajectory") as fabricated.
-  const sourceMaterial = `${itemList}${storyContext}${trajectoryContext}`
+  const sourceMaterial = `${itemList}${storyContext}${trajectoryContext}${relatedPastCoverage}`
 
   return { content, highlights, changes, sourceMaterial }
 }
@@ -229,6 +245,12 @@ export async function generateWeeklyDigest(): Promise<WeeklyDigest> {
     sql: `INSERT OR REPLACE INTO weekly_digest (id, week_start, content_md, highlights, changes, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
     args: [id, weekStart, content, JSON.stringify(highlights), JSON.stringify(changes), now],
   })
+
+  // Store this week's highlights as memories so future digests can recall()
+  // them by topic, not just by "last 3 calendar weeks".
+  await Promise.all(
+    highlights.map(h => remember({ kind: 'digest_highlight', refId: id, text: h, metadata: { week_start: weekStart } }))
+  ).catch(err => console.error('[digest] remember() failed:', err))
 
   return { id, week_start: weekStart, content_md: content, highlights, changes, created_at: now }
 }

@@ -23,6 +23,7 @@ import { updateStoryThreads, linkThreads } from './intelligence/stories'
 import { backfillPredictionEvidence } from './intelligence/predictions'
 import { saveEntityMentions, backfillEntities } from './intelligence/entities'
 import { generateYoutubeSummaries } from './intelligence/youtube_summaries'
+import { embedFeedItems } from './memory'
 
 // Tags a thrown error with which pipeline step it came from, since libsql/Turso
 // errors (e.g. "SERVER_ERROR: Server returned HTTP status 400") don't say which
@@ -177,6 +178,23 @@ async function recordSourceRuns(counts: Map<string, number>): Promise<void> {
   )
 }
 
+// Embed screened items that don't have a vector yet (semantic recall in lib/memory.ts).
+// Runs post-screening so irrelevant items (deleted by screenPendingItems) never
+// get embedded — keeps Voyage API volume to roughly the ~30% of items that survive.
+async function embedNewlyScreenedItems(): Promise<void> {
+  const { rows } = await db.execute(
+    `SELECT id, title, summary, raw_content FROM feed_items WHERE screened = 1 AND embedding IS NULL ORDER BY fetched_at DESC LIMIT 200`
+  )
+  const pending = (rows as any[]).map(r => ({
+    id: r.id as string,
+    title: r.title as string,
+    text: (r.summary ?? r.raw_content ?? '') as string,
+  }))
+  if (!pending.length) return
+  await embedFeedItems(pending)
+  console.log(`[pipeline] embedded ${pending.length} feed items`)
+}
+
 // Delete feed items older than 90 days that aren't linked to any story event.
 async function pruneOldFeedItems(): Promise<void> {
   const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
@@ -266,7 +284,7 @@ export async function fetchIntelligence(): Promise<void> {
     topic_tags: JSON.parse(r.topic_tags ?? '[]'),
   })) as FeedItem[]
 
-  const phase1: Promise<void>[] = [generateHooks(), generateYoutubeSummaries()]
+  const phase1: Promise<void>[] = [generateHooks(), generateYoutubeSummaries(), embedNewlyScreenedItems()]
   if (recentItems.length > 0) phase1.push(refreshModelsFromFeed(recentItems))
   if (toolNames.length > 0) phase1.push(classifyToolNames(toolNames))
   if (newItems.length > 0) {

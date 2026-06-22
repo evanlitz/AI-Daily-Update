@@ -2,6 +2,7 @@ import crypto from 'crypto'
 import db from '../db'
 import { anthropic, MODEL } from '../claude'
 import { safeJSON } from '../utils'
+import { recall, rememberEntity } from '../memory'
 import { gatherAdvisorContext } from './advisor-context'
 import type { AdvisorSourceContext } from './advisor-context'
 import type { ProjectIdea, IdeaRefinementMessage } from '../types'
@@ -12,16 +13,33 @@ export interface AdvisorContext {
   hoursPerWeek?: number
 }
 
+// Distance below which a new candidate idea is treated as a semantic
+// duplicate of one already shown to the user (Voyage cosine distance, 0 =
+// identical). Starting value — tune after watching real skip logs.
+const SEMANTIC_DUPLICATE_THRESHOLD = 0.15
+
 // Shared by generateProjectIdeas and generateCustomProjectIdeas — both produce
 // the same shape from Claude and need it persisted so refinement has a row to
-// attach its log to.
-async function persistIdea(raw: any, source: 'trending' | 'custom'): Promise<ProjectIdea> {
+// attach its log to. Returns null (and logs) if the idea is a semantic
+// duplicate of one already shown — this is the single dedup gate for both
+// modes, since neither had a code-enforced check before (trending only asked
+// Claude nicely in-prompt; custom had none at all).
+async function persistIdea(raw: any, source: 'trending' | 'custom'): Promise<ProjectIdea | null> {
+  const title = raw.title ?? 'Untitled'
+  const description = raw.description ?? ''
+
+  const semanticMatch = await recall(`${title} ${description}`, { kind: 'advisor_idea', k: 1 }).catch(() => [])
+  if (semanticMatch[0] && semanticMatch[0].distance < SEMANTIC_DUPLICATE_THRESHOLD) {
+    console.log(`[advisor] skipping likely semantic duplicate: "${title}" ~ "${semanticMatch[0].text.slice(0, 80)}" (distance ${semanticMatch[0].distance.toFixed(3)})`)
+    return null
+  }
+
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
   const idea: ProjectIdea = {
     id,
-    title: raw.title ?? 'Untitled',
-    description: raw.description ?? '',
+    title,
+    description,
     difficulty: raw.difficulty ?? 3,
     skills_learned: raw.skills_learned ?? [],
     estimated_hours: raw.estimated_hours ?? 5,
@@ -34,6 +52,12 @@ async function persistIdea(raw: any, source: 'trending' | 'custom'): Promise<Pro
     sql: `INSERT INTO project_ideas (id, title, description, difficulty, skills_learned, estimated_hours, starter_checklist, tech_stack, created_at, refinement_log, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     args: [idea.id, idea.title, idea.description, idea.difficulty, JSON.stringify(idea.skills_learned), idea.estimated_hours, JSON.stringify(idea.starter_checklist), JSON.stringify(idea.tech_stack), idea.created_at, JSON.stringify(idea.refinement_log), source],
   })
+  await rememberEntity({
+    kind: 'advisor_idea',
+    refId: idea.id,
+    text: `${idea.title}. ${idea.description}`,
+    metadata: { source },
+  }).catch(err => console.error('[advisor] rememberEntity failed:', err))
   return idea
 }
 
@@ -84,7 +108,8 @@ ${ctx.radar}`
   let ideas: any[] = []
   try { const m = content.match(/\[[\s\S]*\]/); if (m) ideas = JSON.parse(m[0]) } catch {}
 
-  return Promise.all(ideas.slice(0, 3).map(i => persistIdea(i, 'custom')))
+  const persisted = await Promise.all(ideas.slice(0, 3).map(i => persistIdea(i, 'custom')))
+  return persisted.filter((i): i is ProjectIdea => i !== null)
 }
 
 export interface TrendingAdvisorContext {
@@ -152,7 +177,8 @@ ${ctx.radar}`
 export async function generateProjectIdeas(context?: AdvisorContext): Promise<ProjectIdea[]> {
   const trendingContext = await fetchTrendingAdvisorContext()
   const ideas = await buildAndRunTrendingIdeas(trendingContext, context)
-  return Promise.all(ideas.map(i => persistIdea(i, 'trending')))
+  const persisted = await Promise.all(ideas.map(i => persistIdea(i, 'trending')))
+  return persisted.filter((i): i is ProjectIdea => i !== null)
 }
 
 // ── Refinement ────────────────────────────────────────────────────────────

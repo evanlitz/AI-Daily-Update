@@ -2,7 +2,16 @@ import crypto from 'crypto'
 import db from '../db'
 import { anthropic, MODEL, MODEL_FAST } from '../claude'
 import { getMondayISO, safeJSON } from '../utils'
+import { recall, rememberEntity } from '../memory'
 import { applyStoryEvidence } from './predictions'
+
+function rememberThread(id: string, title: string, summary: string | null, watchFor: string | null): Promise<void> {
+  return rememberEntity({
+    kind: 'story_thread',
+    refId: id,
+    text: `${title}. ${summary ?? ''} ${watchFor ?? ''}`,
+  }).catch(err => console.error('[stories] rememberEntity failed:', err))
+}
 
 const PINNED_SEEDS = [
   {
@@ -121,11 +130,12 @@ export async function seedPinnedStories(): Promise<void> {
   if ((rows[0] as any).c >= PINNED_SEEDS.length) return
 
   const now = new Date().toISOString()
+  const ids = PINNED_SEEDS.map(() => crypto.randomUUID())
   const placeholders = PINNED_SEEDS.map(() =>
     `(?, ?, ?, 'active', ?, ?, 1, ?, ?)`
   ).join(', ')
-  const args = PINNED_SEEDS.flatMap(s => [
-    crypto.randomUUID(), s.title, s.category, s.current_summary, s.watch_for, now, now,
+  const args = PINNED_SEEDS.flatMap((s, i) => [
+    ids[i], s.title, s.category, s.current_summary, s.watch_for, now, now,
   ])
   await db.execute({
     sql: `INSERT OR IGNORE INTO story_threads
@@ -133,6 +143,7 @@ export async function seedPinnedStories(): Promise<void> {
           VALUES ${placeholders}`,
     args,
   })
+  await Promise.all(PINNED_SEEDS.map((s, i) => rememberThread(ids[i], s.title, s.current_summary, s.watch_for)))
 }
 
 async function pruneOldThreads(): Promise<void> {
@@ -307,6 +318,7 @@ Rules:
               created_at = excluded.created_at`,
       args: [crypto.randomUUID(), thread.id, newSummary, newWatchFor, week, now],
     })
+    await rememberThread(thread.id, thread.title, newSummary, newWatchFor)
   }))
 
   // Collect high-significance events for prediction evidence linking
@@ -351,6 +363,7 @@ Rules:
             VALUES (?, ?, ?, ?, ?, ?)`,
       args: [crypto.randomUUID(), id, initSummary, initWatchFor, week, now],
     })
+    await rememberThread(id, nt.title, initSummary, initWatchFor)
     activeCount++
     if (nt.significance === 'high' && nt.title) {
       highSigEvents.push({ threadTitle: nt.title, category: nt.category ?? 'market', eventText: nt.update_text ?? '' })
@@ -414,12 +427,35 @@ export async function linkThreads(): Promise<void> {
   // Find candidate pairs above Jaccard threshold
   const THRESHOLD = 0.18
   const candidates: { i: number; j: number; shared: string[]; score: number }[] = []
+  const seenPairs = new Set<string>()
   for (let i = 0; i < threads.length - 1; i++) {
     for (let j = i + 1; j < threads.length; j++) {
       const { score, shared } = jaccard(kwSets[i], kwSets[j])
       if (score >= THRESHOLD && shared.length >= 2) {
         candidates.push({ i, j, shared, score })
+        seenPairs.add(`${i}:${j}`)
       }
+    }
+  }
+
+  // Semantic candidates alongside the Jaccard filter, not instead of it — a
+  // recall() failure (e.g. Voyage outage) degrades to keyword-only behavior.
+  // Two threads can be deeply related while sharing almost no vocabulary
+  // (e.g. "interpretability push" vs "mechanistic understanding of circuits"),
+  // which Jaccard overlap would never surface.
+  const threadIndexById = new Map(threads.map((t, idx) => [t.id, idx]))
+  const semanticHits = await Promise.all(
+    threads.map(t => recall(`${t.title} ${t.watch_for ?? ''} ${t.latest_event ?? ''}`, { kind: 'story_thread', k: 5 }).catch(() => []))
+  )
+  for (let i = 0; i < threads.length; i++) {
+    for (const hit of semanticHits[i]) {
+      const j = hit.refId ? threadIndexById.get(hit.refId) : undefined
+      if (j === undefined || j === i) continue
+      const [lo, hi] = i < j ? [i, j] : [j, i]
+      const key = `${lo}:${hi}`
+      if (seenPairs.has(key)) continue
+      seenPairs.add(key)
+      candidates.push({ i: lo, j: hi, shared: [], score: Math.max(0, 1 - hit.distance) })
     }
   }
 
@@ -498,4 +534,7 @@ export async function resolveStoryThread(id: string): Promise<void> {
 export async function deleteStoryThread(id: string): Promise<void> {
   await db.execute({ sql: `DELETE FROM story_events WHERE thread_id = ?`, args: [id] })
   await db.execute({ sql: `DELETE FROM story_threads WHERE id = ?`, args: [id] })
+  // memories has no FK to story_threads, so it won't ride the cascade the way
+  // story_events/thread_relations do — clean it up explicitly.
+  await db.execute({ sql: `DELETE FROM memories WHERE kind = 'story_thread' AND ref_id = ?`, args: [id] })
 }
