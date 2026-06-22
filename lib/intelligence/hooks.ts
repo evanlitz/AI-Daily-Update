@@ -13,6 +13,10 @@ const DEDUP_WINDOW_DAYS = 14
 // github/github-releases legitimately produce near-identical titles for
 // distinct updates (e.g. consecutive release versions) — never fast-track these.
 const DEDUP_EXCLUDED_SOURCE_PREFIXES = ['github']
+// Input tokens are cheap and prefill is parallelized, so a generous snippet costs
+// almost nothing extra — but the old 200-char cap cut off mid-sentence for most
+// sources and gutted transcripts (which open with intros/sponsor reads, not the thesis).
+const SCREENING_SNIPPET_CHARS = 600
 
 const SYSTEM_PROMPT = `You screen AI/ML news items for relevance, write hooks, and extract named entities and tools.
 
@@ -75,7 +79,7 @@ export async function generateHooks(): Promise<void> {
 
   const items = rows as any[]
   const prompt = items.map((item, n) => {
-    const snippet = item.raw_content ? `\n   ${String(item.raw_content).slice(0, 200)}` : ''
+    const snippet = item.raw_content ? `\n   ${String(item.raw_content).slice(0, SCREENING_SNIPPET_CHARS)}` : ''
     return `${n + 1}. (${item.source}) ${item.title}${snippet}`
   }).join('\n')
 
@@ -179,7 +183,7 @@ export async function screenPendingItems(): Promise<ScreenResult> {
   for (let i = 0; i < candidates.length; i += BATCH) {
     const batch = candidates.slice(i, i + BATCH)
     const prompt = batch.map((item, n) => {
-      const snippet = item.raw_content ? `\n   ${String(item.raw_content).slice(0, 200)}` : ''
+      const snippet = item.raw_content ? `\n   ${String(item.raw_content).slice(0, SCREENING_SNIPPET_CHARS)}` : ''
       return `${n + 1}. (${item.source}) ${item.title}${snippet}`
     }).join('\n')
 
