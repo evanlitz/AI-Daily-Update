@@ -7,7 +7,6 @@ import { fetchGithubTop } from './sources/github_top'
 import { fetchHuggingFace } from './sources/huggingface'
 import { fetchDatasets } from './sources/datasets'
 import { fetchKaggleDatasets } from './sources/kaggle'
-import { fetchReddit } from './sources/reddit'
 import { fetchYoutube } from './sources/youtube'
 import { fetchPapersWithCode } from './sources/paperswithcode'
 import { fetchSemanticScholar } from './sources/semanticscholar'
@@ -239,12 +238,12 @@ export async function fetchIngest(): Promise<number> {
   const SOURCE_TIMEOUT_MS = 20000
   const withFallback = <T>(label: string, p: Promise<T[]>) => withTimeout(label, p, SOURCE_TIMEOUT_MS, [] as T[])
 
-  const [arxiv, hn, rss, github, huggingface, githubTop, hfDatasets, kaggleDatasets, reddit, pwc, hfModels, youtube, semanticScholar, ghReleases] = await step('fetch-sources', () => Promise.all([
+  const [arxiv, hn, rss, github, huggingface, githubTop, hfDatasets, kaggleDatasets, pwc, hfModels, youtube, semanticScholar, ghReleases] = await step('fetch-sources', () => Promise.all([
     withFallback('arxiv', fetchArxiv()), withFallback('hackernews', fetchHackerNews()),
     withFallback('rss', fetchRSS()), withFallback('github', fetchGithubTrending()),
     withFallback('huggingface', fetchHuggingFace()), withFallback('github-top', fetchGithubTop()),
     withFallback('hf-datasets', fetchDatasets()), withFallback('kaggle', fetchKaggleDatasets()),
-    withFallback('reddit', fetchReddit()), withFallback('paperswithcode', fetchPapersWithCode()),
+    withFallback('paperswithcode', fetchPapersWithCode()),
     withFallback('hf-models', fetchHFModels()), withFallback('youtube', fetchYoutube(knownYoutubeUrls)),
     withFallback('semanticscholar', fetchSemanticScholar()), withFallback('github-releases', fetchGithubReleases()),
   ]))
@@ -254,7 +253,7 @@ export async function fetchIngest(): Promise<number> {
   const seenDatasets = new Set(cappedHfDatasets.map(d => d.full_name))
   for (const d of cap('kaggle', kaggleDatasets, 300)) { if (!seenDatasets.has(d.full_name)) { seenDatasets.add(d.full_name); allDatasets.push(d) } }
 
-  const allFeedItems = [...arxiv, ...hn, ...rss, ...github, ...huggingface, ...reddit, ...pwc, ...hfModels, ...youtube, ...semanticScholar, ...ghReleases]
+  const allFeedItems = [...arxiv, ...hn, ...rss, ...github, ...huggingface, ...pwc, ...hfModels, ...youtube, ...semanticScholar, ...ghReleases]
 
   const sourceCounts = new Map<string, number>()
   for (const item of allFeedItems) {

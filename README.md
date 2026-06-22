@@ -4,7 +4,7 @@ A personal AI intelligence dashboard that aggregates 14+ sources, uses Claude to
 
 ## What it does
 
-- **Feed** — Articles from arXiv, Hacker News, GitHub, HuggingFace, Reddit, YouTube, RSS feeds, and more. Claude screens each item for relevance and writes a one-sentence hook.
+- **Feed** — Articles from arXiv, Hacker News, GitHub, HuggingFace, YouTube, RSS feeds, and more. Claude screens each item for relevance and writes a one-sentence hook.
 - **Daily Brief** — A 4-section (Signal / Rising / Watch / Shift) briefing generated each morning.
 - **Stories** — Narrative threads connecting related articles over time, with weekly arc graphs.
 - **Weekly Digest** — Longer-form briefing covering macro trends, research highlights, and a tools roundup.
@@ -135,7 +135,7 @@ lib/
 
 ## Sources
 
-`arxiv` · `hackernews` · `rss` · `github` (trending) · `github_top` · `huggingface` · `hf_models` · `datasets` · `kaggle` · `reddit` · `youtube` · `paperswithcode` · `semanticscholar` · `github_releases`
+`arxiv` · `hackernews` · `rss` · `github` (trending) · `github_top` · `huggingface` · `hf_models` · `datasets` · `kaggle` · `youtube` · `paperswithcode` · `semanticscholar` · `github_releases`
 
 ## Notes
 
