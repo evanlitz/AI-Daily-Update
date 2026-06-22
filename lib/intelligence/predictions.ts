@@ -640,7 +640,7 @@ For each future prediction, return:
 - month_guess: integer 1-12. Your best estimate of the most likely month within year_guess.
 - date_guess: human-readable string like "March 2027" or "Q2 2026" or "Late 2029". Be as specific as evidence supports.
 - confidence: "speculative" | "low" | "medium" | "high"
-- evidence: array of up to 3 objects {title, url, source} from the provided feed items most relevant to this prediction.
+- evidence_idxs: array of up to 3 integers — the numbered feed item(s) above most relevant to this prediction. Never write a URL yourself; reference items by their number only.
 
 Return a JSON array only. No markdown fences. Only include predictions where the feed provides new or materially relevant signal. For predictions with no relevant signal, return only {"id":"...","unchanged":true} — do not regenerate rationale.`,
         cache_control: { type: 'ephemeral' },
@@ -666,6 +666,23 @@ Return a JSON array only. No markdown fences. Only include predictions where the
   return { updated, feedList }
 }
 
+// Resolves one of Claude's 1-based feed item references to the real
+// feed_items row — Claude never sees a url, so it can't echo back a
+// hallucinated one. Returns undefined for any missing/out-of-range/non-numeric
+// index so callers can drop the candidate instead of degrading it silently.
+function feedItemByIdx(idx: any, feedItems: any[]): any | undefined {
+  return typeof idx === 'number' ? feedItems[idx - 1] : undefined
+}
+
+function resolveEvidence(idxs: any, feedItems: any[]): EvidenceLink[] {
+  if (!Array.isArray(idxs)) return []
+  return idxs
+    .map(n => feedItemByIdx(n, feedItems))
+    .filter(Boolean)
+    .slice(0, 3)
+    .map(item => ({ title: item.title, url: item.url, source: item.source }))
+}
+
 export async function refreshPredictionAnalysis(): Promise<void> {
   const context = await fetchPredictionContext()
   const { updated } = await buildAndRunPredictionRefresh(context)
@@ -687,7 +704,7 @@ export async function refreshPredictionAnalysis(): Promise<void> {
         u.month_guess ?? 6,
         u.date_guess ?? String(u.year_guess),
         u.confidence,
-        JSON.stringify(Array.isArray(u.evidence) ? u.evidence : []),
+        JSON.stringify(resolveEvidence(u.evidence_idxs, context.feedItems)),
         now,
         u.id,
       ],
@@ -738,7 +755,7 @@ Default to NOT resolved unless the feed contains clear, specific evidence the pr
 
 Only include predictions you found resolving evidence for. Omit every prediction with no resolving evidence at all — do not list them as unresolved, just leave them out.`
 
-  const userPrompt = `Recent AI news feed:\n${feedList}\n\nPredictions to check:\n${predList}\n\nReturn ONLY a JSON array of resolved predictions (omit everything else):\n[{"id":"...","evidence_title":"...","evidence_url":"...","rationale":"one sentence citing the feed item"}]`
+  const userPrompt = `Recent AI news feed:\n${feedList}\n\nPredictions to check:\n${predList}\n\nReturn ONLY a JSON array of resolved predictions (omit everything else):\n[{"id":"...","evidence_idx":3,"rationale":"one sentence citing the feed item"}]\n\nevidence_idx is the number of the feed item above that resolves this prediction. Never write a URL yourself.`
 
   const response = await anthropic.messages.create({
     model: MODEL,
@@ -750,7 +767,18 @@ Only include predictions you found resolving evidence for. Omit every prediction
   const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
   const match = text.match(/\[[\s\S]*\]/)
   const found = safeJSON<any[]>(match ? match[0] : '[]', [])
-  return found.filter(r => r.id).map(r => ({ ...r, source: 'feed' as const }))
+  return found
+    .filter(r => r.id && feedItemByIdx(r.evidence_idx, feedItems))
+    .map(r => {
+      const item = feedItemByIdx(r.evidence_idx, feedItems)
+      return {
+        id: r.id,
+        evidence_title: item.title,
+        evidence_url: item.url,
+        rationale: r.rationale,
+        source: 'feed' as const,
+      }
+    })
 }
 
 async function checkResolutionViaWebSearch(prediction: any): Promise<ResolvedPrediction | null> {
