@@ -391,8 +391,34 @@ try { await db.execute(`CREATE INDEX IF NOT EXISTS memories_vec_idx ON memories(
 try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_memories_kind ON memories (kind)`) } catch {}
 
 // feed_items: embedding column for semantic recall of raw ingested content
-// (populated post-screening in lib/pipeline.ts — see lib/memory.ts).
+// (populated at ingest time in lib/pipeline.ts — see lib/memory.ts).
 try { await db.execute(`ALTER TABLE feed_items ADD COLUMN embedding F32_BLOB(512)`) } catch {}
 try { await db.execute(`CREATE INDEX IF NOT EXISTS feed_items_vec_idx ON feed_items(libsql_vector_idx(embedding, 'metric=cosine'))`) } catch {}
+
+// Per-source screening outcomes and Claude token spend, written once per
+// pipeline run (lib/intelligence/hooks.ts) — lets /api/stats answer "where is
+// the noise/cost actually coming from" instead of guessing.
+try { await db.execute(`
+  CREATE TABLE IF NOT EXISTS screening_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_at TEXT NOT NULL,
+    source TEXT NOT NULL,
+    accepted_count INTEGER NOT NULL DEFAULT 0,
+    rejected_count INTEGER NOT NULL DEFAULT 0,
+    fast_tracked_count INTEGER NOT NULL DEFAULT 0
+  )
+`) } catch {}
+try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_screening_stats_run_at ON screening_stats (run_at)`) } catch {}
+
+try { await db.execute(`
+  CREATE TABLE IF NOT EXISTS claude_usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_at TEXT NOT NULL,
+    task TEXT NOT NULL,
+    input_tokens INTEGER NOT NULL DEFAULT 0,
+    output_tokens INTEGER NOT NULL DEFAULT 0
+  )
+`) } catch {}
+try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_claude_usage_run_at ON claude_usage (run_at)`) } catch {}
 
 export default db

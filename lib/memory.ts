@@ -170,6 +170,54 @@ export async function embedFeedItems(items: EmbedFeedItemInput[]): Promise<void>
   if (statements.length) await db.batch(statements as any)
 }
 
+export interface DuplicateFeedItemMatch {
+  id: string
+  hook: string | null
+  distance: number
+}
+
+// Used by hooks.ts's screening pre-filter: if an unscreened item is a near-
+// identical embedding match for something Claude already classified recently,
+// its classification can be copied instead of spending another Haiku call on
+// what's functionally the same story. Takes the candidate's own row id and
+// references its already-stored embedding via subquery — no need to round-trip
+// the F32_BLOB vector out to JS just to feed it back into vector32(). Restricted
+// to screened=1 rows only — an unscreened candidate can never match itself, so
+// no self-exclusion needed. excludeSourcePrefixes exists for sources like
+// 'github'/'github-releases' where distinct items (different release versions)
+// legitimately produce near-identical titles/content and must never be merged.
+export async function findRecentDuplicateFeedItem(
+  candidateId: string,
+  opts: { sinceISO: string; excludeSourcePrefixes?: string[] }
+): Promise<DuplicateFeedItemMatch | null> {
+  try {
+    const excludeClauses = (opts.excludeSourcePrefixes ?? []).map(() => `AND f.source NOT LIKE ?`).join(' ')
+    const excludeArgs = (opts.excludeSourcePrefixes ?? []).map(p => `${p}%`)
+
+    // Same CTE-over-vector_top_k pattern as recall() — an inline WHERE tacked
+    // onto the join mis-plans alongside the vector_top_k table-valued function.
+    const { rows } = await db.execute({
+      sql: `WITH target AS (SELECT embedding FROM feed_items WHERE id = ?),
+            candidates AS (
+              SELECT f.id, f.hook,
+                     vector_distance_cos(f.embedding, (SELECT embedding FROM target)) AS distance
+              FROM vector_top_k('feed_items_vec_idx', (SELECT embedding FROM target), 8) vt
+              JOIN feed_items f ON f.rowid = vt.id
+              WHERE f.screened = 1 AND f.fetched_at >= ? AND f.id != ? ${excludeClauses}
+            )
+            SELECT * FROM candidates ORDER BY distance ASC LIMIT 1`,
+      args: [candidateId, opts.sinceISO, candidateId, ...excludeArgs],
+    })
+
+    const top = (rows as any[])[0]
+    if (!top) return null
+    return { id: top.id as string, hook: (top.hook as string | null) ?? null, distance: top.distance as number }
+  } catch (err) {
+    console.error('[memory] findRecentDuplicateFeedItem failed:', err)
+    return null
+  }
+}
+
 export interface RecallFeedItemResult {
   id: string
   title: string

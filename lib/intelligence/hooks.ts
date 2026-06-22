@@ -3,6 +3,16 @@ import db from '../db'
 import type { FeedItem } from '../types'
 import type { ExtractedEntity } from './entities'
 import { safeJSON } from '../utils'
+import { findRecentDuplicateFeedItem } from '../memory'
+
+// Strict on purpose: a false-positive match here would copy the wrong
+// relevance/hook onto a genuinely different story, vs. advisor.ts's looser
+// 0.15 idea-dedup where a false positive just skips a redundant suggestion.
+const DEDUP_DISTANCE_THRESHOLD = 0.08
+const DEDUP_WINDOW_DAYS = 14
+// github/github-releases legitimately produce near-identical titles for
+// distinct updates (e.g. consecutive release versions) — never fast-track these.
+const DEDUP_EXCLUDED_SOURCE_PREFIXES = ['github']
 
 const SYSTEM_PROMPT = `You screen AI/ML news items for relevance, write hooks, and extract named entities and tools.
 
@@ -27,6 +37,31 @@ export type ScreenResult = {
 // Normalize a tool name for deduplication (same key as radar.ts normalizeKey)
 function normalizeToolKey(s: string): string {
   return s.toLowerCase().replace(/[\s\-_.]+/g, '')
+}
+
+async function recordClaudeUsage(task: string, inputTokens: number, outputTokens: number): Promise<void> {
+  await db.execute({
+    sql: `INSERT INTO claude_usage (run_at, task, input_tokens, output_tokens) VALUES (?, ?, ?, ?)`,
+    args: [new Date().toISOString(), task, inputTokens, outputTokens],
+  }).catch(err => console.error('[hooks] recordClaudeUsage failed:', err))
+}
+
+type SourceTally = { accepted: number; rejected: number; fastTracked: number }
+
+async function recordScreeningStats(runAt: string, tallies: Map<string, SourceTally>): Promise<void> {
+  if (!tallies.size) return
+  await db.batch(
+    Array.from(tallies.entries()).map(([source, t]) => ({
+      sql: `INSERT INTO screening_stats (run_at, source, accepted_count, rejected_count, fast_tracked_count) VALUES (?, ?, ?, ?, ?)`,
+      args: [runAt, source, t.accepted, t.rejected, t.fastTracked],
+    }))
+  ).catch(err => console.error('[hooks] recordScreeningStats failed:', err))
+}
+
+function bumpTally(tallies: Map<string, SourceTally>, source: string, field: keyof SourceTally): void {
+  const t = tallies.get(source) ?? { accepted: 0, rejected: 0, fastTracked: 0 }
+  t[field]++
+  tallies.set(source, t)
 }
 
 // Backfill hooks for any items already in the DB that slipped through without one.
@@ -55,6 +90,8 @@ export async function generateHooks(): Promise<void> {
       }],
     })
 
+    await recordClaudeUsage('generate_hooks', resp.usage.input_tokens, resp.usage.output_tokens)
+
     const text = resp.content[0].type === 'text' ? resp.content[0].text : ''
     const match = text.match(/\[[\s\S]*\]/)
     if (!match) { console.error('[hooks] no JSON in backfill response'); return }
@@ -73,10 +110,41 @@ export async function generateHooks(): Promise<void> {
   }
 }
 
+// Items that match a recently-screened item closely enough to fast-track:
+// copy the match's hook, mark screened, skip the Claude call entirely.
+async function fastTrackDuplicates(
+  candidates: any[],
+  tallies: Map<string, SourceTally>
+): Promise<{ remaining: any[]; fastTracked: { item: any; hook: string | null }[] }> {
+  const sinceISO = new Date(Date.now() - DEDUP_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString()
+  const remaining: any[] = []
+  const fastTracked: { item: any; hook: string | null }[] = []
+
+  for (const item of candidates) {
+    const isExcluded = DEDUP_EXCLUDED_SOURCE_PREFIXES.some(p => (item.source as string).startsWith(p))
+    if (isExcluded) { remaining.push(item); continue }
+
+    const match = await findRecentDuplicateFeedItem(item.id, {
+      sinceISO,
+      excludeSourcePrefixes: DEDUP_EXCLUDED_SOURCE_PREFIXES,
+    })
+    if (match && match.distance < DEDUP_DISTANCE_THRESHOLD) {
+      fastTracked.push({ item, hook: match.hook })
+      bumpTally(tallies, item.source, 'fastTracked')
+    } else {
+      remaining.push(item)
+    }
+  }
+  return { remaining, fastTracked }
+}
+
 // Screen all unscreened items from the DB (screened = 0).
 // Deletes irrelevant items, marks relevant ones screened = 1, and sets their hook.
 // Returns the kept items + entityMap + toolNames for downstream intel tasks.
 export async function screenPendingItems(): Promise<ScreenResult> {
+  const runAt = new Date().toISOString()
+  const tallies = new Map<string, SourceTally>()
+
   const { rows } = await db.execute({
     sql: `SELECT id, source, title, url, summary, raw_content, velocity_score FROM feed_items WHERE screened = 0 ORDER BY fetched_at DESC LIMIT 200`,
     args: [],
@@ -84,12 +152,15 @@ export async function screenPendingItems(): Promise<ScreenResult> {
 
   if (!rows.length) return { items: [], entityMap: {}, toolNames: [] }
 
-  const candidates = rows as any[]
+  const { remaining: candidates, fastTracked } = await fastTrackDuplicates(rows as any[], tallies)
+  if (fastTracked.length) console.log(`[hooks] fast-tracked ${fastTracked.length} near-duplicate item(s), skipping Claude`)
+
   const BATCH = 30
-  const keptRows: { item: any; hook?: string }[] = []
+  const keptRows: { item: any; hook?: string }[] = [...fastTracked.map(({ item, hook }) => ({ item, hook: hook ?? undefined }))]
   const entityMap: Record<string, ExtractedEntity[]> = {}
   const toolsSeen = new Map<string, string>()
   const toDelete: string[] = []
+  let totalInputTokens = 0, totalOutputTokens = 0
 
   for (let i = 0; i < candidates.length; i += BATCH) {
     const batch = candidates.slice(i, i + BATCH)
@@ -110,6 +181,9 @@ export async function screenPendingItems(): Promise<ScreenResult> {
         }],
       })
 
+      totalInputTokens += resp.usage.input_tokens
+      totalOutputTokens += resp.usage.output_tokens
+
       const text = resp.content[0].type === 'text' ? resp.content[0].text : ''
       const match = text.match(/\[[\s\S]*\]/)
       if (!match) {
@@ -126,7 +200,12 @@ export async function screenPendingItems(): Promise<ScreenResult> {
         if (Array.isArray(entry.entities) && entry.entities.length) {
           entityMap[item.id] = entry.entities.filter((e: ExtractedEntity) => e.name && e.type)
         }
-        if (entry.relevant === false) { toDelete.push(item.id); dropped++; continue }
+        if (entry.relevant === false) {
+          toDelete.push(item.id)
+          dropped++
+          bumpTally(tallies, item.source, 'rejected')
+          continue
+        }
         if (Array.isArray(entry.tools)) {
           for (const t of entry.tools) {
             if (typeof t === 'string' && t.length > 1) {
@@ -137,6 +216,7 @@ export async function screenPendingItems(): Promise<ScreenResult> {
         }
         keptRows.push({ item, hook: entry.hook ? entry.hook.slice(0, 120) : undefined })
         kept++
+        bumpTally(tallies, item.source, 'accepted')
       }
       console.log(`[hooks] pending batch ${Math.floor(i / BATCH) + 1}: kept ${kept}, dropped ${dropped}`)
     } catch (err) {
@@ -144,6 +224,9 @@ export async function screenPendingItems(): Promise<ScreenResult> {
       keptRows.push(...batch.map(item => ({ item })))
     }
   }
+
+  if (totalInputTokens || totalOutputTokens) await recordClaudeUsage('screen_pending', totalInputTokens, totalOutputTokens)
+  await recordScreeningStats(runAt, tallies)
 
   // Delete irrelevant items
   if (toDelete.length > 0) {

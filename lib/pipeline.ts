@@ -178,12 +178,28 @@ async function recordSourceRuns(counts: Map<string, number>): Promise<void> {
   )
 }
 
-// Embed screened items that don't have a vector yet (semantic recall in lib/memory.ts).
-// Runs post-screening so irrelevant items (deleted by screenPendingItems) never
-// get embedded — keeps Voyage API volume to roughly the ~30% of items that survive.
-async function embedNewlyScreenedItems(): Promise<void> {
+// Embed newly-inserted raw items immediately at ingest (before screening), so
+// the dedup pre-filter in hooks.ts has vectors to compare unscreened candidates
+// against. This costs more Voyage calls than the old post-screening-only
+// approach, but Voyage is cheap relative to Claude — the point is spending a
+// little more here to let hooks.ts skip a lot more Haiku calls on duplicates.
+async function embedNewItems(items: FeedItem[]): Promise<void> {
+  if (!items.length) return
+  const pending = items.map(item => ({
+    id: item.id,
+    title: item.title,
+    text: (item.summary ?? item.raw_content ?? '') as string,
+  }))
+  await embedFeedItems(pending)
+  console.log(`[pipeline] embedded ${pending.length} feed items at ingest`)
+}
+
+// Backstop for any rows that somehow ended up without an embedding (e.g. a
+// failed Voyage call during ingest) — selects only where embedding IS NULL,
+// so this is a no-op once embedNewItems has already run for a row.
+async function embedAnyMissing(): Promise<void> {
   const { rows } = await db.execute(
-    `SELECT id, title, summary, raw_content FROM feed_items WHERE screened = 1 AND embedding IS NULL ORDER BY fetched_at DESC LIMIT 200`
+    `SELECT id, title, summary, raw_content FROM feed_items WHERE embedding IS NULL ORDER BY fetched_at DESC LIMIT 200`
   )
   const pending = (rows as any[]).map(r => ({
     id: r.id as string,
@@ -192,7 +208,7 @@ async function embedNewlyScreenedItems(): Promise<void> {
   }))
   if (!pending.length) return
   await embedFeedItems(pending)
-  console.log(`[pipeline] embedded ${pending.length} feed items`)
+  console.log(`[pipeline] backfilled ${pending.length} missing feed item embeddings`)
 }
 
 // Delete feed items older than 90 days that aren't linked to any story event.
@@ -252,8 +268,9 @@ export async function fetchIngest(): Promise<number> {
   const newCandidates = await step('filter-new-items', () => filterNewItems(allFeedItems))
   console.log(`[pipeline] ${newCandidates.length}/${allFeedItems.length} are new — inserting raw`)
 
-  const { count } = await step('insert-items', () => insertItems(newCandidates))
+  const { count, newItems } = await step('insert-items', () => insertItems(newCandidates))
   await step('insert-repos-and-datasets', () => Promise.all([insertRepos(githubTop), insertDatasets(allDatasets)]))
+  await step('embed-new-items', () => embedNewItems(newItems)).catch(console.error)
 
   console.log(`[pipeline] inserted ${count} raw feed items, ${githubTop.length} repos, ${allDatasets.length} datasets`)
 
@@ -284,7 +301,7 @@ export async function fetchIntelligence(): Promise<void> {
     topic_tags: JSON.parse(r.topic_tags ?? '[]'),
   })) as FeedItem[]
 
-  const phase1: Promise<void>[] = [generateHooks(), generateYoutubeSummaries(), embedNewlyScreenedItems()]
+  const phase1: Promise<void>[] = [generateHooks(), generateYoutubeSummaries(), embedAnyMissing()]
   if (recentItems.length > 0) phase1.push(refreshModelsFromFeed(recentItems))
   if (toolNames.length > 0) phase1.push(classifyToolNames(toolNames))
   if (newItems.length > 0) {
