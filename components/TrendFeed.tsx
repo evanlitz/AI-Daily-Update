@@ -21,10 +21,9 @@ const STATION_CONFIG: Record<string, { code: string; label: string; color: strin
   hn:          { code: 'HNWS', label: 'HackerNews',  color: '#f87171', rgb: '248,113,113' },
   rss:         { code: 'RSS·', label: 'RSS Feeds',   color: '#22c55e', rgb: '34,197,94'   },
   youtube:     { code: 'YT··', label: 'YouTube',     color: '#a78bfa', rgb: '167,139,250' },
-  reddit:      { code: 'RDDT', label: 'Reddit',      color: '#e879a8', rgb: '232,121,168' },
 }
 
-const ALL_STATIONS = ['arxiv', 'hn', 'github', 'huggingface', 'rss', 'youtube', 'reddit']
+const ALL_STATIONS = ['arxiv', 'hn', 'github', 'huggingface', 'rss', 'youtube']
 
 const TOPIC_META: Record<string, { color: string; rgb: string }> = {
   models:   { color: '#a78bfa', rgb: '167,139,250' },
@@ -46,7 +45,6 @@ function stationMeta(source: string) {
   if (source in STATION_CONFIG)       return STATION_CONFIG[source]
   if (source.startsWith('rss:'))      return STATION_CONFIG.rss
   if (source.startsWith('youtube:'))  return STATION_CONFIG.youtube
-  if (source.startsWith('reddit:'))   return STATION_CONFIG.reddit
   return { code: source.slice(0, 4).toUpperCase(), label: source, color: '#60a5fa', rgb: '96,165,250' }
 }
 
@@ -198,7 +196,6 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
     for (const item of items) {
       const key = item.source.startsWith('rss:')     ? 'rss'
                 : item.source.startsWith('youtube:') ? 'youtube'
-                : item.source.startsWith('reddit:')  ? 'reddit'
                 : item.source
       counts[key] = (counts[key] ?? 0) + 1
     }

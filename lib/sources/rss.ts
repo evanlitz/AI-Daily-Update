@@ -5,7 +5,7 @@ import type { FeedItem } from '../types'
 
 const parser = new Parser({
   customFields: { item: ['content:encoded'] },
-  headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AIPulse/1.0)' },
+  headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36' },
   timeout: 8000,
 })
 
@@ -57,10 +57,21 @@ const FEEDS = [
   { url: 'https://tldr.tech/ai/rss',                                     source: 'rss:tldr-ai',             tags: ['industry', 'tools'] },
   { url: 'https://simonwillison.net/atom/everything/',                   source: 'rss:simon-willison',      tags: ['tools'] },
   { url: 'https://huggingface.co/blog/feed.xml',                         source: 'rss:huggingface-blog',    tags: ['tools', 'models'] },
+  { url: 'https://www.oneusefulthing.org/feed',                          source: 'rss:one-useful-thing',    tags: ['industry'] },
+  { url: 'https://thezvi.substack.com/feed',                             source: 'rss:zvi',                 tags: ['industry', 'research'] },
+
+  // ── Academic / Research Labs ─────────────────────────────────────────────────
+  { url: 'https://bair.berkeley.edu/blog/feed.xml',                      source: 'rss:bair',                tags: ['research'] },
+
+  // ── Model Labs / Infra ───────────────────────────────────────────────────────
+  { url: 'https://www.together.ai/blog/rss.xml',                         source: 'rss:together-ai',         tags: ['models', 'infrastructure'] },
+  { url: 'https://stability.ai/news-updates?format=rss',                  source: 'rss:stability-ai',        tags: ['models'] },
 
   // ── Tech News ────────────────────────────────────────────────────────────────
   { url: 'https://techcrunch.com/category/artificial-intelligence/feed/', source: 'rss:techcrunch-ai',      tags: ['industry'] },
   { url: 'https://www.technologyreview.com/feed/',                        source: 'rss:mit-tech-review',    tags: ['research'] },
+  { url: 'https://venturebeat.com/category/ai/feed',                      source: 'rss:venturebeat-ai',     tags: ['industry'] },
+  { url: 'https://www.marktechpost.com/feed/',                            source: 'rss:marktechpost',       tags: ['research', 'industry'] },
 ]
 
 function timeout(ms: number): Promise<never> {
