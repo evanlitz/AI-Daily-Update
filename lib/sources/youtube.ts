@@ -16,6 +16,10 @@ const CHANNELS = [
   { channelId: 'UCbfYPyITQ-7l4upoX8nvctg', slug: 'two-minute-papers', tags: ['research'] as string[] },
   { channelId: 'UCSHZKyawb77ixDdsGog4iWA', slug: 'lex-fridman',       tags: ['industry'] as string[] },
   { channelId: 'UCXUPKJO5MZQMU11T0GGQLXw', slug: 'andrej-karpathy',   tags: ['research', 'tools'] as string[] },
+  { channelId: 'UCXl4i9dYBrFOabk0xGmbkRA', slug: 'dwarkesh-patel',    tags: ['research', 'industry'] as string[] },
+  { channelId: 'UCxBcwypKK-W3GHd_RZ9FZrQ', slug: 'latent-space',      tags: ['tools', 'industry'] as string[] },
+  { channelId: 'UCSI7h9hydQ40K5MJHnCrQvw', slug: 'no-priors',         tags: ['industry'] as string[] },
+  { channelId: 'UCfV5_thTSP0Wvi0odqxG96Q', slug: 'cognitive-revolution', tags: ['industry', 'tools'] as string[] },
 ]
 
 const CUTOFF_DAYS = 7
