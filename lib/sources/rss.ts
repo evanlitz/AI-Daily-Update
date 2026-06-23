@@ -81,6 +81,10 @@ const FEEDS = [
   { url: 'https://venturebeat.com/category/ai/feed',                      source: 'rss:venturebeat-ai',     tags: ['industry'] },
   { url: 'https://www.marktechpost.com/feed/',                            source: 'rss:marktechpost',       tags: ['research', 'industry'] },
   { url: 'https://techcrunch.com/category/venture/feed/',                 source: 'rss:techcrunch-venture',  tags: ['industry'] },
+  // No free primary-source feed exists for anthropic/cohere/meta-ai (see note above) —
+  // these two news aggregators pick up their announcements editorially instead.
+  { url: 'https://the-decoder.com/feed/',                                  source: 'rss:the-decoder',         tags: ['models', 'industry'] },
+  { url: 'https://arstechnica.com/ai/feed/',                               source: 'rss:ars-technica-ai',     tags: ['industry'] },
 ]
 
 function timeout(ms: number): Promise<never> {
