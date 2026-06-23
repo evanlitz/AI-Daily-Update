@@ -157,6 +157,65 @@ async function fastTrackDuplicates(
   return { remaining, fastTracked }
 }
 
+// fastTrackDuplicates only catches cross-run duplicates (it matches against
+// screened=1 rows). Two sources covering the same story in the SAME run both
+// arrive as screened=0 and would otherwise be screened independently, landing
+// in the feed twice. This clusters same-run candidates by embedding distance
+// — one representative per cluster goes through fastTrackDuplicates/Claude as
+// normal, and the rest inherit whatever outcome the representative gets.
+async function clusterSameRunDuplicates(
+  candidates: any[]
+): Promise<{ representatives: any[]; duplicatesByRep: Map<string, any[]> }> {
+  const duplicatesByRep = new Map<string, any[]>()
+  if (candidates.length < 2) return { representatives: candidates, duplicatesByRep }
+
+  const order = new Map(candidates.map((c, i) => [c.id as string, i]))
+  const parent = new Map<string, string>()
+  function find(id: string): string {
+    if (!parent.has(id)) parent.set(id, id)
+    let root = id
+    while (parent.get(root) !== root) root = parent.get(root)!
+    parent.set(id, root)
+    return root
+  }
+  // Keep whichever root was fetched earlier as the cluster's representative.
+  function union(a: string, b: string): void {
+    const ra = find(a), rb = find(b)
+    if (ra === rb) return
+    if ((order.get(ra) ?? 0) <= (order.get(rb) ?? 0)) parent.set(rb, ra)
+    else parent.set(ra, rb)
+  }
+
+  const clusterable = candidates.filter(c =>
+    !DEDUP_EXCLUDED_SOURCE_PREFIXES.some(p => (c.source as string).startsWith(p))
+  )
+  if (clusterable.length >= 2) {
+    const ids = clusterable.map(c => c.id as string)
+    const idPh = ids.map(() => '?').join(',')
+    const { rows } = await db.execute({
+      sql: `SELECT a.id AS id_a, b.id AS id_b, vector_distance_cos(a.embedding, b.embedding) AS dist
+            FROM feed_items a JOIN feed_items b ON a.id < b.id
+            WHERE a.id IN (${idPh}) AND b.id IN (${idPh})
+              AND a.embedding IS NOT NULL AND b.embedding IS NOT NULL`,
+      args: [...ids, ...ids],
+    })
+    for (const row of rows as any[]) {
+      if (typeof row.dist === 'number' && row.dist < DEDUP_DISTANCE_THRESHOLD) {
+        union(row.id_a as string, row.id_b as string)
+      }
+    }
+  }
+
+  for (const c of candidates) {
+    const root = find(c.id as string)
+    if (root === c.id) continue
+    if (!duplicatesByRep.has(root)) duplicatesByRep.set(root, [])
+    duplicatesByRep.get(root)!.push(c)
+  }
+  const representatives = candidates.filter(c => find(c.id as string) === c.id)
+  return { representatives, duplicatesByRep }
+}
+
 // Screen all unscreened items from the DB (screened = 0).
 // Deletes irrelevant items, marks relevant ones screened = 1, and sets their hook.
 // Returns the kept items + entityMap + toolNames for downstream intel tasks.
@@ -173,6 +232,12 @@ export async function screenPendingItems(): Promise<ScreenResult> {
 
   const { remaining: candidates, fastTracked } = await fastTrackDuplicates(rows as any[], tallies)
   if (fastTracked.length) console.log(`[hooks] fast-tracked ${fastTracked.length} near-duplicate item(s), skipping Claude`)
+
+  const { representatives, duplicatesByRep } = await clusterSameRunDuplicates(candidates)
+  if (duplicatesByRep.size) {
+    const dupCount = [...duplicatesByRep.values()].reduce((n, d) => n + d.length, 0)
+    console.log(`[hooks] clustered ${dupCount} same-run duplicate(s) into ${duplicatesByRep.size} representative(s)`)
+  }
 
   const BATCH = 30
   const keptRows: { item: any; hook?: string }[] = [...fastTracked.map(({ item, hook }) => ({ item, hook: hook ?? undefined }))]
@@ -197,8 +262,8 @@ export async function screenPendingItems(): Promise<ScreenResult> {
     }
   }
 
-  for (let i = 0; i < candidates.length; i += BATCH) {
-    const batch = candidates.slice(i, i + BATCH)
+  for (let i = 0; i < representatives.length; i += BATCH) {
+    const batch = representatives.slice(i, i + BATCH)
     const prompt = batch.map((item, n) => {
       const snippet = item.raw_content ? `\n   ${String(item.raw_content).slice(0, SCREENING_SNIPPET_CHARS)}` : ''
       return `${n + 1}. (${item.source}) ${item.title}${snippet}`
@@ -257,6 +322,28 @@ export async function screenPendingItems(): Promise<ScreenResult> {
     } catch (err) {
       console.error('[hooks] screen error:', err)
       handleBatchFailure(batch)
+    }
+  }
+
+  // Apply each representative's outcome to its same-run duplicates. If the rep
+  // itself ended up neither kept nor deleted (handleBatchFailure left it pending
+  // for retry), its duplicates are left pending too — they'll re-cluster next run.
+  if (duplicatesByRep.size > 0) {
+    const toDeleteSet = new Set(toDelete)
+    for (const [repId, dups] of duplicatesByRep) {
+      if (toDeleteSet.has(repId)) {
+        for (const d of dups) {
+          toDelete.push(d.id)
+          bumpTally(tallies, d.source, 'rejected')
+        }
+        continue
+      }
+      const repEntry = keptRows.find(k => k.item.id === repId)
+      if (!repEntry) continue
+      for (const d of dups) {
+        keptRows.push({ item: d, hook: repEntry.hook })
+        bumpTally(tallies, d.source, 'fastTracked')
+      }
     }
   }
 
