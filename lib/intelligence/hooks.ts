@@ -17,6 +17,7 @@ const DEDUP_EXCLUDED_SOURCE_PREFIXES = ['github']
 // almost nothing extra — but the old 200-char cap cut off mid-sentence for most
 // sources and gutted transcripts (which open with intros/sponsor reads, not the thesis).
 const SCREENING_SNIPPET_CHARS = 600
+const MAX_SCREEN_ATTEMPTS = 3
 
 const SYSTEM_PROMPT = `You screen AI/ML news items for relevance, write hooks, and extract named entities and tools.
 
@@ -164,7 +165,7 @@ export async function screenPendingItems(): Promise<ScreenResult> {
   const tallies = new Map<string, SourceTally>()
 
   const { rows } = await db.execute({
-    sql: `SELECT id, source, title, url, summary, raw_content, velocity_score FROM feed_items WHERE screened = 0 ORDER BY fetched_at ASC LIMIT 200`,
+    sql: `SELECT id, source, title, url, summary, raw_content, velocity_score, screen_attempts FROM feed_items WHERE screened = 0 ORDER BY fetched_at ASC LIMIT 200`,
     args: [],
   })
 
@@ -178,7 +179,23 @@ export async function screenPendingItems(): Promise<ScreenResult> {
   const entityMap: Record<string, ExtractedEntity[]> = {}
   const toolsSeen = new Map<string, string>()
   const toDelete: string[] = []
+  const toRetry: string[] = []
   let totalInputTokens = 0, totalOutputTokens = 0
+
+  // On Claude failure, leave items unscreened so they retry next run instead of
+  // bypassing relevance screening entirely — but cap retries so a poison-pill item
+  // (persistent malformed response, recurring API error) can't loop forever.
+  // After MAX_SCREEN_ATTEMPTS failures it's dropped, same as a rejected item.
+  function handleBatchFailure(batch: any[]): void {
+    for (const item of batch) {
+      if ((item.screen_attempts ?? 0) + 1 >= MAX_SCREEN_ATTEMPTS) {
+        toDelete.push(item.id)
+        bumpTally(tallies, item.source, 'rejected')
+      } else {
+        toRetry.push(item.id)
+      }
+    }
+  }
 
   for (let i = 0; i < candidates.length; i += BATCH) {
     const batch = candidates.slice(i, i + BATCH)
@@ -206,7 +223,7 @@ export async function screenPendingItems(): Promise<ScreenResult> {
       const match = text.match(/\[[\s\S]*\]/)
       if (!match) {
         console.error('[hooks] no JSON in response')
-        keptRows.push(...batch.map(item => ({ item })))
+        handleBatchFailure(batch)
         continue
       }
 
@@ -239,7 +256,7 @@ export async function screenPendingItems(): Promise<ScreenResult> {
       console.log(`[hooks] pending batch ${Math.floor(i / BATCH) + 1}: kept ${kept}, dropped ${dropped}`)
     } catch (err) {
       console.error('[hooks] screen error:', err)
-      keptRows.push(...batch.map(item => ({ item })))
+      handleBatchFailure(batch)
     }
   }
 
@@ -254,6 +271,16 @@ export async function screenPendingItems(): Promise<ScreenResult> {
       await db.execute({ sql: `DELETE FROM feed_items WHERE id IN (${chunk.map(() => '?').join(',')})`, args: chunk })
     }
     console.log(`[hooks] deleted ${toDelete.length} irrelevant items`)
+  }
+
+  // Bump retry count for items left unscreened after a failed batch, so the next
+  // run knows how many attempts they've already had
+  if (toRetry.length > 0) {
+    await db.batch(toRetry.map(id => ({
+      sql: `UPDATE feed_items SET screen_attempts = screen_attempts + 1 WHERE id = ?`,
+      args: [id],
+    })))
+    console.log(`[hooks] ${toRetry.length} item(s) failed screening, will retry next run`)
   }
 
   // Mark relevant items screened = 1 and write their hooks

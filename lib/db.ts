@@ -293,6 +293,9 @@ try { await db.execute(`ALTER TABLE story_events ADD COLUMN source TEXT NOT NULL
 try { await db.execute(`ALTER TABLE story_events ADD COLUMN source_url TEXT`) } catch {}
 try { await db.execute(`ALTER TABLE feed_items ADD COLUMN screened INTEGER NOT NULL DEFAULT 1`) } catch {}
 try { await db.execute(`ALTER TABLE story_threads ADD COLUMN acceleration_score REAL DEFAULT 0`) } catch {}
+// Caps retries for items whose screening batch keeps failing (bad encoding, persistent
+// API error) — without this, a poison-pill item would retry forever every run.
+try { await db.execute(`ALTER TABLE feed_items ADD COLUMN screen_attempts INTEGER NOT NULL DEFAULT 0`) } catch {}
 try { await db.execute(`
   CREATE TABLE IF NOT EXISTS daily_briefs (
     id         TEXT PRIMARY KEY,
