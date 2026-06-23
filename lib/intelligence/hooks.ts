@@ -224,7 +224,7 @@ export async function screenPendingItems(): Promise<ScreenResult> {
   const tallies = new Map<string, SourceTally>()
 
   const { rows } = await db.execute({
-    sql: `SELECT id, source, title, url, summary, raw_content, velocity_score, screen_attempts FROM feed_items WHERE screened = 0 ORDER BY fetched_at ASC LIMIT 200`,
+    sql: `SELECT id, source, title, url, summary, raw_content, screen_attempts FROM feed_items WHERE screened = 0 ORDER BY fetched_at ASC LIMIT 200`,
     args: [],
   })
 
