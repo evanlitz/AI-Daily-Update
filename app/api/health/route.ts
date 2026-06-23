@@ -3,12 +3,19 @@ import db from '@/lib/db'
 
 type SourceStatus = 'ok' | 'warn' | 'stale' | 'dead'
 
-function computeStatus(lastFetchAt: string | null, lastCount: number): SourceStatus {
+// benchmark-sync runs every 10 days — use a wider staleness window for it
+const STALE_HOURS: Record<string, { warn: number; dead: number }> = {
+  'benchmark-sync': { warn: 240, dead: 288 }, // 10d warn, 12d dead
+}
+const DEFAULT_THRESHOLDS = { warn: 24, dead: 72 }
+
+function computeStatus(lastFetchAt: string | null, lastCount: number, source: string): SourceStatus {
   if (!lastFetchAt) return 'dead'
   const ageMs = Date.now() - new Date(lastFetchAt).getTime()
   const hours = ageMs / 3_600_000
-  if (hours > 72) return 'dead'
-  if (hours > 24) return 'stale'
+  const { warn, dead } = STALE_HOURS[source] ?? DEFAULT_THRESHOLDS
+  if (hours > dead) return 'dead'
+  if (hours > warn) return 'stale'
   if (lastCount === 0) return 'warn'
   return 'ok'
 }
@@ -27,7 +34,7 @@ export async function GET() {
   `)
 
   const sources = (rows as any[]).map(row => {
-    const status = computeStatus(row.last_fetch, row.last_count)
+    const status = computeStatus(row.last_fetch, row.last_count, row.source)
     return {
       source: row.source as string,
       lastFetchAt: row.last_fetch as string,

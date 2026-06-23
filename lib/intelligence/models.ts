@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import db from '../db'
-import { anthropic, MODEL } from '../claude'
+import { anthropic, MODEL, MODEL_FAST } from '../claude'
 import type { AIModel, FeedItem } from '../types'
 import { safeJSON } from '../utils'
 
@@ -28,12 +28,92 @@ interface SeedModel {
 const MODEL_SEEDS: SeedModel[] = [
   // ── Anthropic ──────────────────────────────────────────────────────────────
   {
+    name: 'Claude Fable 5',
+    slug: 'claude-fable-5',
+    lab: 'Anthropic',
+    family: 'Claude Fable',
+    release_date: '2026-06-09',
+    status: 'active',
+    context_window: 1000000,
+    input_cost_per_mtok: 10.00,
+    output_cost_per_mtok: 50.00,
+    knowledge_cutoff: 'Early 2026',
+    modalities: ['text', 'vision', 'code'],
+    benchmarks: { swe_bench: 95.0, gpqa: 92.6 },
+    highlights: [
+      '95% SWE-bench Verified — highest ever at launch',
+      '1M token context window with 128k output',
+      'Anthropic\'s most capable generally available model',
+    ],
+    notes: 'Flagship frontier model released June 2026. Positioned above Opus 4.8 at 2x the price.',
+  },
+  {
+    name: 'Claude Opus 4.8',
+    slug: 'claude-opus-4-8',
+    lab: 'Anthropic',
+    family: 'Claude 4',
+    release_date: '2026-05-28',
+    status: 'active',
+    context_window: 200000,
+    input_cost_per_mtok: 5.00,
+    output_cost_per_mtok: 25.00,
+    knowledge_cutoff: 'Early 2026',
+    modalities: ['text', 'vision', 'code'],
+    benchmarks: { swe_bench: 88.6, gpqa: 93.6 },
+    highlights: [
+      '88.6% SWE-bench Verified, 69.2% SWE-bench Pro',
+      '4x honesty improvement over prior Opus versions',
+      'Optional fast mode at 2.5x speed ($10/$50)',
+    ],
+    notes: 'Current flagship Opus model. Released May 2026 with significant honesty and coding improvements.',
+  },
+  {
+    name: 'Claude Sonnet 4.6',
+    slug: 'claude-sonnet-4-6',
+    lab: 'Anthropic',
+    family: 'Claude 4',
+    release_date: '2025-10-28',
+    status: 'active',
+    context_window: 200000,
+    input_cost_per_mtok: 3.00,
+    output_cost_per_mtok: 15.00,
+    knowledge_cutoff: 'Early 2025',
+    modalities: ['text', 'vision', 'code'],
+    benchmarks: { swe_bench: 79.6, gpqa: 74.1 },
+    highlights: [
+      '79.6% SWE-bench Verified — near-Opus coding performance',
+      'Best price-to-performance in the Claude 4 family',
+      'Default model for most Claude API applications',
+    ],
+    notes: 'Current mid-tier Claude model. Released October 2025, nearly matches Opus 4.6 on coding at 1/5 the price.',
+  },
+  {
+    name: 'Claude Haiku 4.5',
+    slug: 'claude-haiku-4-5-20251001',
+    lab: 'Anthropic',
+    family: 'Claude 4',
+    release_date: '2025-10-01',
+    status: 'active',
+    context_window: 200000,
+    input_cost_per_mtok: 1.00,
+    output_cost_per_mtok: 5.00,
+    knowledge_cutoff: 'Early 2025',
+    modalities: ['text', 'vision', 'code'],
+    benchmarks: { swe_bench: 73.3 },
+    highlights: [
+      '73.3% SWE-bench Verified — strongest small model at launch',
+      'Within 5 points of best-in-class at 1/3 the cost',
+      'Extended thinking support in the Haiku tier',
+    ],
+    notes: 'Current fast Claude model. Includes extended thinking. Outperforms Sonnet 4 on computer-use benchmarks.',
+  },
+  {
     name: 'Claude 4 Opus',
     slug: 'claude-4-opus',
     lab: 'Anthropic',
     family: 'Claude 4',
     release_date: '2025-05-01',
-    status: 'active',
+    status: 'deprecated',
     context_window: 200000,
     input_cost_per_mtok: 15.00,
     output_cost_per_mtok: 75.00,
@@ -41,30 +121,9 @@ const MODEL_SEEDS: SeedModel[] = [
     modalities: ['text', 'vision', 'code'],
     benchmarks: { swe_bench: 72.5 },
     highlights: [
-      'Top SWE-Bench score at release',
-      'Powers Claude Code CLI for autonomous coding',
-      'Best-in-class for long-horizon agentic tasks',
+      'Original Claude 4 Opus — superseded by Opus 4.8',
     ],
-    notes: 'Most capable Claude model. Designed for complex multi-step reasoning and autonomous software engineering workflows.',
-  },
-  {
-    name: 'Claude 4 Sonnet',
-    slug: 'claude-4-sonnet',
-    lab: 'Anthropic',
-    family: 'Claude 4',
-    release_date: '2025-05-01',
-    status: 'active',
-    context_window: 200000,
-    input_cost_per_mtok: 3.00,
-    output_cost_per_mtok: 15.00,
-    knowledge_cutoff: 'Early 2025',
-    modalities: ['text', 'vision', 'code'],
-    benchmarks: {},
-    highlights: [
-      'Best price-to-performance in Claude 4 family',
-      'Default model for most Claude API applications',
-    ],
-    notes: 'Balanced capability and cost. Recommended default for most applications.',
+    notes: 'Superseded by Claude Opus 4.8 (May 2026). Was the initial Claude 4 Opus release.',
   },
   {
     name: 'Claude 3.7 Sonnet',
@@ -112,7 +171,7 @@ const MODEL_SEEDS: SeedModel[] = [
     lab: 'Anthropic',
     family: 'Claude 3.5',
     release_date: '2024-11-04',
-    status: 'active',
+    status: 'deprecated',
     context_window: 200000,
     input_cost_per_mtok: 0.80,
     output_cost_per_mtok: 4.00,
@@ -123,7 +182,7 @@ const MODEL_SEEDS: SeedModel[] = [
       'Fastest Claude 3.5 model',
       'Outperforms Claude 3 Opus on several benchmarks at 20x lower cost',
     ],
-    notes: 'Best value in the Claude lineup. Strong coding for its price tier.',
+    notes: 'Superseded by Claude Haiku 4.5 (October 2025). Was best value in the Claude 3.5 lineup.',
   },
   {
     name: 'Claude 3 Opus',
@@ -198,9 +257,10 @@ const MODEL_SEEDS: SeedModel[] = [
     output_cost_per_mtok: 1.60,
     knowledge_cutoff: 'Early 2025',
     modalities: ['text', 'vision', 'code'],
-    benchmarks: {},
+    benchmarks: { mmlu: 80.1, gpqa: 50.3 },
     highlights: [
       '1M context at $0.40/M input — most affordable long-context model',
+      'Outperforms GPT-4o on intelligence evals at 83% lower cost',
     ],
     notes: 'Small, fast, cheap, long-context. Replaces GPT-4o mini for most use cases.',
   },
@@ -302,6 +362,27 @@ const MODEL_SEEDS: SeedModel[] = [
     notes: 'Superseded by GPT-4o. Was the dominant model for Q4 2023–Q1 2024.',
   },
 
+  {
+    name: 'GPT-5.5',
+    slug: 'gpt-5-5',
+    lab: 'OpenAI',
+    family: 'GPT-5',
+    release_date: '2026-04-23',
+    status: 'active',
+    context_window: 1000000,
+    input_cost_per_mtok: 5.00,
+    output_cost_per_mtok: 30.00,
+    knowledge_cutoff: 'Early 2026',
+    modalities: ['text', 'vision', 'audio', 'code'],
+    benchmarks: { swe_bench: 88.7, mmlu: 92.4, gpqa: 93.6 },
+    highlights: [
+      '88.7% SWE-bench Verified — first retrained GPT base since 4.5',
+      '60% hallucination rate reduction vs GPT-5.4',
+      'Natively omnimodal — text, vision, audio in one model',
+    ],
+    notes: 'OpenAI\'s flagship model as of April 2026. Fully retrained base model with major reliability improvements over GPT-5.x incremental releases.',
+  },
+
   // ── Google ─────────────────────────────────────────────────────────────────
   {
     name: 'Gemini 2.5 Pro',
@@ -315,7 +396,7 @@ const MODEL_SEEDS: SeedModel[] = [
     output_cost_per_mtok: 10.00,
     knowledge_cutoff: 'Early 2025',
     modalities: ['text', 'vision', 'audio', 'code'],
-    benchmarks: { mmlu: 95.5, aime: 92.0, gpqa: 84.0, swe_bench: 63.8 },
+    benchmarks: { mmlu: 95.5, aime: 88.0, gpqa: 86.4, swe_bench: 63.8 },
     highlights: [
       'Topped LMArena leaderboard at release — #1 across all benchmarks',
       '1M token context with native audio understanding',
@@ -335,10 +416,11 @@ const MODEL_SEEDS: SeedModel[] = [
     output_cost_per_mtok: 0.60,
     knowledge_cutoff: 'Early 2025',
     modalities: ['text', 'vision', 'audio', 'code'],
-    benchmarks: {},
+    benchmarks: { swe_bench: 60.3, gpqa: 82.8, aime: 72.0 },
     highlights: [
       'Fastest Gemini 2.5 model',
       '1M context at Flash pricing',
+      '82.8% GPQA — graduate-level reasoning at budget price',
     ],
     notes: 'Speed-optimized version of Gemini 2.5. Best value for high-throughput long-context tasks.',
   },
@@ -415,10 +497,11 @@ const MODEL_SEEDS: SeedModel[] = [
     output_cost_per_mtok: null,
     knowledge_cutoff: 'Early 2025',
     modalities: ['text', 'vision', 'code'],
-    benchmarks: {},
+    benchmarks: { mmlu: 84.0, swe_bench: 70.3, gpqa: 84.8, humaneval: 86.0 },
     highlights: [
       'Runs on a single GPU — 17B active parameters',
       '10M context on consumer hardware',
+      '84.8% GPQA — frontier reasoning in a single-GPU model',
     ],
     notes: 'Efficiency-focused Llama 4. Designed to run on a single H100 or comparable consumer GPU.',
   },
@@ -653,6 +736,7 @@ interface ExtractedModel {
   lab: string
   family: string
   release_date: string
+  status?: 'active' | 'preview' | 'deprecated'
   context_window: number | null
   input_cost_per_mtok: number | null
   output_cost_per_mtok: number | null
@@ -732,7 +816,7 @@ Rules:
       try {
         await db.execute({
           sql: `INSERT INTO ai_models (id, name, slug, lab, family, release_date, status, context_window, input_cost_per_mtok, output_cost_per_mtok, knowledge_cutoff, modalities, benchmarks, highlights, notes, feed_item_id, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, null, ?, ?, ?, ?, null, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, null, ?, ?, ?, ?, null, ?, ?)
                 ON CONFLICT(slug) DO UPDATE SET
                   status = CASE WHEN excluded.status = 'active' THEN 'active' ELSE ai_models.status END,
                   context_window = COALESCE(excluded.context_window, ai_models.context_window),
@@ -745,6 +829,7 @@ Rules:
           args: [
             crypto.randomUUID(), m.name, slug, m.lab, m.family ?? m.name,
             m.release_date ?? now.slice(0, 10),
+            m.status ?? 'active',
             m.context_window ?? null,
             m.input_cost_per_mtok ?? null,
             m.output_cost_per_mtok ?? null,
@@ -763,6 +848,100 @@ Rules:
   } catch (err) {
     console.error('[models] error enriching from feed:', err)
   }
+}
+
+// ── Auto-promotion ────────────────────────────────────────────────────────────
+// Detected-* models from refreshModelsFromFeed have messy auto-generated slugs.
+// This runs after every benchmark cron to assign canonical slugs so models show
+// up correctly in the UI and match against Artificial Analysis.
+
+interface SlugAssignment {
+  detectedSlug: string
+  canonicalSlug: string
+  isNewModel: boolean
+}
+
+export async function promoteDetectedModels(): Promise<number> {
+  const { rows: detectedRows } = await db.execute(
+    `SELECT slug, name, lab FROM ai_models WHERE slug LIKE 'detected-%'`
+  )
+  if (detectedRows.length === 0) return 0
+
+  const { rows: knownRows } = await db.execute(
+    `SELECT slug FROM ai_models WHERE slug NOT LIKE 'detected-%'`
+  )
+  const knownSlugs = new Set((knownRows as any[]).map(r => r.slug as string))
+
+  const modelList = (detectedRows as any[])
+    .map(r => `${r.slug} | ${r.name} | ${r.lab}`)
+    .join('\n')
+
+  const knownList = Array.from(knownSlugs).slice(0, 60).join(', ')
+
+  let text = ''
+  try {
+    const resp = await anthropic.messages.create({
+      model: MODEL_FAST,
+      max_tokens: 1000,
+      messages: [{
+        role: 'user',
+        content: `You are assigning canonical API-style slugs to AI models.
+
+For each detected model below, produce a canonical slug:
+- Use lowercase, hyphens only (no underscores or dots)
+- Anthropic models: match their API IDs (claude-fable-5, claude-opus-4-8, claude-sonnet-4-6)
+- OpenAI: gpt-5-5, gpt-4-1-mini, openai-o3, openai-o4-mini
+- Google: gemini-2-5-pro, gemini-2-5-flash, gemini-3-flash
+- Meta: llama-4-maverick, llama-4-scout
+- Others: {lab-prefix}-{model-name} lowercased
+
+If the canonical slug already exists in the known list below, set isNewModel=false (it's a duplicate to delete).
+If it's genuinely new, set isNewModel=true.
+
+Known slugs (existing models): ${knownList}
+
+Detected models to process:
+${modelList}
+
+Return ONLY a JSON array:
+[{"detectedSlug": "detected-gpt-56", "canonicalSlug": "gpt-5-6", "isNewModel": true}]`,
+      }],
+    })
+    text = resp.content[0].type === 'text' ? resp.content[0].text : ''
+  } catch (e) {
+    console.error('[models] promoteDetectedModels Claude call failed:', e)
+    return 0
+  }
+
+  const match = text.match(/\[[\s\S]*?\]/)
+  if (!match) return 0
+
+  const assignments: SlugAssignment[] = safeJSON(match[0], [])
+  if (!Array.isArray(assignments) || assignments.length === 0) return 0
+
+  let promoted = 0
+  const stmts: { sql: string; args: unknown[] }[] = []
+
+  for (const { detectedSlug, canonicalSlug, isNewModel } of assignments) {
+    if (!detectedSlug?.startsWith('detected-') || !canonicalSlug) continue
+    if (!/^[a-z0-9-]+$/.test(canonicalSlug)) continue
+
+    if (isNewModel && !knownSlugs.has(canonicalSlug)) {
+      // Rename detected-* slug to canonical
+      stmts.push({ sql: `UPDATE ai_models SET slug = ? WHERE slug = ?`, args: [canonicalSlug, detectedSlug] })
+      promoted++
+    } else {
+      // Duplicate — a model with this canonical slug already exists; delete the detected stub
+      stmts.push({ sql: `DELETE FROM ai_models WHERE slug = ?`, args: [detectedSlug] })
+    }
+  }
+
+  if (stmts.length > 0) {
+    await db.batch(stmts as any)
+    if (promoted > 0) console.log(`[models] promoted ${promoted} detected models to canonical slugs`)
+  }
+
+  return promoted
 }
 
 export async function getAllModels(): Promise<AIModel[]> {

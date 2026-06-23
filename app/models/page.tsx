@@ -18,10 +18,11 @@ const LAB: Record<string, { color: string; rgb: string; short: string; bg: strin
 }
 
 const BENCH_LABEL: Record<string, string> = {
+  intelligence_index: 'AI Index',
   arc_agi: 'ARC-AGI', aime: 'AIME', swe_bench: 'SWE-Bench',
   gpqa: 'GPQA', mmlu: 'MMLU', humaneval: 'HumanEval', math: 'MATH',
 }
-const BENCH_ORDER = ['arc_agi', 'aime', 'swe_bench', 'gpqa', 'mmlu', 'humaneval', 'math']
+const BENCH_ORDER = ['intelligence_index', 'arc_agi', 'aime', 'swe_bench', 'gpqa', 'mmlu', 'humaneval', 'math']
 const MOD_LABEL: Record<string, string> = { text: 'TXT', vision: 'VIS', audio: 'AUD', code: 'COD' }
 const ALL_LABS = Object.keys(LAB)
 const PRESETS = [
@@ -691,12 +692,13 @@ function ComparePanel({ models, onClose, onRemove }: {
 // ── Benchmark history chart ───────────────────────────────────────────────────
 
 const HIST_METRICS = [
-  { key: 'swe_bench', label: 'SWE-Bench' },
-  { key: 'humaneval', label: 'HumanEval' },
-  { key: 'arc_agi',   label: 'ARC-AGI'   },
-  { key: 'gpqa',      label: 'GPQA'       },
-  { key: 'mmlu',      label: 'MMLU'       },
-  { key: 'aime',      label: 'AIME'       },
+  { key: 'intelligence_index', label: 'AI Index'  },
+  { key: 'swe_bench',          label: 'SWE-Bench' },
+  { key: 'humaneval',          label: 'HumanEval' },
+  { key: 'arc_agi',            label: 'ARC-AGI'   },
+  { key: 'gpqa',               label: 'GPQA'       },
+  { key: 'mmlu',               label: 'MMLU'       },
+  { key: 'aime',               label: 'AIME'       },
 ]
 
 type Tip = { x: number; y: number; name: string; lab: string; value: number; date: string }
@@ -728,8 +730,12 @@ function BenchmarkHistory() {
   const tSpan = maxT - minT || 86400000
   const rawMin = allVals.length ? Math.min(...allVals) : 0
   const rawMax = allVals.length ? Math.max(...allVals) : 100
-  const minV  = Math.max(0,   rawMin - Math.max((rawMax - rawMin) * 0.12, 5))
-  const maxV  = Math.min(100, rawMax + Math.max((rawMax - rawMin) * 0.12, 5))
+  const padding = Math.max((rawMax - rawMin) * 0.12, 5)
+  const minV  = Math.max(0, rawMin - padding)
+  // intelligence_index is open-ended (can exceed 100); other metrics are 0–100
+  const maxV  = metric === 'intelligence_index'
+    ? rawMax + padding
+    : Math.min(100, rawMax + padding)
   const vSpan = maxV - minV || 1
 
   const px = (d: string) => ML + ((new Date(d).getTime() - minT) / tSpan) * CW
@@ -750,7 +756,9 @@ function BenchmarkHistory() {
     setTip({ x: e.clientX - box.left, y: e.clientY - box.top, name: s.name, lab: s.lab, value: v.value, date: v.date })
   }
 
+  // Show baseline note when every model has exactly one snapshot (first run only)
   const isBaseline = series.length > 0 &&
+    series.every(s => s.values.length === 1) &&
     new Set(series.flatMap(s => s.values.map(v => v.date.slice(0, 10)))).size <= 1
 
   return (
@@ -809,7 +817,7 @@ function BenchmarkHistory() {
                   <line x1={ML} y1={py(t)} x2={ML + CW} y2={py(t)}
                     stroke="rgba(255,255,255,0.045)" strokeWidth={1} />
                   <text x={ML - 7} y={py(t)} textAnchor="end" dominantBaseline="middle"
-                    fill="#52525b" fontSize={10} fontFamily="monospace">{t}%</text>
+                    fill="#52525b" fontSize={10} fontFamily="monospace">{t}{metric === 'intelligence_index' ? '' : '%'}</text>
                 </g>
               ))}
 
@@ -867,7 +875,7 @@ function BenchmarkHistory() {
                 </p>
                 <p style={{ color: '#e0e0f0', fontSize: 13, fontWeight: 700, marginBottom: 3 }}>{tip.name}</p>
                 <p style={{ color: LAB[tip.lab]?.color ?? '#60a5fa', fontSize: 16, fontWeight: 900, fontFamily: 'monospace', marginBottom: 2 }}>
-                  {tip.value}%
+                  {tip.value}{metric === 'intelligence_index' ? '' : '%'}
                 </p>
                 <p style={{ color: '#52525b', fontSize: 11 }}>{fmtD(new Date(tip.date).getTime())}</p>
               </div>
@@ -883,7 +891,7 @@ function BenchmarkHistory() {
                     <div style={{ width: 12, height: 3, borderRadius: 2, background: color, opacity: 0.8 }} />
                     <span style={{ color: '#71717a', fontSize: 12 }}>{s.name}</span>
                     <span style={{ color, fontSize: 12, fontWeight: 700, fontFamily: 'monospace' }}>
-                      {latest?.value}%
+                      {latest?.value}{metric === 'intelligence_index' ? '' : '%'}
                     </span>
                   </div>
                 )
@@ -954,11 +962,12 @@ export default function ModelsPage() {
       const r = await fetch('/api/benchmarks', { method: 'POST' })
       if (r.ok) {
         const data = await r.json()
-        const msg = data.updated > 0
-          ? `${data.updated} scores updated from ${data.sources.join(', ')}`
-          : data.sources.length > 0 ? `No new scores (${data.sources.join(', ')} checked)` : 'No sources reachable'
+        const total = (data.updated ?? 0) + (data.seeded ?? 0)
+        const msg = total > 0
+          ? [data.seeded > 0 && `${data.seeded} baselines seeded`, data.updated > 0 && `${data.updated} scores updated`].filter(Boolean).join(', ') + (data.sources?.length > 0 ? ` · ${data.sources.join(', ')}` : '')
+          : data.sources?.length > 0 ? `No new scores (${data.sources.join(', ')} checked)` : 'No sources reachable'
         setSyncMsg(msg)
-        if (data.updated > 0) {
+        if (total > 0) {
           const fresh = await fetch('/api/models'); if (fresh.ok) setModels(await fresh.json())
         }
       }

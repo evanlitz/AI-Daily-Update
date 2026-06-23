@@ -6,6 +6,7 @@
     { "path": "/api/cron/fetch-intel",  "schedule": "10 20 * * *" },
     { "path": "/api/cron/brief",        "schedule": "45 8 * * *"  },
     { "path": "/api/cron/digest",       "schedule": "0 9 * * *"   },
-    { "path": "/api/cron/predictions",  "schedule": "0 10 * * 1"  }
+    { "path": "/api/cron/predictions",  "schedule": "0 10 * * 1"  },
+    { "path": "/api/cron/benchmarks",   "schedule": "0 9 1,11,21 * *" }
   ]
 }

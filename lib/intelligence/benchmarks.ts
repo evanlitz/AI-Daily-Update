@@ -1,122 +1,175 @@
 import crypto from 'crypto'
 import db from '../db'
-
-// Maps external leaderboard model IDs → our slugs
-const SLUG_MAP: Record<string, string> = {
-  // OpenAI
-  'gpt-4o':                     'gpt-4o',
-  'gpt-4o-2024-11-20':          'gpt-4o',
-  'gpt-4o-mini':                'gpt-4o-mini',
-  'gpt-4o-mini-2024-07-18':     'gpt-4o-mini',
-  'o1':                         'o1',
-  'o1-2024-12-17':              'o1',
-  'o1-mini':                    'o1-mini',
-  'o3':                         'o3',
-  'o3-mini':                    'o3-mini',
-  // Anthropic
-  'claude-3-5-sonnet-20241022':  'claude-3-5-sonnet',
-  'claude-3-5-sonnet':           'claude-3-5-sonnet',
-  'claude-3-5-haiku-20241022':   'claude-3-5-haiku',
-  'claude-3-opus-20240229':      'claude-3-opus',
-  'claude-3-7-sonnet-20250219':  'claude-3-7-sonnet',
-  'claude-opus-4-5':             'claude-4-opus',
-  'claude-sonnet-4-5':           'claude-4-sonnet',
-  // Google
-  'gemini-1.5-pro':             'gemini-1-5-pro',
-  'gemini-1.5-pro-002':         'gemini-1-5-pro',
-  'gemini-2.0-flash':           'gemini-2-0-flash',
-  'gemini-2.5-pro':             'gemini-2-5-pro',
-  // Meta
-  'llama-3.1-405b-instruct':    'llama-3-1-405b',
-  'llama-3.1-70b-instruct':     'llama-3-1-70b',
-  'llama-3.3-70b-instruct':     'llama-3-3-70b',
-  // Mistral
-  'mistral-large-2411':         'mistral-large-2',
-  // DeepSeek
-  'deepseek-v3':                'deepseek-v3',
-  'deepseek-v3-0324':           'deepseek-v3',
-  'deepseek-r1':                'deepseek-r1',
-}
-
-function resolveSlug(rawName: string): string | null {
-  const direct = SLUG_MAP[rawName]
-  if (direct) return direct
-  const lower = rawName.toLowerCase()
-  for (const [key, slug] of Object.entries(SLUG_MAP)) {
-    if (key.toLowerCase() === lower) return slug
-  }
-  return null
-}
+import { anthropic, MODEL_FAST } from '../claude'
+import { safeJSON } from '../utils'
+import { promoteDetectedModels } from './models'
 
 export interface BenchmarkUpdateResult {
+  seeded: number
   updated: number
   sources: string[]
   errors: string[]
 }
 
+// ── Baseline seed ─────────────────────────────────────────────────────────────
+// Writes each model's existing benchmark values to benchmark_snapshots once,
+// so the history chart has a starting point before any external scraping runs.
+
+async function seedBaselineSnapshots(now: string): Promise<number> {
+  const { rows: modelRows } = await db.execute(
+    `SELECT slug, benchmarks FROM ai_models WHERE benchmarks IS NOT NULL AND benchmarks != '{}'`
+  )
+
+  // Pre-load all already-seeded pairs in one query to avoid N+1 SELECTs
+  const { rows: seededRows } = await db.execute(
+    `SELECT model_slug, metric FROM benchmark_snapshots WHERE source = 'seed'`
+  )
+  const seededSet = new Set((seededRows as any[]).map(r => `${r.model_slug}:${r.metric}`))
+
+  const inserts: { sql: string; args: unknown[] }[] = []
+
+  for (const row of modelRows as any[]) {
+    const benches: Record<string, number> = safeJSON(row.benchmarks ?? '{}', {})
+    for (const [metric, value] of Object.entries(benches)) {
+      if (typeof value !== 'number') continue
+      if (seededSet.has(`${row.slug}:${metric}`)) continue
+      inserts.push({
+        sql: `INSERT INTO benchmark_snapshots (id, model_slug, metric, value, source, fetched_at) VALUES (?, ?, ?, ?, ?, ?)`,
+        args: [crypto.randomUUID(), row.slug, metric, value, 'seed', now],
+      })
+    }
+  }
+
+  if (inserts.length > 0) await db.batch(inserts as any)
+  return inserts.length
+}
+
+// ── Artificial Analysis ───────────────────────────────────────────────────────
+// Fetches their SSR models page and uses Claude to extract Intelligence Index
+// scores, matching each AA model name to our internal slugs.
+
+async function fetchArtificialAnalysis(
+  models: { slug: string; name: string }[],
+  now: string
+): Promise<{ updated: number; error?: string }> {
+  let html: string
+  try {
+    const r = await fetch('https://artificialanalysis.ai/models', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+      signal: AbortSignal.timeout(20000),
+    })
+    if (!r.ok) return { updated: 0, error: `HTTP ${r.status}` }
+    html = await r.text()
+  } catch (e) {
+    return { updated: 0, error: String(e).slice(0, 120) }
+  }
+
+  const modelList = models.map(m => `${m.slug} | ${m.name}`).join('\n')
+
+  let text = ''
+  try {
+    const resp = await anthropic.messages.create({
+      model: MODEL_FAST,
+      max_tokens: 2000,
+      messages: [{
+        role: 'user',
+        content: `Extract all model names and their Intelligence Index scores from the HTML below.
+Then match each model to the closest entry in this slug list (slug | name):
+${modelList}
+
+Return ONLY a JSON array with no extra text:
+[{"slug": "our-model-slug", "score": 60}]
+
+Rules:
+- Only include entries where you found a score and are confident in the slug match
+- Omit any model you can't match to a slug above
+- score is a number (the Intelligence Index value)
+
+HTML (first 35000 chars):
+${html.slice(0, 35000)}`,
+      }],
+    })
+    text = resp.content[0].type === 'text' ? resp.content[0].text : ''
+  } catch (e) {
+    return { updated: 0, error: `Claude: ${String(e).slice(0, 120)}` }
+  }
+
+  const match = text.match(/\[[\s\S]*?\]/)
+  if (!match) return { updated: 0, error: 'no JSON array in Claude response' }
+
+  const results: { slug: string; score: number }[] = safeJSON(match[0], [])
+  if (!Array.isArray(results) || results.length === 0) return { updated: 0 }
+
+  const knownSlugs = new Set(models.map(m => m.slug))
+  const inserts: { sql: string; args: unknown[] }[] = []
+
+  for (const { slug, score } of results) {
+    // Guard against wrong type, out-of-range, or non-finite values from Claude
+    if (!knownSlugs.has(slug) || typeof score !== 'number' || score < 0 || score > 200 || !isFinite(score)) continue
+    inserts.push({
+      sql: `INSERT INTO benchmark_snapshots (id, model_slug, metric, value, source, fetched_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [crypto.randomUUID(), slug, 'intelligence_index', Math.round(score * 10) / 10, 'artificial_analysis', now],
+    })
+  }
+
+  if (inserts.length > 0) await db.batch(inserts as any)
+  return { updated: inserts.length }
+}
+
+// ── Main entry point ──────────────────────────────────────────────────────────
+
 export async function updateBenchmarks(): Promise<BenchmarkUpdateResult> {
   const now = new Date().toISOString()
+  let seeded = 0
   let updated = 0
   const sources: string[] = []
   const errors: string[] = []
 
-  // Load all models from DB into a slug→row map
-  const { rows: modelRows } = await db.execute(`SELECT id, slug, benchmarks FROM ai_models`)
-  const modelsBySlug = new Map((modelRows as any[]).map(r => [r.slug as string, r as any]))
-
-  async function persistScore(slug: string, metric: string, value: number, source: string) {
-    const model = modelsBySlug.get(slug)
-    if (!model) return
-
-    let benchmarks: Record<string, number>
-    try { benchmarks = JSON.parse(model.benchmarks ?? '{}') } catch { benchmarks = {} }
-    benchmarks[metric] = Math.round(value * 10) / 10
-
-    await db.execute({
-      sql: `UPDATE ai_models SET benchmarks = ?, updated_at = ? WHERE slug = ?`,
-      args: [JSON.stringify(benchmarks), now, slug],
-    })
-    await db.execute({
-      sql: `INSERT INTO benchmark_snapshots (id, model_slug, metric, value, source, fetched_at) VALUES (?, ?, ?, ?, ?, ?)`,
-      args: [crypto.randomUUID(), slug, metric, value, source, now],
-    })
-    // Update local cache so repeated calls in same run are consistent
-    model.benchmarks = JSON.stringify(benchmarks)
-    updated++
+  // 1. Seed any model+metric combination that has no snapshot yet
+  try {
+    seeded = await seedBaselineSnapshots(now)
+    if (seeded > 0) sources.push(`seed(${seeded})`)
+  } catch (e) {
+    errors.push(`seed: ${String(e).slice(0, 120)}`)
   }
 
-  // ── EvalPlus (HumanEval++) ──────────────────────────────────────────────
+  // 2. Artificial Analysis — Intelligence Index composite score per model
   try {
-    const r = await fetch('https://evalplus.github.io/leaderboard.json', {
-      signal: AbortSignal.timeout(12000),
-      headers: { 'User-Agent': 'ai-pulse-dashboard/1.0' },
-    })
-    if (r.ok) {
-      const data: Record<string, any> = await r.json()
-      for (const [rawName, results] of Object.entries(data)) {
-        const slug = resolveSlug(rawName)
-        if (!slug) continue
-        const val = results?.humaneval_plus ?? results?.humaneval ?? results?.pass_at_1
-        if (typeof val === 'number') await persistScore(slug, 'humaneval', val, 'evalplus')
-      }
-      sources.push('EvalPlus')
+    const { rows: modelRows } = await db.execute(
+      `SELECT slug, name FROM ai_models WHERE status != 'deprecated'`
+    )
+    const models = (modelRows as any[]).map(r => ({ slug: r.slug as string, name: r.name as string }))
+    const { updated: aaUpdated, error } = await fetchArtificialAnalysis(models, now)
+
+    if (error) {
+      errors.push(`artificial_analysis: ${error}`)
     } else {
-      errors.push(`EvalPlus HTTP ${r.status}`)
+      updated += aaUpdated
+      sources.push(`artificial_analysis(${aaUpdated})`)
     }
   } catch (e) {
-    errors.push(`EvalPlus: ${String(e).slice(0, 100)}`)
+    errors.push(`artificial_analysis: ${String(e).slice(0, 120)}`)
   }
 
-  // ── BigCode (SWE-bench) via HuggingFace Datasets API ───────────────────
+  // 3. Promote any detected-* preview stubs to canonical slugs
   try {
-    const r = await fetch(
-      'https://datasets-server.huggingface.co/rows?dataset=princeton-nlp%2FSWE-bench_Verified&config=default&split=test&offset=0&limit=1',
-      { signal: AbortSignal.timeout(8000) }
-    )
-    // This endpoint just validates accessibility; actual leaderboard data
-    // isn't available in a simple JSON — skip to avoid bad data.
-    if (!r.ok) errors.push(`SWE-bench HF: HTTP ${r.status}`)
-  } catch {}
+    await promoteDetectedModels()
+  } catch (e) {
+    errors.push(`promote: ${String(e).slice(0, 120)}`)
+  }
 
-  return { updated, sources, errors }
+  // Record this run in source_runs so the health endpoint tracks it
+  try {
+    await db.execute({
+      sql: `INSERT INTO source_runs (source, fetched_at, item_count) VALUES (?, ?, ?)`,
+      args: ['benchmark-sync', now, seeded + updated],
+    })
+  } catch (e) {
+    console.error('[benchmarks] source_runs insert failed:', e)
+  }
+
+  return { seeded, updated, sources, errors }
 }
