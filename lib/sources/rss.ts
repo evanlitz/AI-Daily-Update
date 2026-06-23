@@ -3,9 +3,11 @@ import he from 'he'
 import crypto from 'crypto'
 import type { FeedItem } from '../types'
 
+const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
+
 const parser = new Parser({
   customFields: { item: ['content:encoded'] },
-  headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36' },
+  headers: { 'User-Agent': USER_AGENT },
   timeout: 8000,
 })
 
@@ -31,18 +33,23 @@ function stripTrackingParams(rawUrl: string): string {
 
 const FEEDS = [
   // ── Official AI Lab Blogs ────────────────────────────────────────────────────
+  // anthropic, cohere, meta-ai dropped — confirmed dead with no free fix available:
+  // anthropic.com no longer publishes a public RSS feed at all (checked /rss.xml,
+  // /news/rss.xml, /feed.xml, and the /news page itself for an alternate link — none
+  // exist). cohere.com/blog/rss 307-redirects to the plain HTML blog page, which has
+  // no <link rel="alternate" type="application/rss+xml"> either — they've dropped RSS.
+  // ai.meta.com/blog/rss/ returns 400 from every header combination tried (UA, Accept) —
+  // looks like bot mitigation at their edge, not a URL issue, same dead end as Reddit's
+  // anonymous API crackdown earlier this session.
   { url: 'https://openai.com/blog/rss.xml',                              source: 'rss:openai',              tags: ['models', 'industry'] },
-  { url: 'https://www.anthropic.com/rss.xml',                            source: 'rss:anthropic',           tags: ['models', 'safety', 'industry'] },
   { url: 'https://deepmind.google/blog/rss.xml',                         source: 'rss:deepmind',            tags: ['research', 'models'] },
-  { url: 'https://ai.meta.com/blog/rss/',                                source: 'rss:meta-ai',             tags: ['research', 'models', 'industry'] },
-  { url: 'https://mistral.ai/news/rss/',                                 source: 'rss:mistral',             tags: ['models', 'industry'] },
-  { url: 'https://cohere.com/blog/rss',                                  source: 'rss:cohere',              tags: ['models', 'industry'] },
+  { url: 'https://mistral.ai/rss.xml',                                   source: 'rss:mistral',             tags: ['models', 'industry'] },
 
   // ── Big Tech AI Blogs ────────────────────────────────────────────────────────
   { url: 'https://blog.google/innovation-and-ai/technology/ai/rss/',     source: 'rss:google-ai',           tags: ['models'] },
   { url: 'https://research.google/blog/rss',                             source: 'rss:google-research',     tags: ['research'] },
   { url: 'https://www.microsoft.com/en-us/research/blog/feed/',          source: 'rss:microsoft-research',  tags: ['research'] },
-  { url: 'https://blogs.microsoft.com/ai/feed/',                         source: 'rss:microsoft-ai',        tags: ['industry', 'tools'] },
+  { url: 'https://news.microsoft.com/source/topics/ai/feed/',            source: 'rss:microsoft-ai',        tags: ['industry', 'tools'] },
   { url: 'https://developer.nvidia.com/blog/feed/',                      source: 'rss:nvidia',              tags: ['infrastructure', 'tools'] },
   { url: 'https://machinelearning.apple.com/rss.xml',                    source: 'rss:apple-ml',            tags: ['research', 'models'] },
   { url: 'https://aws.amazon.com/blogs/machine-learning/feed/',          source: 'rss:aws-ml',              tags: ['infrastructure', 'tools'] },
@@ -54,7 +61,7 @@ const FEEDS = [
   { url: 'https://thegradient.pub/rss/',                                 source: 'rss:the-gradient',        tags: ['research'] },
   { url: 'https://newsletter.theaiedge.io/feed',                         source: 'rss:ai-edge',             tags: ['research', 'tools'] },
   { url: 'https://www.latent.space/feed',                                source: 'rss:latent-space',        tags: ['research', 'tools'] },
-  { url: 'https://tldr.tech/ai/rss',                                     source: 'rss:tldr-ai',             tags: ['industry', 'tools'] },
+  { url: 'https://tldr.tech/api/rss/ai',                                 source: 'rss:tldr-ai',             tags: ['industry', 'tools'] },
   { url: 'https://simonwillison.net/atom/everything/',                   source: 'rss:simon-willison',      tags: ['tools'] },
   { url: 'https://huggingface.co/blog/feed.xml',                         source: 'rss:huggingface-blog',    tags: ['tools', 'models'] },
   { url: 'https://www.oneusefulthing.org/feed',                          source: 'rss:one-useful-thing',    tags: ['industry'] },
@@ -82,9 +89,23 @@ function timeout(ms: number): Promise<never> {
 
 const CUTOFF_DAYS = 14
 
+// Some upstream feeds ship genuinely malformed XML — e.g. apple-ml's feed has a raw
+// unescaped & in a title ("...Machine Learning & AI 2026") that breaks strict XML
+// parsing. Escaping any & not already part of a valid entity fixes this class of bug
+// without needing per-feed special-casing; well-formed feeds are unaffected (no-op).
+function sanitizeXmlEntities(xml: string): string {
+  return xml.replace(/&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)/g, '&amp;')
+}
+
 async function fetchFeed(feed: typeof FEEDS[number]): Promise<FeedItem[]> {
   try {
-    const result = await Promise.race([parser.parseURL(feed.url), timeout(8000)])
+    const res = await Promise.race([
+      fetch(feed.url, { headers: { 'User-Agent': USER_AGENT } }),
+      timeout(8000),
+    ])
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const xml = sanitizeXmlEntities(await res.text())
+    const result = await parser.parseString(xml)
     const now = new Date().toISOString()
     const cutoff = Date.now() - CUTOFF_DAYS * 24 * 60 * 60 * 1000
 
