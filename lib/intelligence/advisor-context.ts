@@ -1,4 +1,5 @@
 import db from '../db'
+import { recallFeedItems } from '../memory'
 import { getAllModels } from './models'
 
 const PAPER_SOURCES = ['arxiv', 'paperswithcode', 'semanticscholar', 'huggingface']
@@ -18,17 +19,18 @@ export async function gatherAdvisorContext(): Promise<AdvisorSourceContext> {
   const paperPlaceholders = PAPER_SOURCES.map(() => '?').join(', ')
 
   const [
-    { rows: trendingRows },
+    trendingItems,
     { rows: paperRows },
     { rows: repoRows },
     { rows: datasetRows },
     { rows: radarRows },
     models,
   ] = await Promise.all([
-    db.execute({
-      sql: `SELECT title FROM feed_items WHERE fetched_at >= ? AND velocity_score > 0 AND screened = 1 AND source NOT IN (${paperPlaceholders}) ORDER BY velocity_score DESC LIMIT 10`,
-      args: [day14, ...PAPER_SOURCES],
-    }),
+    recallFeedItems(
+      'AI tools frameworks APIs developer projects capabilities worth building with',
+      14,
+      { sinceISO: day14 }
+    ),
     db.execute({
       sql: `SELECT title, source FROM feed_items WHERE fetched_at >= ? AND screened = 1 AND source IN (${paperPlaceholders}) ORDER BY velocity_score DESC LIMIT 6`,
       args: [day21, ...PAPER_SOURCES],
@@ -44,7 +46,9 @@ export async function gatherAdvisorContext(): Promise<AdvisorSourceContext> {
     getAllModels(),
   ])
 
-  const trending = (trendingRows as any[]).map(i => `- ${i.title}`).join('\n') || 'No recent items available.'
+  const trending = trendingItems.length
+    ? trendingItems.map(i => `- ${i.title}`).join('\n')
+    : 'No recent items available.'
 
   const papers = (paperRows as any[]).map(i => `- ${i.title} (${i.source})`).join('\n') || 'No recent papers available.'
 

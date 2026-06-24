@@ -1,7 +1,7 @@
 import crypto from 'crypto'
 import db from '../db'
 import { anthropic, MODEL } from '../claude'
-import { recall, remember } from '../memory'
+import { recall, remember, recallFeedItems } from '../memory'
 import type { WeeklyDigest, DigestChange } from '../types'
 import { getMondayISO } from '../utils'
 
@@ -97,6 +97,46 @@ async function getPriorDigests(currentWeekStart: string): Promise<{ week_start: 
   } catch { return [] }
 }
 
+// One query per digest section — each retrieves items semantically relevant to
+// that section's topic rather than pulling a flat date-sorted pool and hoping
+// Claude distributes them correctly. The union is deduplicated before fetching
+// full rows, so Claude still sees a coherent set, not four separate buckets.
+const SECTION_QUERIES = [
+  'major AI model releases company announcements capability breakthroughs',
+  'AI developer tools frameworks libraries SDKs open source projects',
+  'AI research papers machine learning academic findings benchmarks',
+  'AI industry implications practical applications developer skills career',
+]
+
+async function getSemanticItems(sinceISO: string): Promise<any[]> {
+  const results = await Promise.all(
+    SECTION_QUERIES.map(q => recallFeedItems(q, 25, { sinceISO }))
+  )
+
+  // Deduplicate: if an item appears in multiple section results keep the
+  // closest (lowest) distance so the re-ranking in buildAndRunDigest has
+  // the most accurate signal for each item.
+  const bestDistance = new Map<string, number>()
+  const orderedIds: string[] = []
+  for (const section of results) {
+    for (const item of section) {
+      const prev = bestDistance.get(item.id)
+      if (prev === undefined || item.distance < prev) bestDistance.set(item.id, item.distance)
+      if (prev === undefined) orderedIds.push(item.id)
+    }
+  }
+
+  if (!orderedIds.length) return []
+
+  const placeholders = orderedIds.map(() => '?').join(', ')
+  const { rows } = await db.execute({
+    sql: `SELECT id, source, title, raw_content, summary, published_at, velocity_score, topic_tags
+          FROM feed_items WHERE id IN (${placeholders})`,
+    args: orderedIds,
+  })
+  return rows as any[]
+}
+
 export interface DigestContext {
   raw: any[]
   storyContext: string
@@ -110,15 +150,24 @@ export interface DigestContext {
 export async function fetchDigestContext(weekStart: string): Promise<DigestContext> {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  const [{ rows: raw }, storyContext, priorDigests, affinityContext] = await Promise.all([
-    db.execute({
-      sql: `SELECT id, source, title, raw_content, summary, published_at, velocity_score, topic_tags FROM feed_items WHERE fetched_at >= ? AND screened = 1 ORDER BY fetched_at DESC LIMIT 200`,
-      args: [weekAgo],
-    }),
+  const [semanticItems, storyContext, priorDigests, affinityContext] = await Promise.all([
+    getSemanticItems(weekAgo),
     getStoryContext(),
     getPriorDigests(weekStart),
     getAffinityContext(),
-  ]) as [{ rows: any[] }, string, { week_start: string; highlights: string[] }[], string]
+  ])
+
+  // Fall back to date-sorted SQL if semantic retrieval came back empty (Voyage
+  // outage, embeddings not yet computed on a fresh DB, etc.)
+  let raw: any[] = semanticItems
+  if (raw.length < 15) {
+    console.warn('[digest] semantic retrieval yielded < 15 items — falling back to SQL')
+    const { rows } = await db.execute({
+      sql: `SELECT id, source, title, raw_content, summary, published_at, velocity_score, topic_tags FROM feed_items WHERE fetched_at >= ? AND screened = 1 ORDER BY fetched_at DESC LIMIT 200`,
+      args: [weekAgo],
+    })
+    raw = rows as any[]
+  }
 
   return { raw, storyContext, priorDigests, affinityContext }
 }

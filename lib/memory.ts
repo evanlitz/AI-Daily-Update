@@ -226,20 +226,48 @@ export interface RecallFeedItemResult {
 
 // Semantic search over ingested raw content — finds related items by meaning
 // instead of a SQL WHERE clause on tags/dates.
-export async function recallFeedItems(query: string, k = 10): Promise<RecallFeedItemResult[]> {
+// opts.sinceISO: when provided, restricts to screened=1 items fetched after that
+// timestamp. Over-fetches from vector_top_k (k*4) first so the date/screened
+// pruning doesn't starve the result set — same pattern as recall() above.
+export async function recallFeedItems(
+  query: string,
+  k = 10,
+  opts: { sinceISO?: string } = {}
+): Promise<RecallFeedItemResult[]> {
   try {
     const [vec] = await embed([query], 'query')
     if (!vec.length) return []
 
-    const { rows } = await db.execute({
-      sql: `SELECT f.id, f.title,
-                   vector_distance_cos(f.embedding, vector32(?)) AS distance
-            FROM vector_top_k('feed_items_vec_idx', vector32(?), ?) vt
-            JOIN feed_items f ON f.rowid = vt.id`,
-      args: [JSON.stringify(vec), JSON.stringify(vec), k],
-    })
+    let rows: any[]
 
-    return (rows as any[]).map(r => ({
+    if (opts.sinceISO) {
+      const fetchK = k * 4
+      const result = await db.execute({
+        sql: `WITH candidates AS (
+                SELECT f.id, f.title, f.fetched_at, f.screened,
+                       vector_distance_cos(f.embedding, vector32(?)) AS distance
+                FROM vector_top_k('feed_items_vec_idx', vector32(?), ?) vt
+                JOIN feed_items f ON f.rowid = vt.id
+              )
+              SELECT id, title, distance FROM candidates
+              WHERE screened = 1 AND fetched_at >= ?
+              ORDER BY distance ASC
+              LIMIT ?`,
+        args: [JSON.stringify(vec), JSON.stringify(vec), fetchK, opts.sinceISO, k],
+      })
+      rows = result.rows as any[]
+    } else {
+      const result = await db.execute({
+        sql: `SELECT f.id, f.title,
+                     vector_distance_cos(f.embedding, vector32(?)) AS distance
+              FROM vector_top_k('feed_items_vec_idx', vector32(?), ?) vt
+              JOIN feed_items f ON f.rowid = vt.id`,
+        args: [JSON.stringify(vec), JSON.stringify(vec), k],
+      })
+      rows = (result.rows as any[]).slice(0, k)
+    }
+
+    return rows.map(r => ({
       id: r.id as string,
       title: r.title as string,
       distance: r.distance as number,
