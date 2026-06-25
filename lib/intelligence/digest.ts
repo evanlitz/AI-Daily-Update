@@ -1,9 +1,10 @@
 import crypto from 'crypto'
 import db from '../db'
 import { anthropic, MODEL } from '../claude'
-import { recall, remember, recallFeedItems } from '../memory'
+import { recall, remember, embed, recallFeedItems } from '../memory'
+import type { RecallResult } from '../memory'
 import type { WeeklyDigest, DigestChange } from '../types'
-import { getMondayISO } from '../utils'
+import { getMondayISO, sanitizeText } from '../utils'
 
 // Extract meaningful words from a title for overlap comparison
 function titleTokens(title: string): Set<string> {
@@ -97,48 +98,81 @@ async function getPriorDigests(currentWeekStart: string): Promise<{ week_start: 
   } catch { return [] }
 }
 
-// One query per digest section — each retrieves items semantically relevant to
-// that section's topic rather than pulling a flat date-sorted pool and hoping
-// Claude distributes them correctly. The union is deduplicated before fetching
-// full rows, so Claude still sees a coherent set, not four separate buckets.
-const SECTION_QUERIES = [
-  'major AI model releases company announcements capability breakthroughs',
-  'AI developer tools frameworks libraries SDKs open source projects',
-  'AI research papers machine learning academic findings benchmarks',
-  'AI industry implications practical applications developer skills career',
-]
+// One query per digest section, aligned to each section's actual focus.
+// Items are deduplicated globally: each item is assigned to whichever section
+// it matched most closely (lowest cosine distance), so every section gets
+// its own semantically relevant candidate pool rather than all sections
+// competing for the same ranked list.
+const SECTION_QUERIES: Record<string, string> = {
+  trajectory: 'AI industry direction phase inflection milestone trend development arc narrative',
+  bigMoves:   'AI model release company announcement capability breakthrough funding acquisition',
+  tools:      'developer tool framework SDK library open source release API integration CLI',
+  research:   'research paper arxiv preprint academic machine learning benchmark experiment finding',
+  hotTakes:   'AI controversy criticism safety ethics debate hype backlash surprising contrarian',
+  actionable: 'developer career workflow automation skill productivity practical tutorial how-to',
+}
 
-async function getSemanticItems(sinceISO: string): Promise<any[]> {
-  const results = await Promise.all(
-    SECTION_QUERIES.map(q => recallFeedItems(q, 25, { sinceISO }))
+const SECTION_LABELS: Record<string, string> = {
+  trajectory: 'THE TRAJECTORY',
+  bigMoves:   'THE BIG MOVES',
+  tools:      'TOOLS WORTH YOUR TIME',
+  research:   'RESEARCH THAT MATTERS',
+  hotTakes:   'HOT TAKES',
+  actionable: 'WHAT THIS MEANS FOR YOU',
+}
+
+// Maps the markdown section heading Claude writes back to its section key,
+// so we can store each section's output as a typed memory.
+const SECTION_TITLE_MAP: Record<string, string> = {
+  'The Trajectory':          'trajectory',
+  'The Big Moves':           'bigMoves',
+  'Tools Worth Your Time':   'tools',
+  'Research That Matters':   'research',
+  'Hot Takes':               'hotTakes',
+  'What This Means For You': 'actionable',
+}
+
+async function getSemanticItems(
+  sinceISO: string
+): Promise<{ items: any[]; sectionMap: Record<string, string> }> {
+  const entries = Object.entries(SECTION_QUERIES)
+
+  const queryResults = await Promise.all(
+    entries.map(async ([section, q]) => ({
+      section,
+      results: await recallFeedItems(q, 20, { sinceISO }),
+    }))
   )
 
-  // Deduplicate: if an item appears in multiple section results keep the
-  // closest (lowest) distance so the re-ranking in buildAndRunDigest has
-  // the most accurate signal for each item.
-  const bestDistance = new Map<string, number>()
-  const orderedIds: string[] = []
-  for (const section of results) {
-    for (const item of section) {
-      const prev = bestDistance.get(item.id)
-      if (prev === undefined || item.distance < prev) bestDistance.set(item.id, item.distance)
-      if (prev === undefined) orderedIds.push(item.id)
+  // Assign each item to the section where cosine distance is lowest.
+  const bestMatch = new Map<string, { section: string; distance: number }>()
+  for (const { section, results } of queryResults) {
+    for (const item of results) {
+      const prev = bestMatch.get(item.id)
+      if (!prev || item.distance < prev.distance) {
+        bestMatch.set(item.id, { section, distance: item.distance })
+      }
     }
   }
 
-  if (!orderedIds.length) return []
+  const allIds = [...bestMatch.keys()]
+  if (!allIds.length) return { items: [], sectionMap: {} }
 
-  const placeholders = orderedIds.map(() => '?').join(', ')
+  const placeholders = allIds.map(() => '?').join(', ')
   const { rows } = await db.execute({
     sql: `SELECT id, source, title, raw_content, summary, published_at, velocity_score, topic_tags
           FROM feed_items WHERE id IN (${placeholders})`,
-    args: orderedIds,
+    args: allIds,
   })
-  return rows as any[]
+
+  const sectionMap = Object.fromEntries(allIds.map(id => [id, bestMatch.get(id)!.section]))
+  return { items: rows as any[], sectionMap }
 }
 
 export interface DigestContext {
   raw: any[]
+  sectionMap: Record<string, string>
+  sectionPastCoverage: Record<string, RecallResult[]>
   storyContext: string
   priorDigests: { week_start: string; highlights: string[] }[]
   affinityContext: string
@@ -150,16 +184,31 @@ export interface DigestContext {
 export async function fetchDigestContext(weekStart: string): Promise<DigestContext> {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  const [semanticItems, storyContext, priorDigests, affinityContext] = await Promise.all([
+  const [{ items: semanticItems, sectionMap }, storyContext, priorDigests, affinityContext, sectionPastCoverageEntries] = await Promise.all([
     getSemanticItems(weekAgo),
     getStoryContext(),
     getPriorDigests(weekStart),
     getAffinityContext(),
+    // Per-section recall runs in parallel with other DB calls. Uses each
+    // section's query string as the recall probe — keeps fetchDigestContext
+    // fully self-contained and leaves buildAndRunDigest as a pure function.
+    Promise.all(
+      Object.keys(SECTION_QUERIES).map(async key => {
+        const sectionHits = await recall(SECTION_QUERIES[key], { kind: `digest_section_${key}`, k: 2 }).catch(() => [])
+        const hits = sectionHits.length
+          ? sectionHits
+          : await recall(SECTION_QUERIES[key], { kind: 'digest_highlight', k: 3 }).catch(() => [])
+        return [key, hits] as const
+      })
+    ),
   ])
+
+  const sectionPastCoverage: Record<string, RecallResult[]> = Object.fromEntries(sectionPastCoverageEntries)
 
   // Fall back to date-sorted SQL if semantic retrieval came back empty (Voyage
   // outage, embeddings not yet computed on a fresh DB, etc.)
   let raw: any[] = semanticItems
+  let resolvedSectionMap = sectionMap
   if (raw.length < 15) {
     console.warn('[digest] semantic retrieval yielded < 15 items — falling back to SQL')
     const { rows } = await db.execute({
@@ -167,16 +216,17 @@ export async function fetchDigestContext(weekStart: string): Promise<DigestConte
       args: [weekAgo],
     })
     raw = rows as any[]
+    resolvedSectionMap = {}
   }
 
-  return { raw, storyContext, priorDigests, affinityContext }
+  return { raw, sectionMap: resolvedSectionMap, sectionPastCoverage, storyContext, priorDigests, affinityContext }
 }
 
 // Pure prompt-building + Claude call — no DB access. Reused by both the live
 // pipeline (generateWeeklyDigest) and the eval harness (replaying a frozen
 // DigestContext fixture).
 export async function buildAndRunDigest(
-  { raw, storyContext, priorDigests, affinityContext }: DigestContext,
+  { raw, sectionMap, sectionPastCoverage, storyContext, priorDigests, affinityContext }: DigestContext,
   weekStart: string
 ): Promise<{ content: string; highlights: string[]; changes: DigestChange[]; sourceMaterial: string }> {
   // Source diversity cap: max 8 per source
@@ -201,16 +251,32 @@ export async function buildAndRunDigest(
     return scoreB - scoreA
   })
 
-  // Take top 25 clusters, format for Claude
-  const top = clusters.slice(0, 25)
-  const itemList = top.map((cluster, i) => {
-    const item = cluster.representative
-    const content = (item.raw_content ?? item.summary ?? '').slice(0, 400)
-    const sourceNote = cluster.count > 1
-      ? ` [covered by ${cluster.count} sources: ${cluster.sources.map(s => s.replace('rss:', '')).join(', ')}]`
-      : ` [${item.source.replace('rss:', '')}]`
-    return `${i + 1}.${sourceNote}\n   Title: ${item.title}\n   ${content}`
-  }).join('\n\n')
+  // Group clusters by their assigned section, then format with section headers
+  // so Claude knows which candidate pool belongs to which section of the digest.
+  const top = clusters.slice(0, 30)
+
+  const sectionBuckets: Record<string, typeof top> = {}
+  for (const key of Object.keys(SECTION_QUERIES)) sectionBuckets[key] = []
+
+  for (const cluster of top) {
+    const section = sectionMap[cluster.representative.id] ?? 'bigMoves'
+    sectionBuckets[section].push(cluster)
+  }
+
+  let globalIdx = 0
+  const itemList = Object.entries(SECTION_LABELS).map(([key, label]) => {
+    const bucket = sectionBuckets[key]
+    if (!bucket.length) return ''
+    const lines = bucket.map(cluster => {
+      const item = cluster.representative
+      const content = (item.raw_content ?? item.summary ?? '').slice(0, 400)
+      const sourceNote = cluster.count > 1
+        ? ` [covered by ${cluster.count} sources: ${cluster.sources.map((s: string) => s.replace('rss:', '')).join(', ')}]`
+        : ` [${item.source.replace('rss:', '')}]`
+      return `${++globalIdx}.${sourceNote}\n   Title: ${item.title}\n   ${content}`
+    }).join('\n\n')
+    return `--- ${label} ---\n${lines}`
+  }).filter(Boolean).join('\n\n')
 
   // Build trajectory context from up to 3 prior weeks — oldest first so Claude reads the arc in order
   const hasPrior = priorDigests.length > 0
@@ -221,17 +287,15 @@ export async function buildAndRunDigest(
       ).join('\n\n')
     : ''
 
-  // Semantic recall: find past highlights related to THIS week's actual topics,
-  // regardless of how many weeks ago they ran — getPriorDigests() above only
-  // looks back 3 calendar weeks, so a relevant callout from 2 months ago
-  // (e.g. the same model family resurfacing) would otherwise be invisible.
-  const recalledHighlights = await recall(top.slice(0, 5).map(c => c.representative.title).join('; '), {
-    kind: 'digest_highlight',
-    k: 5,
-  }).catch(() => [])
-  const relatedPastCoverage = recalledHighlights.length
-    ? `\n\nRELATED PAST COVERAGE (semantically related, may be older than 3 weeks — reference only if it adds real continuity, don't force it):\n` +
-      recalledHighlights.map(r => `- (week of ${r.metadata.week_start ?? '?'}) ${r.text}`).join('\n')
+  const relatedPastCoverage = Object.values(sectionPastCoverage).some(hits => hits.length)
+    ? `\n\nRELATED PAST COVERAGE BY SECTION (reference only if it adds real continuity — don't force it):\n` +
+      Object.entries(sectionPastCoverage)
+        .filter(([, hits]) => hits.length)
+        .map(([key, hits]) =>
+          `${SECTION_LABELS[key]}:\n` +
+          hits.map(h => `- (week of ${h.metadata.week_start ?? '?'}) ${h.text}`).join('\n')
+        )
+        .join('\n\n')
     : ''
 
   const response = await anthropic.messages.create({
@@ -295,11 +359,41 @@ export async function generateWeeklyDigest(): Promise<WeeklyDigest> {
     args: [id, weekStart, content, JSON.stringify(highlights), JSON.stringify(changes), now],
   })
 
-  // Store this week's highlights as memories so future digests can recall()
-  // them by topic, not just by "last 3 calendar weeks".
+  // Store highlights as short-form memories for backward-compat recall.
   await Promise.all(
     highlights.map(h => remember({ kind: 'digest_highlight', refId: id, text: h, metadata: { week_start: weekStart } }))
   ).catch(err => console.error('[digest] remember() failed:', err))
+
+  // Parse sections from the Claude response and store each as a memory.
+  // Batch all texts into one Voyage embed call instead of one call per section.
+  const sectionEntries = content
+    .replace(/\{["']?highlights[\s\S]*$/, '')
+    .split(/^(?=## )/m)
+    .filter(p => p.trim())
+    .flatMap(part => {
+      const title = part.match(/^## (.+)/)?.[1]?.trim() ?? ''
+      const key = SECTION_TITLE_MAP[title]
+      if (!key) return []
+      const text = sanitizeText(part.trim())
+      return text ? [{ key, text }] : []
+    })
+
+  if (sectionEntries.length) {
+    const vectors = await embed(sectionEntries.map(s => s.text), 'document').catch(() => [])
+    await db.batch([
+      ...sectionEntries.map(({ key }) => ({
+        sql: `DELETE FROM memories WHERE kind = ? AND ref_id = ?`,
+        args: [`digest_section_${key}`, weekStart],
+      })),
+      ...sectionEntries
+        .map(({ key, text }, i) => ({ key, text, vec: vectors[i] }))
+        .filter(({ vec }) => vec?.length)
+        .map(({ key, text, vec }) => ({
+          sql: `INSERT INTO memories (id, kind, ref_id, text, metadata, embedding, created_at) VALUES (?, ?, ?, ?, ?, vector32(?), ?)`,
+          args: [crypto.randomUUID(), `digest_section_${key}`, weekStart, text, JSON.stringify({ week_start: weekStart }), JSON.stringify(vec), now],
+        })),
+    ] as any[]).catch(err => console.error('[digest] section memories failed:', err))
+  }
 
   return { id, week_start: weekStart, content_md: content, highlights, changes, created_at: now }
 }

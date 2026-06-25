@@ -143,6 +143,11 @@ body {
   border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.82rem; color: var(--accent);
 }
 
+/* ── Newspaper sidebar — scrollable, no visible scrollbar ─ */
+.paper-sidebar { overflow-y: auto; overflow-x: hidden; }
+.paper-sidebar::-webkit-scrollbar { display: none; }
+.paper-sidebar { scrollbar-width: none; }
+
 /* ── Newspaper drop caps ───────────────────────────────── */
 .lead-body p:first-of-type::first-letter {
   font-family: 'Playfair Display', Georgia, serif;

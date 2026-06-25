@@ -524,7 +524,7 @@ function PaperFace({
 // ── Section header rule ───────────────────────────────────────────────────────
 function SectionRule({ num: _num, title }: { num: number; title: string }) {
   return (
-    <div style={{ paddingBottom: 14, breakInside: 'avoid' as const }}>
+    <div style={{ paddingBottom: 14, breakInside: 'avoid' as const, breakAfter: 'avoid' as const }}>
       <div style={{ height: 3, background: INK, marginBottom: 2 }} />
       <div style={{ height: 1, background: 'rgba(0,0,0,0.22)', marginBottom: 6 }} />
       <h3 style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 900, fontStyle: 'italic',
@@ -542,12 +542,18 @@ function SectionColumns({ batch, batchIdx }: {
   batchIdx: number
 }) {
   return (
-    <div style={{
-      columns: 3, columnGap: 28, columnRule: '1px solid rgba(0,0,0,0.16)',
-      columnFill: 'auto' as const, height: '100%',
-    }}>
+    <div style={{ display: 'flex', height: '100%' }}>
       {batch.map((section, i) => (
-        <div key={i} style={{ breakInside: 'avoid' as const, paddingBottom: 18 }}>
+        <div
+          key={i}
+          className="paper-sidebar"
+          style={{
+            flex: 1, minHeight: 0, paddingBottom: 18,
+            paddingLeft:  i > 0 ? 14 : 0,
+            paddingRight: i < batch.length - 1 ? 14 : 0,
+            borderLeft: i > 0 ? '1px solid rgba(0,0,0,0.16)' : 'none',
+          }}
+        >
           <SectionRule num={batchIdx * SECTIONS_PER_PAGE + i + 2} title={section.title} />
           <NewsBody body={section.body} />
         </div>
@@ -737,7 +743,7 @@ export default function DigestPage() {
         (7 * 24 * 60 * 60 * 1000)) + 1)
     : 1
 
-  const paperW = 'min(1440px, calc(100vw - 100px))'
+  const paperW = 'min(1440px, calc(100vw - 520px))'
   const paperH = 'calc(100vh - 90px)'
 
   const frontMouse = {
@@ -778,51 +784,31 @@ export default function DigestPage() {
       padding: '36px 16px 60px',
     }}>
 
-      {/* ── Fountain pen — top left corner ───────────────────────────────── */}
-      <div style={{
-        position: 'absolute', left: 48, top: 38,
-        zIndex: 50, transform: 'rotate(-22deg)',
-        pointerEvents: 'none',
-      }}>
-        <FountainPen />
-      </div>
-
-      {/* ── AI chip — lower left corner of table ──────────────────────────── */}
-      <div style={{
-        position: 'absolute', left: 88, bottom: 64,
-        zIndex: 50, transform: 'rotate(-8deg)',
-        pointerEvents: 'none',
-      }}>
-        <GPUChip />
-      </div>
-
-      {/* ── Coffee mug — upper right ───────────────────────────────────────── */}
-      <div style={{
-        position: 'absolute', right: 100, top: 32,
-        zIndex: 50, transform: 'rotate(4deg)',
-        pointerEvents: 'none',
-      }}>
-        <CoffeeMug />
-      </div>
-
-      {/* ── Coffee ring stain ─────────────────────────────────────────────── */}
-      <div style={{
-        position: 'absolute', right: 162, top: 220,
-        zIndex: 6, width: 90, height: 90, borderRadius: '50%',
-        border: '5px solid rgba(70,40,10,0.11)',
-        background: 'radial-gradient(circle, rgba(70,40,10,0.04) 0%, transparent 70%)',
-        pointerEvents: 'none',
-      }} />
-
-      {/* ── Regen notepad — lower right ───────────────────────────────────── */}
-      <div style={{ position: 'absolute', right: 80, bottom: 64, zIndex: 50 }}>
-        <RegenCard generating={generating} onClick={generate} />
-      </div>
-
       {/* ── Newspaper scene ───────────────────────────────────────────────── */}
       <div style={{
         position: 'relative', display: 'inline-block',
       }}>
+        {/* Table decorations — right/left values are relative to the newspaper
+            width via 100%, so they stay anchored to its edges on any viewport.
+            Objects clip at the screen edge on narrow displays rather than
+            sliding over newspaper content. */}
+        {/* Decorations are placed fully OUTSIDE the newspaper boundaries so they
+            never cover text. 100% = newspaper width; objects to the left use
+            right:100%+, objects to the right use left:100%+. They clip at the
+            viewport edge on narrow screens — that's fine. */}
+        <div style={{ position: 'absolute', right: '100%', top: 20, zIndex: 50, transform: 'rotate(-22deg)', pointerEvents: 'none' }}>
+          <FountainPen />
+        </div>
+        <div style={{ position: 'absolute', right: 'calc(100% + 24px)', bottom: 80, zIndex: 50, transform: 'rotate(-8deg)', pointerEvents: 'none' }}>
+          <GPUChip />
+        </div>
+        <div style={{ position: 'absolute', left: '100%', top: 28, zIndex: 50, transform: 'rotate(4deg)', pointerEvents: 'none' }}>
+          <CoffeeMug />
+        </div>
+        <div style={{ position: 'absolute', left: 'calc(100% + 20px)', top: 240, zIndex: 6, width: 90, height: 90, borderRadius: '50%', border: '5px solid rgba(70,40,10,0.11)', background: 'radial-gradient(circle, rgba(70,40,10,0.04) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', left: 'calc(100% + 24px)', bottom: 64, zIndex: 50 }}>
+          <RegenCard generating={generating} onClick={generate} />
+        </div>
         {/* Drop shadow on perspective div — NOT on preserve-3d container */}
         <div style={{
           perspective: '2400px',
@@ -942,7 +928,7 @@ export default function DigestPage() {
                           </div>
 
                           {/* Right sidebar */}
-                          <div style={{ paddingLeft: 22, overflow: 'hidden' }}>
+                          <div className="paper-sidebar" style={{ paddingLeft: 22 }}>
 
                             {/* ── Key Findings ── */}
                             {digest.highlights.length > 0 && (
