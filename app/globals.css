@@ -143,6 +143,36 @@ body {
   border-radius: 4px; padding: 0.1rem 0.4rem; font-size: 0.82rem; color: var(--accent);
 }
 
+/* ── Newspaper drop caps ───────────────────────────────── */
+.lead-body p:first-of-type::first-letter {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 5.2em;
+  font-weight: 900;
+  float: left;
+  line-height: 0.78;
+  margin: 6px 10px -4px 0;
+  color: #f4f4f5;
+}
+.news-drop-cap p:first-of-type::first-letter {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 5em;
+  font-weight: 900;
+  float: left;
+  line-height: 0.78;
+  margin: 4px 10px -4px 0;
+  color: #1a1208;
+}
+
+/* ── Print press animations ────────────────────────────── */
+@keyframes press-sweep {
+  from { top: -120px; }
+  to   { top: calc(100% + 120px); }
+}
+@keyframes ink-reveal {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* ── Animations ────────────────────────────────────────── */
 @keyframes ping-slow {
   0% { transform: scale(1); opacity: 0.8; }
