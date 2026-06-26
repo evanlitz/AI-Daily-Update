@@ -22,7 +22,7 @@ const MAX_SCREEN_ATTEMPTS = 3
 
 const SYSTEM_PROMPT = `You screen AI/ML news items for relevance, write hooks, and extract named entities and tools.
 
-Relevance: mark relevant=true only if the item is meaningfully about AI, ML, LLMs, robotics, or adjacent developer tooling. Mark relevant=false for: job postings, general tech/finance/politics news, press releases for non-AI products, content unrelated to AI development.
+Relevance: mark relevant=true only if the item is meaningfully about AI, ML, LLMs, robotics, or adjacent developer tooling. Mark relevant=false for: job postings, general tech/finance/politics news, press releases for non-AI products, content unrelated to AI development. For YouTube items, judge the specific episode topic — not the channel's general reputation. An episode from an AI-focused channel is irrelevant if the episode itself is not about AI, ML, LLMs, robotics, or developer tooling.
 
 Hook (only for relevant items): one sentence, max 100 chars, concrete practical relevance for a self-taught developer, no hype or hedging.
 Good: "First open-weight model to beat GPT-4o on coding benchmarks"
