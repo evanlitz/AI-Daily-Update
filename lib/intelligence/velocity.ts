@@ -40,9 +40,11 @@ export async function updateVelocityScores(): Promise<void> {
   }
 
   const scored = items.map(item => {
-    const top2 = keywords(item.title).map(kw => kwVel[kw] ?? 0).sort((a, b) => b - a).slice(0, 2)
-    const vel   = top2.length ? top2.reduce((s, v) => s + v, 0) / top2.length : 0
-    return { id: item.id, vel: Math.round(vel * 100) / 100 }
+    const top2    = keywords(item.title).map(kw => kwVel[kw] ?? 0).sort((a, b) => b - a).slice(0, 2)
+    const kwScore = top2.length ? top2.reduce((s, v) => s + v, 0) / top2.length : 0
+    const ageDays = (now - new Date(item.fetched_at).getTime()) / 86_400_000
+    const decay   = Math.exp(-ageDays * Math.LN2 / 3)
+    return { id: item.id, vel: Math.round(kwScore * decay * 100) / 100 }
   })
 
   await db.batch(scored.map(({ id, vel }) => ({
