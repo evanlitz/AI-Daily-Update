@@ -30,8 +30,10 @@ async function searchQuery(query: string, dateFrom: string): Promise<any[]> {
       publicationDateOrYear: `${dateFrom}:`,
       limit: FETCH_LIMIT,
     })
+    const headers: Record<string, string> = { 'User-Agent': 'AIPulse/1.0' }
+    if (process.env.S2_API_KEY) headers['x-api-key'] = process.env.S2_API_KEY
     const res = await fetch(`${BASE}/paper/search?${params}`, {
-      headers: { 'User-Agent': 'AIPulse/1.0' },
+      headers,
       signal: controller.signal,
     })
     if (!res.ok) {
@@ -60,13 +62,12 @@ export async function fetchSemanticScholar(): Promise<FeedItem[]> {
     const dateFrom = cutoff.toISOString().split('T')[0]
     const now = new Date().toISOString()
 
-    // Stagger start times (public tier limit is 100 req/5min) but run concurrently
-    // so one slow query doesn't serialize against the rest.
+    // Without an API key, unauthenticated burst limit triggers at ~1 req/sec.
+    // Stagger by 1.1s per query so 5 queries take ~5s total instead of firing simultaneously.
+    // With an API key the header is set and this stagger becomes unnecessary overhead,
+    // but it's harmless either way (5 extra seconds on an already slow ingest phase).
     const results = await Promise.all(
-      QUERIES.map(async (query, i) => {
-        await new Promise(r => setTimeout(r, i * 300))
-        return searchQuery(query, dateFrom)
-      })
+      QUERIES.map((q, i) => new Promise<any[]>(r => setTimeout(() => searchQuery(q, dateFrom).then(r), i * 1100)))
     )
     const allPapers = results.flat()
 

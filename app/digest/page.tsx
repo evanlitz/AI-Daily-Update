@@ -626,9 +626,6 @@ export default function DigestPage() {
   const [spread, setSpread] = useState(0)
   const revealedKey      = useRef<string | null>(null)
   const flipTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const leadContainerRef = useRef<HTMLDivElement>(null)
-  const leadContentRef   = useRef<HTMLDivElement>(null)
-  const [leadFontSize, setLeadFontSize] = useState(14)
 
   useEffect(() => {
     fetch('/api/digest')
@@ -660,20 +657,6 @@ export default function DigestPage() {
   const sections        = digest?.content_md ? parseSections(digest.content_md) : []
   const [lead, ...rest] = sections
 
-  // Binary-search font size so lead body exactly fills its container height
-  useEffect(() => {
-    const container = leadContainerRef.current
-    const content   = leadContentRef.current
-    if (!container || !content) return
-    let lo = 10.5, hi = 21
-    for (let i = 0; i < 20; i++) {
-      const mid = (lo + hi) / 2
-      content.style.fontSize = `${mid}px`
-      if (content.scrollHeight <= container.clientHeight) lo = mid
-      else hi = mid
-    }
-    setLeadFontSize(lo)
-  }, [lead?.body, isFlipped, spread])
 
   const ri = (delay: number): React.CSSProperties => revealing
     ? { opacity: 0, animation: `ink-reveal 0.45s ease ${delay}s forwards` }
@@ -885,11 +868,8 @@ export default function DigestPage() {
                             </h2>
                             <div style={{ height: 3, background: INK, marginBottom: 2, flexShrink: 0 }} />
                             <div style={{ height: 1, background: 'rgba(0,0,0,0.22)', marginBottom: 8, flexShrink: 0 }} />
-                            {/* Single column — font size auto-fit to fill height */}
-                            <div ref={leadContainerRef} style={{ flex: 1, overflow: 'hidden' }}>
-                              <div ref={leadContentRef}
-                                className="news-drop-cap"
-                                style={{ fontSize: leadFontSize }}>
+                            <div className="paper-sidebar" style={{ flex: 1, minHeight: 0 }}>
+                              <div className="news-drop-cap" style={{ fontSize: 14 }}>
                                 <ReactMarkdown components={{
                                   p: ({ children }) => (
                                     <p style={{ fontFamily: SERIF_SM, color: INK,

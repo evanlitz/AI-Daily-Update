@@ -14,9 +14,11 @@ function stripTrackingParams(rawUrl: string): string {
   } catch { return rawUrl }
 }
 
-// HN Algolia supports numericFilters=created_at_i>UNIX_TIMESTAMP for recency
-function since48hFilter(): string {
-  const ts = Math.floor((Date.now() - 48 * 60 * 60 * 1000) / 1000)
+// HN Algolia supports numericFilters=created_at_i>UNIX_TIMESTAMP for recency.
+// 72h (not 48h) so a single failed pipeline run doesn't permanently drop a story —
+// DB-level dedup (INSERT OR IGNORE) handles any overlap from the extra window.
+function since72hFilter(): string {
+  const ts = Math.floor((Date.now() - 72 * 60 * 60 * 1000) / 1000)
   return `created_at_i>${ts}`
 }
 
@@ -30,7 +32,7 @@ const QUERIES = [
 
 export async function fetchHackerNews(): Promise<FeedItem[]> {
   try {
-    const recencyFilter = since48hFilter()
+    const recencyFilter = since72hFilter()
     const now = new Date().toISOString()
     const seen = new Set<string>()
     const results: FeedItem[] = []
@@ -39,7 +41,7 @@ export async function fetchHackerNews(): Promise<FeedItem[]> {
     const responses = await Promise.all(
       QUERIES.map(q =>
         axios.get(
-          `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&tags=story&numericFilters=points>20,${recencyFilter}&hitsPerPage=15`,
+          `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&tags=story&numericFilters=${recencyFilter}&hitsPerPage=15`,
           { timeout: 10000 }
         ).catch(() => null)
       )

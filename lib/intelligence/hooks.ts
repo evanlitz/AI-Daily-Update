@@ -5,10 +5,11 @@ import type { ExtractedEntity } from './entities'
 import { safeJSON } from '../utils'
 import { findRecentDuplicateFeedItem } from '../memory'
 
-// Strict on purpose: a false-positive match here would copy the wrong
-// relevance/hook onto a genuinely different story, vs. advisor.ts's looser
-// 0.15 idea-dedup where a false positive just skips a redundant suggestion.
-const DEDUP_DISTANCE_THRESHOLD = 0.08
+// Raised from 0.08: zero fast-tracks observed over 14 days suggested the old
+// threshold was too tight for the embedding distances our sources actually produce.
+// 0.12 is still strict enough to avoid false positives across genuinely different
+// stories; advisor.ts uses 0.15 for its looser idea-dedup comparison.
+const DEDUP_DISTANCE_THRESHOLD = 0.12
 const DEDUP_WINDOW_DAYS = 14
 // github/github-releases legitimately produce near-identical titles for
 // distinct updates (e.g. consecutive release versions) — never fast-track these.
@@ -32,6 +33,53 @@ Bad: "Researchers have achieved a new milestone in AI"
 Entities (all items, including irrelevant): up to 4 key named entities — companies, AI models, or researchers. Canonical form only: "GPT-4o" not "gpt 4o", "Anthropic" not "anthropic". Type must be "company", "model", "researcher", or "paper". Generic terms like "AI" or "LLM" are NOT entities. Omit entities array if none.
 
 Tools (only for relevant items): up to 5 AI tool or model names explicitly mentioned — frameworks, libraries, models, techniques, or infra products a developer could actually use. Canonical form only: "LangGraph" not "langgraph", "vLLM" not "vllm", "GPT-4o" not "gpt4o". Generic terms ("AI", "LLM", "transformer", "neural network") are NOT tools. Omit tools array if none.`
+
+type ScreenEntry = {
+  n: number
+  relevant: boolean
+  hook?: string
+  entities?: Array<{ name: string; type: string }>
+  tools?: string[]
+}
+
+// Tool schema that forces Claude to emit structured JSON via tool_use rather
+// than free-text JSON we have to regex-extract. The model uses a constrained
+// decoding path, so schema violations are retried at the API level — safeJSON
+// cleanup and regex extraction are no longer needed for screening.
+const SCREEN_TOOL = {
+  name: 'screen_items',
+  description: 'Report screening results for every item in the batch.',
+  input_schema: {
+    type: 'object' as const,
+    required: ['results'],
+    properties: {
+      results: {
+        type: 'array',
+        items: {
+          type: 'object',
+          required: ['n', 'relevant'],
+          properties: {
+            n:        { type: 'integer' },
+            relevant: { type: 'boolean' },
+            hook:     { type: 'string' },
+            entities: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['name', 'type'],
+                properties: {
+                  name: { type: 'string' },
+                  type: { type: 'string', enum: ['company', 'model', 'researcher', 'paper'] },
+                },
+              },
+            },
+            tools: { type: 'array', items: { type: 'string' } },
+          },
+        },
+      },
+    },
+  },
+}
 
 export type ScreenResult = {
   items: FeedItem[]
@@ -273,32 +321,32 @@ export async function screenPendingItems(): Promise<ScreenResult> {
       const resp = await anthropic.messages.create({
         model: MODEL_FAST,
         max_tokens: 2800,
+        tools: [SCREEN_TOOL],
+        tool_choice: { type: 'tool', name: 'screen_items' },
         system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
         messages: [{
           role: 'user',
-          content: `Screen each item, write a hook for relevant ones, and extract entities and tools. Return ONLY a JSON array (one entry per item, in order):\n[{"n":1,"relevant":true,"hook":"...","entities":[{"name":"Anthropic","type":"company"}],"tools":["LangGraph","vLLM"]},{"n":2,"relevant":false,"entities":[]},...]` +
-            `\n\n${prompt}`,
+          content: `Screen each item, write a hook for relevant ones, and extract entities and tools.\n\n${prompt}`,
         }],
       })
 
       totalInputTokens += resp.usage.input_tokens
       totalOutputTokens += resp.usage.output_tokens
 
-      const text = resp.content[0].type === 'text' ? resp.content[0].text : ''
-      const match = text.match(/\[[\s\S]*\]/)
-      if (!match) {
-        console.error('[hooks] no JSON in response')
+      const toolUse = resp.content.find(b => b.type === 'tool_use')
+      if (!toolUse || toolUse.type !== 'tool_use') {
+        console.error('[hooks] no tool_use block in response')
         handleBatchFailure(batch)
         continue
       }
 
-      const parsed: { n: number; relevant: boolean; hook?: string; entities?: ExtractedEntity[]; tools?: string[] }[] = safeJSON(match[0], [])
+      const parsed: ScreenEntry[] = (toolUse.input as { results: ScreenEntry[] }).results ?? []
       let kept = 0, dropped = 0
       for (const entry of parsed) {
         const item = batch[entry.n - 1]
         if (!item) continue
         if (Array.isArray(entry.entities) && entry.entities.length) {
-          entityMap[item.id] = entry.entities.filter((e: ExtractedEntity) => e.name && e.type)
+          entityMap[item.id] = entry.entities.filter(e => e.name && e.type) as ExtractedEntity[]
         }
         if (entry.relevant === false) {
           toDelete.push(item.id)

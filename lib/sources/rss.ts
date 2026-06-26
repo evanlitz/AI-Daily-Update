@@ -68,14 +68,31 @@ const FEEDS = [
   { url: 'https://thezvi.substack.com/feed',                             source: 'rss:zvi',                 tags: ['industry', 'research'] },
   { url: 'https://www.bensbites.com/feed',                               source: 'rss:bens-bites',          tags: ['industry'] },
 
+  // ── AI Safety / Alignment ────────────────────────────────────────────────────
+  // Alignment Forum: the primary venue for alignment research discourse —
+  // interpretability, RLHF theory, agent foundations. Not covered by any tech press feed.
+  { url: 'https://www.alignmentforum.org/feed.xml',                      source: 'rss:alignment-forum',     tags: ['research', 'industry'] },
+
   // ── Academic / Research Labs ─────────────────────────────────────────────────
   { url: 'https://bair.berkeley.edu/blog/feed.xml',                      source: 'rss:bair',                tags: ['research'] },
+  // Stanford HAI: policy and governance angle — the only institute-level AI policy source.
+  { url: 'https://hai.stanford.edu/news/rss.xml',                        source: 'rss:stanford-hai',        tags: ['industry'] },
 
   // ── Model Labs / Infra ───────────────────────────────────────────────────────
   { url: 'https://www.together.ai/blog/rss.xml',                         source: 'rss:together-ai',         tags: ['models', 'infrastructure'] },
   { url: 'https://stability.ai/news-updates?format=rss',                  source: 'rss:stability-ai',        tags: ['models'] },
 
   // ── Tech News ────────────────────────────────────────────────────────────────
+  // The Verge covers AI company drama, policy, and competitive moves — exactly
+  // the stories that don't appear in lab blogs or research feeds (e.g. IP disputes,
+  // regulatory news, industry conflicts). Best free source for this gap.
+  { url: 'https://www.theverge.com/rss/index.xml',                        source: 'rss:the-verge',           tags: ['industry'] },
+  // Wired AI: investigative/longform journalism — deep company profiles, policy pieces.
+  // Different cadence from TechCrunch/Ars which are news-cycle oriented.
+  { url: 'https://www.wired.com/feed/tag/ai/latest/rss',                  source: 'rss:wired-ai',            tags: ['industry'] },
+  // IEEE Spectrum AI: engineering and hardware angle — inference chips, data center
+  // builds, practical deployment. Underrepresented in the current software-skewed mix.
+  { url: 'https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss', source: 'rss:ieee-spectrum-ai', tags: ['infrastructure', 'research'] },
   { url: 'https://techcrunch.com/category/artificial-intelligence/feed/', source: 'rss:techcrunch-ai',      tags: ['industry'] },
   { url: 'https://www.technologyreview.com/feed/',                        source: 'rss:mit-tech-review',    tags: ['research'] },
   { url: 'https://venturebeat.com/category/ai/feed',                      source: 'rss:venturebeat-ai',     tags: ['industry'] },
