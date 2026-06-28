@@ -300,24 +300,48 @@ export async function fetchIntelligence(): Promise<void> {
     topic_tags: JSON.parse(r.topic_tags ?? '[]'),
   })) as FeedItem[]
 
-  const phase1: Promise<void>[] = [generateHooks(), generateYoutubeSummaries(), embedAnyMissing()]
-  if (recentItems.length > 0) phase1.push(refreshModelsFromFeed(recentItems))
-  if (toolNames.length > 0) phase1.push(classifyToolNames(toolNames))
+  const phase1: { label: string; promise: Promise<void> }[] = [
+    { label: 'generateHooks', promise: generateHooks() },
+    { label: 'generateYoutubeSummaries', promise: generateYoutubeSummaries() },
+    { label: 'embedAnyMissing', promise: embedAnyMissing() },
+  ]
+  if (recentItems.length > 0) phase1.push({ label: 'refreshModelsFromFeed', promise: refreshModelsFromFeed(recentItems) })
+  if (toolNames.length > 0) phase1.push({ label: 'classifyToolNames', promise: classifyToolNames(toolNames) })
   if (newItems.length > 0) {
-    phase1.push(updateStoryThreads(newItems, entityMap))
-    phase1.push(saveEntityMentions(newItems, entityMap))
+    phase1.push({ label: 'updateStoryThreads', promise: updateStoryThreads(newItems, entityMap) })
+    phase1.push({ label: 'saveEntityMentions', promise: saveEntityMentions(newItems, entityMap) })
   }
-  await Promise.all(phase1.map(p => p.catch(console.error)))
 
-  await Promise.all([
-    linkThreads(),
-    backfillPredictionEvidence(),
-    backfillEntities(),
-    seedRadarIfEmpty(),
-    reclassifyStaleTools(),
-    pruneOldFeedItems(),
-    updateAccelerationScores(),
-  ].map(p => p.catch(console.error)))
+  const phase2: { label: string; promise: Promise<void> }[] = [
+    { label: 'linkThreads', promise: linkThreads() },
+    { label: 'backfillPredictionEvidence', promise: backfillPredictionEvidence() },
+    { label: 'backfillEntities', promise: backfillEntities() },
+    { label: 'seedRadarIfEmpty', promise: seedRadarIfEmpty() },
+    { label: 'reclassifyStaleTools', promise: reclassifyStaleTools() },
+    { label: 'pruneOldFeedItems', promise: pruneOldFeedItems() },
+    { label: 'updateAccelerationScores', promise: updateAccelerationScores() },
+  ]
+
+  function collectFailures(tasks: typeof phase1, results: PromiseSettledResult<void>[]): string[] {
+    return results
+      .map((r, i) => {
+        if (r.status === 'rejected') {
+          const msg = r.reason instanceof Error ? r.reason.message : String(r.reason)
+          console.error(`[pipeline] ${tasks[i].label} failed:`, r.reason)
+          return `${tasks[i].label}: ${msg}`
+        }
+        return null
+      })
+      .filter((e): e is string => e !== null)
+  }
+
+  const p1Results = await Promise.allSettled(phase1.map(t => t.promise))
+  const p2Results = await Promise.allSettled(phase2.map(t => t.promise))
+  const failures = [...collectFailures(phase1, p1Results), ...collectFailures(phase2, p2Results)]
+
+  if (failures.length > 0) {
+    throw new Error(`Intelligence phase completed with ${failures.length} task failure(s):\n${failures.join('\n')}`)
+  }
 }
 
 // Convenience wrapper for manual triggering (calls both phases sequentially).

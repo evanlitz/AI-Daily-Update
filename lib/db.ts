@@ -424,4 +424,16 @@ try { await db.execute(`
 `) } catch {}
 try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_claude_usage_run_at ON claude_usage (run_at)`) } catch {}
 
+try { await db.execute(`
+  CREATE TABLE IF NOT EXISTS cron_runs (
+    id           TEXT PRIMARY KEY,
+    path         TEXT NOT NULL,
+    started_at   TEXT NOT NULL,
+    completed_at TEXT,
+    status       TEXT,
+    error_text   TEXT
+  )
+`) } catch {}
+try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_cron_runs_started_at ON cron_runs (started_at)`) } catch {}
+
 export default db

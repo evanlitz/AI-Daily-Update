@@ -30,6 +30,7 @@
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
+    "resend": "^6.16.0",
     "rss-parser": "^3.13.0",
     "voyageai": "^0.4.0",
     "xml2js": "^0.6.2",

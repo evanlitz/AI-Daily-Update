@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { generateWeeklyDigest } from '@/lib/intelligence/digest'
 import { getMondayISO } from '@/lib/utils'
+import { startCronRun, finishCronRun } from '@/lib/cronRuns'
 
 export const maxDuration = 300
 
@@ -11,7 +12,6 @@ export async function GET(req: Request) {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  // Only generate once per week — safe to run daily
   const weekStart = getMondayISO()
   const { rows } = await db.execute({
     sql: `SELECT id FROM weekly_digest WHERE week_start = ? LIMIT 1`,
@@ -21,6 +21,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, skipped: true, reason: 'digest already exists for this week' })
   }
 
-  const digest = await generateWeeklyDigest()
-  return NextResponse.json({ ok: true, weekStart: digest.week_start })
+  const runId = await startCronRun('/api/cron/digest')
+  try {
+    const digest = await generateWeeklyDigest()
+    await finishCronRun(runId, 'success')
+    return NextResponse.json({ ok: true, weekStart: digest.week_start })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    await finishCronRun(runId, 'failed', message)
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+  }
 }

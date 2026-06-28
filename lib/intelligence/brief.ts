@@ -141,14 +141,12 @@ Generate the daily brief now.`
     const raw = response.content[0].type === 'text' ? response.content[0].text : ''
     const match = raw.match(/\{[\s\S]*\}/)
     if (!match) {
-      console.error('[brief] Claude returned no parseable JSON:', raw.slice(0, 200))
-      return null
+      throw new Error(`Claude returned no parseable JSON: ${raw.slice(0, 200)}`)
     }
 
     const parsed = safeJSON(match[0], {}) as { signal?: string; rising?: string; watch?: string; shift?: string }
     if (!parsed?.signal || !parsed?.rising || !parsed?.watch || !parsed?.shift) {
-      console.error('[brief] incomplete JSON from Claude:', parsed)
-      return null
+      throw new Error(`Claude returned incomplete brief — missing fields: ${JSON.stringify(Object.keys(parsed))}`)
     }
 
     const id  = crypto.randomUUID()
@@ -164,7 +162,7 @@ Generate the daily brief now.`
     return { id, date: today, ...parsed, created_at: now } as DailyBrief
   } catch (err) {
     console.error('[brief] generation failed:', err)
-    return null
+    throw err
   }
 }
 
