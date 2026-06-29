@@ -201,7 +201,7 @@ export async function findRecentDuplicateFeedItem(
             candidates AS (
               SELECT f.id, f.hook,
                      vector_distance_cos(f.embedding, (SELECT embedding FROM target)) AS distance
-              FROM vector_top_k('feed_items_vec_idx', (SELECT embedding FROM target), 8) vt
+              FROM vector_top_k('feed_items_vec_idx', (SELECT embedding FROM target), 20) vt
               JOIN feed_items f ON f.rowid = vt.id
               WHERE f.screened = 1 AND f.fetched_at >= ? AND f.id != ? ${excludeClauses}
             )

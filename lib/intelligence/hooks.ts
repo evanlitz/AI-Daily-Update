@@ -2,7 +2,6 @@ import { anthropic, MODEL_FAST } from '../claude'
 import db from '../db'
 import type { FeedItem } from '../types'
 import type { ExtractedEntity } from './entities'
-import { safeJSON } from '../utils'
 import { findRecentDuplicateFeedItem } from '../memory'
 
 // Raised from 0.08: zero fast-tracks observed over 14 days suggested the old
@@ -40,6 +39,28 @@ type ScreenEntry = {
   hook?: string
   entities?: Array<{ name: string; type: string }>
   tools?: string[]
+}
+
+const GENERATE_HOOKS_TOOL = {
+  name: 'generate_hooks',
+  description: 'Return a hook for each item.',
+  input_schema: {
+    type: 'object' as const,
+    required: ['results'],
+    properties: {
+      results: {
+        type: 'array',
+        items: {
+          type: 'object',
+          required: ['n', 'hook'],
+          properties: {
+            n:    { type: 'integer' },
+            hook: { type: 'string' },
+          },
+        },
+      },
+    },
+  },
 }
 
 // Tool schema that forces Claude to emit structured JSON via tool_use rather
@@ -136,20 +157,21 @@ export async function generateHooks(): Promise<void> {
     const resp = await anthropic.messages.create({
       model: MODEL_FAST,
       max_tokens: 1500,
+      tools: [GENERATE_HOOKS_TOOL],
+      tool_choice: { type: 'tool', name: 'generate_hooks' },
       system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
       messages: [{
         role: 'user',
-        content: `Write a hook for each item (assume all are relevant). Return ONLY a JSON array: [{"n":1,"hook":"..."},...]\n\n${prompt}`,
+        content: `Write a hook for each item (assume all are relevant).\n\n${prompt}`,
       }],
     })
 
     await recordClaudeUsage('generate_hooks', resp.usage.input_tokens, resp.usage.output_tokens)
 
-    const text = resp.content[0].type === 'text' ? resp.content[0].text : ''
-    const match = text.match(/\[[\s\S]*\]/)
-    if (!match) { console.error('[hooks] no JSON in backfill response'); return }
+    const toolUse = resp.content.find(b => b.type === 'tool_use')
+    if (!toolUse || toolUse.type !== 'tool_use') { console.error('[hooks] no tool_use block in backfill response'); return }
 
-    const parsed: { n: number; hook: string }[] = safeJSON(match[0], [])
+    const parsed: { n: number; hook: string }[] = (toolUse.input as { results: { n: number; hook: string }[] }).results ?? []
     let updated = 0
     for (const { n, hook } of parsed) {
       const item = items[n - 1]
@@ -392,6 +414,15 @@ export async function screenPendingItems(): Promise<ScreenResult> {
         keptRows.push({ item: d, hook: repEntry.hook })
         bumpTally(tallies, d.source, 'fastTracked')
       }
+    }
+  }
+
+  // Propagate the rep's entity data to same-run cluster duplicates — they inherit
+  // the rep's relevance decision but were never sent to Claude, so entityMap has
+  // no entry for them. Without this, saveEntityMentions silently skips them.
+  for (const [repId, dups] of duplicatesByRep) {
+    if (entityMap[repId]) {
+      for (const d of dups) entityMap[d.id] = entityMap[repId]
     }
   }
 
