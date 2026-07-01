@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import type { AIPrediction } from '@/lib/types'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 // ── Boot screen ───────────────────────────────────────────────────────────────
 
@@ -28,7 +29,7 @@ function BootScreen({ onDone }: { onDone: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center flex-col"
       style={{ background: '#030308', opacity: done ? 0 : 1, transition: 'opacity 0.35s ease', pointerEvents: done ? 'none' : 'auto' }}>
-      <div style={{ fontFamily: 'monospace', width: 440 }}>
+      <div className="tl-boot-inner" style={{ fontFamily: 'monospace', width: 440 }}>
         <p style={{ color: '#3b82f6', fontSize: 13, fontWeight: 900, letterSpacing: '0.2em', marginBottom: 24 }}>
           ■ AI PULSE · TIMELINE
         </p>
@@ -73,7 +74,8 @@ const CONF_META: Record<string, { color: string; label: string; pct: number }> =
 }
 
 const NOW_YEAR = new Date().getFullYear() + new Date().getMonth() / 12
-const SIDEBAR_W = 72   // must match layout.tsx
+const SIDEBAR_W  = 72   // must match layout.tsx
+const MOBILE_NAV = 68   // must match globals.css mobile-nav padding-bottom
 
 // ── Story slide ───────────────────────────────────────────────────────────────
 
@@ -133,7 +135,7 @@ function EventSlide({
       }} />
 
       {/* Main content */}
-      <div style={{
+      <div className="tl-slide-content" style={{
         position: 'relative', zIndex: 2,
         maxWidth: 860, width: '100%',
         padding: '0 80px 0 60px',
@@ -143,7 +145,7 @@ function EventSlide({
       }}>
 
         {/* Row 1: category pills + counter */}
-        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 32 }}>
+        <div className="tl-pills" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 32 }}>
           {CATS.map(cat => {
             const active = cat === p.category
             const c  = CAT_COLOR[cat]
@@ -172,7 +174,7 @@ function EventSlide({
         </div>
 
         {/* Row 2: year + status */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 20, marginBottom: 18 }}>
+        <div className="tl-year-row" style={{ display: 'flex', alignItems: 'baseline', gap: 20, marginBottom: 18 }}>
           <span style={{
             fontSize: 'clamp(56px, 8vw, 96px)',
             fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1,
@@ -196,7 +198,7 @@ function EventSlide({
         </div>
 
         {/* Row 3: Title */}
-        <h1 style={{
+        <h1 className="tl-slide-title" style={{
           fontSize: 'clamp(36px, 5vw, 60px)',
           fontWeight: 800, color: '#f4f4f5',
           lineHeight: 1.15, letterSpacing: '-0.03em',
@@ -206,7 +208,7 @@ function EventSlide({
         </h1>
 
         {/* Row 4: Confidence */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 32 }}>
+        <div className="tl-confidence" style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 32 }}>
           <div style={{
             flex: 1, maxWidth: 380,
             height: 5, background: 'rgba(255,255,255,0.07)', borderRadius: 999, overflow: 'hidden',
@@ -224,7 +226,7 @@ function EventSlide({
 
         {/* Row 5: Description */}
         {(p.description || p.rationale) && (
-          <p style={{
+          <p className="tl-slide-desc" style={{
             fontSize: 'clamp(16px, 1.8vw, 20px)',
             lineHeight: 1.75, color: '#a1a1aa',
             margin: '0 0 32px', maxWidth: 620,
@@ -258,7 +260,7 @@ function EventSlide({
 
       {/* Prev / Next navigation — with event preview */}
       {prevP && (
-        <button onClick={onPrev} style={{
+        <button className="tl-slide-nav" onClick={onPrev} style={{
           position: 'absolute', left: 20, top: '50%', transform: 'translateY(-50%)',
           background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: 12, cursor: 'pointer', padding: '14px 10px',
@@ -277,7 +279,7 @@ function EventSlide({
         </button>
       )}
       {nextP && (
-        <button onClick={onNext} style={{
+        <button className="tl-slide-nav" onClick={onNext} style={{
           position: 'absolute', right: 20, top: '50%', transform: 'translateY(-50%)',
           background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
           borderRadius: 12, cursor: 'pointer', padding: '14px 10px',
@@ -497,7 +499,7 @@ function TimelineStrip({
 function ListView({ events, onSelect }: { events: AIPrediction[]; onSelect: (i: number) => void }) {
   const [hov, setHov] = useState<string | null>(null)
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 40px 32px' }}>
+    <div className="tl-list-inner" style={{ flex: 1, overflowY: 'auto', padding: '20px 40px 32px' }}>
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
         {events.map((p, i) => {
           const color  = CAT_COLOR[p.category] ?? '#3b82f6'
@@ -532,7 +534,7 @@ function ListView({ events, onSelect }: { events: AIPrediction[]; onSelect: (i: 
                 }}
               >
                 <div style={{ width: 3, alignSelf: 'stretch', borderRadius: 999, background: color, opacity: 0.7, flexShrink: 0 }} />
-                <span style={{
+                <span className="tl-list-cat" style={{
                   fontSize: 11, fontWeight: 900, letterSpacing: '0.12em', textTransform: 'uppercase',
                   color, background: `rgba(${rgb},0.12)`, padding: '5px 11px', borderRadius: 6,
                   flexShrink: 0, minWidth: 106, textAlign: 'center',
@@ -542,13 +544,13 @@ function ListView({ events, onSelect }: { events: AIPrediction[]; onSelect: (i: 
                   color: isHov ? '#f4f4f5' : '#d4d4d8', transition: 'color 0.15s',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>{p.title}</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: conf.color, flexShrink: 0 }}>
+                <span className="tl-list-conf" style={{ fontSize: 13, fontWeight: 700, color: conf.color, flexShrink: 0 }}>
                   {conf.label.split(' ')[0]}
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: isPast ? '#34d399' : '#52525b', flexShrink: 0, minWidth: 62, textAlign: 'right' }}>
+                <span className="tl-list-status" style={{ fontSize: 12, fontWeight: 700, color: isPast ? '#34d399' : '#52525b', flexShrink: 0, minWidth: 62, textAlign: 'right' }}>
                   {isPast ? '✓ past' : 'upcoming'}
                 </span>
-                <span style={{ color: isHov ? color : '#27272a', fontSize: 18, flexShrink: 0, transition: 'color 0.15s' }}>›</span>
+                <span className="tl-list-arrow" style={{ color: isHov ? color : '#27272a', fontSize: 18, flexShrink: 0, transition: 'color 0.15s' }}>›</span>
               </div>
             </div>
           )
@@ -561,6 +563,7 @@ function ListView({ events, onSelect }: { events: AIPrediction[]; onSelect: (i: 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function TimelinePage() {
+  const isMobile = useIsMobile(581)
   const [predictions, setPredictions] = useState<AIPrediction[]>([])
   const [activeIdx, setActiveIdx]     = useState(0)
   const [catFilter, setCatFilter]     = useState<string | null>(null)
@@ -649,9 +652,12 @@ export default function TimelinePage() {
   return (
     <>
     {!booted && <BootScreen onDone={handleBootDone} />}
-    <div style={{
+    <div className="tl-outer" style={{
       position: 'fixed',
-      top: 0, left: SIDEBAR_W, right: 0, bottom: 0,
+      top: 0,
+      left: isMobile ? 0 : SIDEBAR_W,
+      right: 0,
+      bottom: isMobile ? MOBILE_NAV : 0,
       zIndex: 45,
       display: 'flex', flexDirection: 'column',
       background: '#05050e',
@@ -665,10 +671,28 @@ export default function TimelinePage() {
           0%, 100% { transform: translateY(0); }
           50%       { transform: translateY(6px); }
         }
+        @media (max-width: 580px) {
+          .tl-boot-inner     { width: 88vw !important; }
+          .tl-topbar         { padding: 0 14px !important; gap: 10px !important; }
+          .tl-brand          { display: none !important; }
+          .tl-year-counter   { display: none !important; }
+          .tl-slide-nav      { display: none !important; }
+          .tl-slide-content  { padding: 0 16px !important; }
+          .tl-pills          { margin-bottom: 16px !important; gap: 6px !important; }
+          .tl-year-row       { margin-bottom: 10px !important; gap: 12px !important; }
+          .tl-slide-title    { margin-bottom: 20px !important; }
+          .tl-confidence     { margin-bottom: 16px !important; }
+          .tl-slide-desc     { display: -webkit-box !important; -webkit-line-clamp: 3 !important; -webkit-box-orient: vertical !important; overflow: hidden !important; margin-bottom: 16px !important; }
+          .tl-list-inner     { padding: 16px 12px 24px !important; }
+          .tl-list-cat       { display: none !important; }
+          .tl-list-conf      { display: none !important; }
+          .tl-list-status    { display: none !important; }
+          .tl-list-arrow     { display: none !important; }
+        }
       `}</style>
 
       {/* ── Topbar ─────────────────────────────────────────────────────────── */}
-      <div style={{
+      <div className="tl-topbar" style={{
         height: TOPBAR_H, flexShrink: 0,
         display: 'flex', alignItems: 'center', gap: 16, padding: '0 28px',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
@@ -676,14 +700,14 @@ export default function TimelinePage() {
         zIndex: 5,
       }}>
         <span style={{ fontSize: 16, fontWeight: 800, color: '#f4f4f5', letterSpacing: '-0.02em' }}>
-          AI Daily Update <span style={{ color: '#27272a', fontWeight: 400 }}>·</span>{' '}
+          <span className="tl-brand">AI Daily Update <span style={{ color: '#27272a', fontWeight: 400 }}>·</span>{' '}</span>
           <span style={{ color: '#3b82f6' }}>Timeline</span>
         </span>
 
         <div style={{ flex: 1 }} />
 
         {view === 'story' && sorted.length > 0 && (
-          <span style={{ fontSize: 13, color: '#52525b' }}>
+          <span className="tl-year-counter" style={{ fontSize: 13, color: '#52525b' }}>
             {sorted[activeIdx]?.year_guess} · {activeIdx + 1} / {sorted.length}
           </span>
         )}

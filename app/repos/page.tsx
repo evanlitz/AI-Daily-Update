@@ -26,7 +26,7 @@ export default function ReposPage() {
     : repos.filter(r => r.language?.toLowerCase() === activeLang.toLowerCase())
 
   return (
-    <main className="mx-auto max-w-screen-2xl px-10 py-8">
+    <main className="mx-auto max-w-screen-2xl px-4 sm:px-10 py-8">
       <div className="mb-8">
         <p className="eyebrow mb-2">Trending Signals</p>
         <h1

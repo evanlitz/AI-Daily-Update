@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { WeeklyDigest, DigestChange } from '@/lib/types'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 // ── Typography ───────────────────────────────────────────────────────────────
 const SERIF    = "'Playfair Display', Georgia, 'Times New Roman', serif"
@@ -614,8 +615,194 @@ function DogEar({ onClick, show }: { onClick: () => void; show: boolean }) {
   )
 }
 
+// ── Mobile layout ─────────────────────────────────────────────────────────────
+function MobileDigest({
+  digest, lead, rest, weekOf, issueNum, loading, generating, onGenerate,
+}: {
+  digest: WeeklyDigest | null
+  lead: { title: string; body: string } | undefined
+  rest: Array<{ title: string; body: string }>
+  weekOf: string | null
+  issueNum: number
+  loading: boolean
+  generating: boolean
+  onGenerate: () => void
+}) {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#0e0804',
+      backgroundImage: `radial-gradient(ellipse 150% 80% at 28% 22%, rgba(100,55,12,0.38) 0%, transparent 62%)`,
+      padding: '16px 12px 48px',
+    }}>
+      <div style={{
+        backgroundColor: PAPER,
+        backgroundImage: `radial-gradient(ellipse at 38% 18%, rgba(255,255,255,0.28) 0%, transparent 52%)`,
+        boxShadow: '0 4px 32px rgba(0,0,0,0.72)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* Paper grain */}
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 4,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E")`,
+        }} />
+
+        <div style={{ position: 'relative', zIndex: 6 }}>
+
+          {/* Masthead */}
+          <div style={{ padding: '10px 16px 0', textAlign: 'center' }}>
+            <div style={{
+              display: 'flex', justifyContent: 'space-between',
+              fontFamily: SERIF_SM, fontSize: 10, fontWeight: 700, color: INK,
+              letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4,
+            }}>
+              <span>Vol. 1, No. {issueNum}</span>
+              <span>{weekOf ?? '—'}</span>
+              <span>By Claude Sonnet</span>
+            </div>
+            <div style={{ height: 1, background: 'rgba(0,0,0,0.3)', marginBottom: 2 }} />
+            <div style={{ height: 4, background: INK, marginBottom: 2 }} />
+            <div style={{ height: 1, background: 'rgba(0,0,0,0.3)', marginBottom: 6 }} />
+            <div style={{
+              fontFamily: SERIF, fontSize: 30, fontWeight: 900, color: INK,
+              lineHeight: 0.9, letterSpacing: '-0.02em', textTransform: 'uppercase', marginBottom: 4,
+            }}>
+              AI Weekly Update
+            </div>
+            <div style={{ height: 1, background: 'rgba(0,0,0,0.3)', marginBottom: 2 }} />
+            <div style={{ height: 4, background: INK, marginBottom: 2 }} />
+            <div style={{ height: 1, background: 'rgba(0,0,0,0.3)', marginBottom: 8 }} />
+
+            {/* Generate button */}
+            <div style={{ textAlign: 'center', marginBottom: 10 }}>
+              <button
+                onClick={onGenerate}
+                disabled={generating}
+                style={{
+                  fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: '0.14em',
+                  textTransform: 'uppercase', color: INK,
+                  background: 'rgba(0,0,0,0.07)', border: '1px solid rgba(0,0,0,0.25)',
+                  padding: '6px 18px', cursor: generating ? 'wait' : 'pointer',
+                  minHeight: 36,
+                }}
+              >
+                {generating ? 'Setting Type…' : '↻ New Issue'}
+              </button>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div style={{ padding: '4px 16px 32px' }}>
+
+            {loading && (
+              <p style={{ fontFamily: SERIF, fontSize: 14, fontStyle: 'italic',
+                color: INK_FAINT, textAlign: 'center', paddingTop: 40 }}>
+                Loading edition…
+              </p>
+            )}
+
+            {!loading && !digest && !generating && (
+              <p style={{ fontFamily: SERIF, fontSize: 18, fontStyle: 'italic',
+                color: INK_FAINT, textAlign: 'center', paddingTop: 40 }}>
+                No edition on press.<br />
+                <span style={{ fontSize: 12 }}>Tap New Issue above to generate one.</span>
+              </p>
+            )}
+
+            {generating && !digest && (
+              <p style={{ fontFamily: SERIF, fontSize: 16, fontStyle: 'italic',
+                color: INK_FAINT, textAlign: 'center', paddingTop: 40 }}>
+                Setting type…
+              </p>
+            )}
+
+            {/* Lead article */}
+            {digest && lead && (
+              <>
+                <h2 style={{
+                  fontFamily: SERIF, fontSize: 28, fontWeight: 900, fontStyle: 'italic',
+                  lineHeight: 1.05, letterSpacing: '-0.02em', color: INK, margin: '0 0 8px',
+                }}>
+                  {lead.title}
+                </h2>
+                <div style={{ height: 3, background: INK, marginBottom: 2 }} />
+                <div style={{ height: 1, background: 'rgba(0,0,0,0.22)', marginBottom: 10 }} />
+                <NewsBody body={lead.body} />
+              </>
+            )}
+
+            {/* Key Findings */}
+            {digest && digest.highlights.length > 0 && (
+              <div style={{ marginTop: 24 }}>
+                <div style={{ height: 3, background: INK, marginBottom: 2 }} />
+                <div style={{ height: 1, background: 'rgba(0,0,0,0.22)', marginBottom: 10 }} />
+                <h4 style={{ fontFamily: SERIF, fontSize: 18, fontWeight: 900,
+                  fontStyle: 'italic', color: INK, margin: '0 0 14px', lineHeight: 1 }}>
+                  Key Findings
+                </h4>
+                {digest.highlights.map((h, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 13, alignItems: 'flex-start' }}>
+                    <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 700,
+                      color: INK_MUTED, flexShrink: 0, lineHeight: 1.7 }}>
+                      {String(i + 1).padStart(2, '0')}.
+                    </span>
+                    <p style={{ fontFamily: SERIF_SM, fontSize: 13, color: INK,
+                      lineHeight: 1.72, margin: 0 }}>{h}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Vs Last Week */}
+            {digest && digest.changes.length > 0 && (
+              <div style={{ marginTop: 24 }}>
+                <div style={{ height: 3, background: INK, marginBottom: 2 }} />
+                <div style={{ height: 1, background: 'rgba(0,0,0,0.22)', marginBottom: 10 }} />
+                <h4 style={{ fontFamily: SERIF, fontSize: 18, fontWeight: 900,
+                  fontStyle: 'italic', color: INK, margin: '0 0 14px', lineHeight: 1 }}>
+                  Vs. Last Week
+                </h4>
+                {digest.changes.map((c: DigestChange, i: number) => {
+                  const { label, symbol } = {
+                    escalated: { label: 'Escalated', symbol: '↑' },
+                    resolved:  { label: 'Resolved',  symbol: '✓' },
+                    new:       { label: 'New',       symbol: '★' },
+                  }[c.type] ?? { label: c.type, symbol: '·' }
+                  return (
+                    <div key={i} style={{ marginBottom: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
+                        <span style={{ fontFamily: SERIF, fontSize: 13, fontWeight: 900, color: INK }}>{symbol}</span>
+                        <span style={{ fontFamily: SERIF_SM, fontSize: 11, fontWeight: 700,
+                          fontStyle: 'italic', color: INK_MID }}>{label}</span>
+                        <div style={{ flex: 1, height: 1, background: 'rgba(0,0,0,0.15)' }} />
+                      </div>
+                      <p style={{ fontFamily: SERIF_SM, fontSize: 13, color: INK,
+                        lineHeight: 1.72, margin: 0 }}>{c.text}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Additional sections */}
+            {digest && rest.map((section, i) => (
+              <div key={i} style={{ marginTop: 28 }}>
+                <SectionRule num={i + 2} title={section.title} />
+                <NewsBody body={section.body} />
+              </div>
+            ))}
+
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function DigestPage() {
+  const isMobile = useIsMobile()
   const [digest,     setDigest]     = useState<WeeklyDigest | null>(null)
   const [loading,    setLoading]    = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -725,6 +912,23 @@ export default function DigestPage() {
         (new Date(digest.week_start).getTime() - new Date('2025-01-01').getTime()) /
         (7 * 24 * 60 * 60 * 1000)) + 1)
     : 1
+
+  if (isMobile === null) return null
+
+  if (isMobile) {
+    return (
+      <MobileDigest
+        digest={digest}
+        lead={lead}
+        rest={rest}
+        weekOf={weekOf}
+        issueNum={issueNum}
+        loading={loading}
+        generating={generating}
+        onGenerate={generate}
+      />
+    )
+  }
 
   const paperW = 'min(1440px, calc(100vw - 520px))'
   const paperH = 'calc(100vh - 90px)'

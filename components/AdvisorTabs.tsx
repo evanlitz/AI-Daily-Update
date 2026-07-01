@@ -29,8 +29,13 @@ export function AdvisorTabs({ initialIdeas }: { initialIdeas: ProjectIdea[] }) {
 
   return (
     <div>
+      <style>{`
+        @media (max-width: 767px) {
+          .adv-mode-grid  { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
       {/* Mode selector */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 28 }}>
+      <div className="adv-mode-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 28 }}>
         {MODES.map(mode => {
           const active = tab === mode.id
           return (

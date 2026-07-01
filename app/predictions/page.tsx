@@ -136,7 +136,7 @@ function PredCard({ p }: { p: AIPrediction }) {
 
       {/* Expanded */}
       {open && (
-        <div className="fade-up" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '16px 18px 18px', paddingLeft: 84 }}>
+        <div className="fade-up pred-expanded" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', padding: '16px 18px 18px', paddingLeft: 84 }}>
           {p.description && (
             <p style={{ color: '#d4d4d8', fontSize: 13, lineHeight: 1.8, margin: '0 0 14px' }}>
               {p.description}
@@ -212,9 +212,17 @@ export default function PredictionsPage() {
   const totalFuture = predictions.filter(p => p.status !== 'past').length
 
   return (
-    <main style={{
+    <main className="pred-main" style={{
       maxWidth: 1600, margin: '0 auto', padding: '32px 48px',
     }}>
+      <style>{`
+        @media (max-width: 767px) {
+          .pred-main     { padding: 24px 16px !important; }
+          .pred-expanded { padding-left: 18px !important; }
+          .pred-divider  { display: none !important; }
+          .pred-stats    { flex-wrap: wrap !important; gap: 8px !important; }
+        }
+      `}</style>
 
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
@@ -222,7 +230,7 @@ export default function PredictionsPage() {
         <h1 style={{ color: '#f4f4f5', fontSize: 28, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 8 }}>
           Predictions
         </h1>
-        <div style={{ display: 'flex', gap: 20 }}>
+        <div className="pred-stats" style={{ display: 'flex', gap: 20 }}>
           <span style={{ fontSize: 13, color: '#34d399', fontWeight: 700 }}>{totalPast} confirmed milestones</span>
           <span style={{ fontSize: 13, color: '#71717a' }}>·</span>
           <span style={{ fontSize: 13, color: '#a78bfa', fontWeight: 700 }}>{totalFuture} future predictions</span>
@@ -251,10 +259,10 @@ export default function PredictionsPage() {
           })}
         </div>
 
-        <div style={{ height: 18, width: 1, background: 'rgba(255,255,255,0.07)', flexShrink: 0 }} />
+        <div className="pred-divider" style={{ height: 18, width: 1, background: 'rgba(255,255,255,0.07)', flexShrink: 0 }} />
 
         {/* Status */}
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
           {STATUS.map(s => {
             const active = activeStatus === s
             return (

@@ -99,7 +99,7 @@ function BootScreen({ onDone }: { onDone: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center flex-col"
       style={{ background: '#030308', opacity: done ? 0 : 1, transition: 'opacity 0.35s ease', pointerEvents: done ? 'none' : 'auto' }}>
-      <div style={{ fontFamily: 'monospace', width: 440 }}>
+      <div className="boot-screen-inner" style={{ fontFamily: 'monospace', width: 440 }}>
         <p style={{ color: '#f97316', fontSize: 13, fontWeight: 900, letterSpacing: '0.2em', marginBottom: 24 }}>
           ■ AI PULSE · MODEL ARSENAL
         </p>
@@ -192,7 +192,7 @@ function ScannerHeader({ models, visibleCount }: { models: AIModel[]; visibleCou
             </span>
           </div>
         ))}
-        <div style={{ marginLeft: 'auto', color: '#71717a', fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
+        <div className="scanner-subtitle" style={{ marginLeft: 'auto', color: '#71717a', fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: 'monospace' }}>
           PRICING/MTOK · BENCHMARKS % · 2025
         </div>
       </div>
@@ -288,7 +288,7 @@ function MetricChart({ models }: { models: AIModel[] }) {
           </p>
           <p style={{ color: '#71717a', fontSize: 12 }}>{activeMeta.desc} · active models only</p>
         </div>
-        <div style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 3 }}>
+        <div className="metric-tabs" style={{ display: 'flex', gap: 2, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 3 }}>
           {CHART_METRICS.map(cm => (
             <button key={cm.key} onClick={() => setMetric(cm.key)} style={{
               padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer',
@@ -525,7 +525,7 @@ function LabSection({ lab, models, compareMode, compareIds, onSelect, hoveredId,
   const active = models.filter(m => m.status === 'active').length
 
   return (
-    <section style={{ marginBottom: 56 }}>
+    <section className="lab-section" style={{ marginBottom: 56 }}>
       <div className="relative flex items-center gap-4 mb-6 overflow-hidden" style={{ paddingBottom: 16 }}>
         <div aria-hidden style={{
           position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)',
@@ -589,7 +589,7 @@ function ComparePanel({ models, onClose, onRemove }: {
   ]
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50"
+    <div className="compare-panel-outer fixed bottom-0 left-0 right-0 z-50"
       style={{ marginLeft: 52, background: 'rgba(3,3,14,0.97)', borderTop: '1px solid rgba(59,130,246,0.3)',
         backdropFilter: 'blur(24px)', boxShadow: '0 -24px 80px rgba(0,0,0,0.7)', animation: 'arsenal-fade-in 0.25s ease-out' }}>
 
@@ -762,7 +762,7 @@ function BenchmarkHistory() {
     new Set(series.flatMap(s => s.values.map(v => v.date.slice(0, 10)))).size <= 1
 
   return (
-    <div className="relative mb-10 rounded-2xl overflow-hidden"
+    <div className="bench-history-wrap relative mb-10 rounded-2xl overflow-hidden"
       style={{ background: 'rgba(4,4,18,0.88)', border: '1px solid rgba(255,255,255,0.09)' }}>
 
       {/* Header */}
@@ -1003,8 +1003,18 @@ export default function ModelsPage() {
       <AmbientBg />
       {!booted && <BootScreen onDone={handleBootDone} />}
 
-      <main className="relative mx-auto max-w-screen-2xl px-10 py-10"
+      <main className="relative mx-auto max-w-screen-2xl px-4 sm:px-10 py-10"
         style={{ zIndex: 1, paddingBottom: 60 + bottomPad, opacity: pageVisible ? 1 : 0, transition: 'opacity 0.4s ease' }}>
+        <style>{`
+          @media (max-width: 767px) {
+            .boot-screen-inner   { width: 88vw !important; }
+            .bench-history-wrap  { display: none !important; }
+            .metric-tabs         { flex-wrap: wrap !important; }
+            .compare-panel-outer { margin-left: 0 !important; bottom: 68px !important; }
+            .scanner-subtitle    { display: none !important; }
+            .lab-section         { margin-bottom: 36px !important; }
+          }
+        `}</style>
 
         <ScannerHeader models={models} visibleCount={displayList.length} />
 

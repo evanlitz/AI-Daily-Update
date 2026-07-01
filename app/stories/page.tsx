@@ -139,6 +139,18 @@ const ANIM_CSS = `
 .story-spotlight-anim {
   animation: ai-spotlightIn 0.38s cubic-bezier(0.22,1,0.36,1) both;
 }
+@media (max-width: 767px) {
+  .stories-main         { padding: 20px 16px !important; }
+  .spotlight-card       { grid-template-columns: 1fr !important; padding: 20px 20px !important; margin-bottom: 20px !important; }
+  .spotlight-right      { display: none !important; }
+  .stories-grid         { grid-template-columns: 1fr !important; gap: 14px !important; }
+  .story-body-grid      { grid-template-columns: 1fr !important; }
+  .story-header-card    { padding: 20px 18px !important; margin-bottom: 20px !important; }
+  .story-header-h2      { font-size: 22px !important; margin-bottom: 10px !important; }
+  .story-arc-card       { padding: 16px 14px !important; }
+  .story-timeline-panel { padding: 18px 16px !important; }
+  .story-coverage-panel { padding: 18px 16px !important; }
+}
 `
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -442,7 +454,7 @@ function StoryDetailView({
       </div>
 
       {/* Story header card with gradient accent */}
-      <div style={{
+      <div className="story-header-card" style={{
         padding: '28px 32px',
         background: `linear-gradient(135deg, rgba(${cat.rgb},0.07) 0%, rgba(${cat.rgb},0.02) 60%, rgba(255,255,255,0.01) 100%)`,
         border: `1px solid rgba(${cat.rgb},0.18)`,
@@ -480,7 +492,7 @@ function StoryDetailView({
           </span>
         </div>
 
-        <h2 style={{
+        <h2 className="story-header-h2" style={{
           fontSize: 28, fontWeight: 800, color: '#f4f4f5',
           letterSpacing: '-0.025em', lineHeight: 1.2, marginBottom: 14,
         }}>
@@ -725,7 +737,7 @@ function StoryDetailView({
             </span>
             <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.05)' }} />
           </div>
-          <div style={{
+          <div className="story-arc-card" style={{
             background: 'var(--surface)',
             border: '1px solid var(--border)',
             borderRadius: 10, padding: '20px 22px',
@@ -775,10 +787,10 @@ function StoryDetailView({
       )}
 
       {/* Two-column body */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 400px', gap: 20, alignItems: 'start' }}>
+      <div className="story-body-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 400px', gap: 20, alignItems: 'start' }}>
 
         {/* Timeline */}
-        <div style={{
+        <div className="story-timeline-panel" style={{
           background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: 12, padding: '24px 26px',
@@ -988,7 +1000,7 @@ function StoryDetailView({
         </div>
 
         {/* Related articles */}
-        <div style={{
+        <div className="story-coverage-panel" style={{
           background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: 12, padding: '24px 26px',
@@ -1080,7 +1092,7 @@ function SpotlightCard({ story, onSelect }: { story: StoryThread; onSelect: () =
 
   return (
     <div
-      className="story-spotlight-anim"
+      className="story-spotlight-anim spotlight-card"
       onClick={onSelect}
       style={{
         display: 'grid',
@@ -1215,7 +1227,7 @@ function SpotlightCard({ story, onSelect }: { story: StoryThread; onSelect: () =
       </div>
 
       {/* Right: stats + CTA */}
-      <div style={{
+      <div className="spotlight-right" style={{
         display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
         gap: 20, flexShrink: 0,
       }}>
@@ -1465,7 +1477,7 @@ export default function StoriesPage() {
       : filtered
 
   return (
-    <main style={{
+    <main className="stories-main" style={{
       padding: '32px 48px', maxWidth: 1600, margin: '0 auto',
     }}>
       <style>{ANIM_CSS}</style>
@@ -1583,7 +1595,7 @@ export default function StoriesPage() {
                     label={activeCategory === 'all' ? 'All Stories' : activeCategory}
                     count={gridStories.length}
                   />
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
+                  <div className="stories-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
                     {gridStories.map((story, i) => (
                       <StoryCard
                         key={story.id}

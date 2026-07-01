@@ -309,10 +309,10 @@ export default async function HomePage() {
   } = data
 
   return (
-    <main style={{ padding: '36px 48px', maxWidth: 1400, margin: '0 auto' }}>
+    <main className="home-wrap" style={{ padding: '36px 48px', maxWidth: 1400, margin: '0 auto' }}>
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <header style={{
+      <header className="home-header" style={{
         marginBottom: 36, paddingBottom: 32, borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 48,
       }}>
@@ -333,7 +333,7 @@ export default async function HomePage() {
           </div>
 
           {/* Title */}
-          <h1 style={{
+          <h1 className="home-title" style={{
             fontSize: 72, fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1, marginBottom: 36,
             background: 'linear-gradient(135deg, #f4f4f5 30%, #71717a 100%)',
             WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
@@ -342,14 +342,14 @@ export default async function HomePage() {
           </h1>
 
           {/* Big stat numbers */}
-          <div style={{ display: 'flex', gap: 44, alignItems: 'flex-start' }}>
+          <div className="home-stats" style={{ display: 'flex', gap: 44, alignItems: 'flex-start' }}>
             {([
               { value: feedToday,    label: 'signals today',  href: '/feed'    },
               { value: totalStories, label: 'active threads', href: '/stories' },
               { value: modelCount,   label: 'models tracked', href: '/models'  },
             ] as const).map(({ value, label, href }) => (
               <Link key={href} href={href} style={{ textDecoration: 'none' }}>
-                <p style={{
+                <p className="home-stat-value" style={{
                   fontSize: 48, fontWeight: 800, color: '#f4f4f5',
                   letterSpacing: '-0.04em', lineHeight: 1, marginBottom: 7,
                 }}>
@@ -365,7 +365,7 @@ export default async function HomePage() {
         </div>
 
         {/* Chip */}
-        <div style={{ flexShrink: 0, position: 'relative' }}>
+        <div className="home-chip-wrap" style={{ flexShrink: 0, position: 'relative' }}>
           <div style={{
             position: 'absolute', inset: -28, borderRadius: '50%',
             background: 'radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%)',
@@ -378,13 +378,13 @@ export default async function HomePage() {
       {/* ── Daily Brief ─────────────────────────────────────────────────── */}
       <section style={{ marginBottom: 36 }}>
         {brief ? (
-          <div style={{
+          <div className="home-brief-card" style={{
             background: 'var(--surface)', border: '1px solid rgba(59,130,246,0.45)',
             borderRadius: 14, padding: '28px 32px',
           }}>
 
             {/* Card header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+            <div className="home-brief-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
               <span style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>Today&apos;s Briefing</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -399,10 +399,10 @@ export default async function HomePage() {
             </div>
 
             {/* Two-column layout: Signal (lead) + Rising/Watch/Shift (sidebar) */}
-            <div style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
+            <div className="home-brief-layout" style={{ display: 'flex', alignItems: 'stretch', gap: 0 }}>
 
               {/* Left — Signal */}
-              <div style={{ flex: '0 0 58%', paddingRight: 36, borderRight: '1px solid var(--border)' }}>
+              <div className="home-brief-signal" style={{ flex: '0 0 58%', paddingRight: 36, borderRight: '1px solid var(--border)' }}>
                 <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)', letterSpacing: '-0.01em', marginBottom: 14 }}>
                   Signal
                 </p>
@@ -412,7 +412,7 @@ export default async function HomePage() {
               </div>
 
               {/* Right — Rising / Watch / Shift */}
-              <div style={{ flex: 1, paddingLeft: 36, display: 'flex', flexDirection: 'column' }}>
+              <div className="home-brief-sidebar" style={{ flex: 1, paddingLeft: 36, display: 'flex', flexDirection: 'column' }}>
                 {[
                   { label: 'Rising', text: brief.rising },
                   { label: 'Watch',  text: brief.watch  },
@@ -447,7 +447,7 @@ export default async function HomePage() {
       </section>
 
       {/* ── Signal Feed + Active Threads ────────────────────────────────── */}
-      <section style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 440px', gap: 20, marginBottom: 36 }}>
+      <section className="home-feed-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 440px', gap: 20, marginBottom: 36 }}>
 
         <div>
           <SectionHeader label="Signal Feed" href="/feed" linkLabel="View All" large />
@@ -523,7 +523,7 @@ export default async function HomePage() {
       {/* ── This Week's Digest ──────────────────────────────────────────── */}
       {digest && highlights.length > 0 && (
         <section style={{ marginBottom: 36 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div className="home-digest-hdr" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 14 }}>
               <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.02em' }}>
                 This Week&apos;s Digest
@@ -558,7 +558,7 @@ export default async function HomePage() {
       {predEvidence.length > 0 && (
         <section style={{ marginBottom: 36 }}>
           <SectionHeader label="Signal Watch" href="/predictions" linkLabel="All Predictions" large />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+          <div className="home-pred-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
             {predEvidence.slice(0, 8).map((p: any) => {
               const catColor  = CAT_COLOR[p.category]  ?? 'var(--muted)'
               const confColor = CONF_COLOR[p.confidence] ?? 'var(--muted)'
@@ -612,6 +612,25 @@ export default async function HomePage() {
 
       {/* ── About ───────────────────────────────────────────────────────── */}
       <CollapsibleAbout pages={PAGE_DIRECTORY} />
+
+      <style>{`
+        @media (max-width: 767px) {
+          .home-wrap          { padding: 20px 16px !important; }
+          .home-header        { flex-direction: column !important; align-items: stretch !important; gap: 0 !important; padding-bottom: 24px !important; margin-bottom: 24px !important; }
+          .home-chip-wrap     { display: none !important; }
+          .home-title         { font-size: 42px !important; margin-bottom: 24px !important; }
+          .home-stats         { gap: 24px !important; flex-wrap: wrap !important; }
+          .home-stat-value    { font-size: 34px !important; }
+          .home-brief-card    { padding: 20px !important; }
+          .home-brief-header  { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; margin-bottom: 20px !important; }
+          .home-brief-layout  { flex-direction: column !important; }
+          .home-brief-signal  { flex: none !important; padding-right: 0 !important; border-right: none !important; padding-bottom: 20px !important; border-bottom: 1px solid var(--border) !important; }
+          .home-brief-sidebar { padding-left: 0 !important; padding-top: 20px !important; }
+          .home-feed-grid     { grid-template-columns: 1fr !important; }
+          .home-digest-hdr    { flex-direction: column !important; align-items: flex-start !important; gap: 12px !important; }
+          .home-pred-grid     { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+      `}</style>
 
     </main>
   )

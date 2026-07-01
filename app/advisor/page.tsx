@@ -23,7 +23,7 @@ export default async function AdvisorPage() {
   const ideas = await getIdeas()
 
   return (
-    <main className="mx-auto max-w-screen-2xl px-10 py-8">
+    <main className="mx-auto max-w-screen-2xl px-4 sm:px-10 py-8">
       <div className="mb-8">
         <p style={{
           fontSize: 11, fontWeight: 700, letterSpacing: '0.16em',

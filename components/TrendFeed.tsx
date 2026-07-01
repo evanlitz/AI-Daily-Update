@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import type { FeedItem } from '@/lib/types'
 import { relTime } from '@/lib/utils'
+import { useIsMobile } from '@/hooks/useIsMobile'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -295,11 +296,12 @@ function SummaryBullets({ summary }: { summary: string }) {
 // ── Reading drawer ─────────────────────────────────────────────────────────
 
 function ReadingDrawer({
-  item, onClose, onPrev, onNext, hasPrev, hasNext,
+  item, onClose, onPrev, onNext, hasPrev, hasNext, isMobile,
 }: {
   item: FeedItem; onClose: () => void
   onPrev: () => void; onNext: () => void
   hasPrev: boolean; hasNext: boolean
+  isMobile: boolean
 }) {
   const src    = stationMeta(item.source)
   const sk     = srcKey(item.source)
@@ -321,10 +323,13 @@ function ReadingDrawer({
 
       {/* Panel */}
       <div style={{
-        position: 'fixed', right: 0, top: 0, bottom: 0, width: 360,
+        position: 'fixed',
+        ...(isMobile
+          ? { inset: 0 }
+          : { right: 0, top: 0, bottom: 0, width: 360, borderLeft: `1px solid rgba(${src.rgb},0.2)` }
+        ),
         background: '#0d0d10',
-        borderLeft: `1px solid rgba(${src.rgb},0.2)`,
-        zIndex: 50, display: 'flex', flexDirection: 'column',
+        zIndex: isMobile ? 51 : 50, display: 'flex', flexDirection: 'column',
         animation: 'drawer-slide-in 0.2s cubic-bezier(0.4,0,0.2,1)',
       }}>
         {/* Header */}
@@ -350,9 +355,10 @@ function ReadingDrawer({
           <button
             onClick={onClose}
             style={{
-              width: 26, height: 26, borderRadius: 6, cursor: 'pointer',
+              width: isMobile ? 44 : 26, height: isMobile ? 44 : 26,
+              borderRadius: isMobile ? 10 : 6, cursor: 'pointer',
               background: 'none', border: '1px solid rgba(255,255,255,0.08)',
-              color: '#71717a', fontSize: 16, lineHeight: 1,
+              color: '#71717a', fontSize: isMobile ? 20 : 16, lineHeight: 1,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'color 0.15s, border-color 0.15s',
             }}
@@ -427,9 +433,10 @@ function ReadingDrawer({
             href={item.url} target="_blank" rel="noopener noreferrer"
             style={{
               fontSize: 12, fontWeight: 700, letterSpacing: '0.05em',
-              color: src.color, textDecoration: 'none', padding: '6px 14px',
+              color: src.color, textDecoration: 'none',
+              padding: isMobile ? '11px 18px' : '6px 14px',
               background: `rgba(${src.rgb},0.1)`, border: `1px solid rgba(${src.rgb},0.22)`,
-              borderRadius: 7,
+              borderRadius: 7, display: 'inline-flex', alignItems: 'center',
             }}
           >
             Open ↗
@@ -437,21 +444,23 @@ function ReadingDrawer({
           <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <button onClick={onPrev} disabled={!hasPrev} title="Previous (k)"
               style={{
-                width: 26, height: 26, borderRadius: 5, cursor: hasPrev ? 'pointer' : 'default',
+                width: isMobile ? 44 : 26, height: isMobile ? 44 : 26,
+                borderRadius: 5, cursor: hasPrev ? 'pointer' : 'default',
                 background: 'transparent', border: '1px solid rgba(255,255,255,0.07)',
                 color: hasPrev ? '#71717a' : '#3f3f46',
-                fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: isMobile ? 16 : 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
             >↑</button>
             <button onClick={onNext} disabled={!hasNext} title="Next (j)"
               style={{
-                width: 26, height: 26, borderRadius: 5, cursor: hasNext ? 'pointer' : 'default',
+                width: isMobile ? 44 : 26, height: isMobile ? 44 : 26,
+                borderRadius: 5, cursor: hasNext ? 'pointer' : 'default',
                 background: 'transparent', border: '1px solid rgba(255,255,255,0.07)',
                 color: hasNext ? '#71717a' : '#3f3f46',
-                fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: isMobile ? 16 : 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
             >↓</button>
-            <span style={{ fontSize: 10, color: '#3f3f46', marginLeft: 2, letterSpacing: '0.05em' }}>j / k · esc</span>
+            {!isMobile && <span style={{ fontSize: 10, color: '#3f3f46', marginLeft: 2, letterSpacing: '0.05em' }}>j / k · esc</span>}
           </div>
         </div>
       </div>
@@ -701,6 +710,7 @@ function FeedCard({
 // ── Main component ─────────────────────────────────────────────────────────
 
 export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: Stats }) {
+  const isMobile = useIsMobile()
   const [items,         setItems]         = useState(init)
   const [activeTag,     setActiveTag]     = useState('all')
   const [activeSort,    setActiveSort]    = useState('mixed')
@@ -927,10 +937,10 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
       />
 
       {/* ── Main grid: sidebar + feed ───────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20, alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '200px 1fr', gap: 20, alignItems: 'start' }}>
 
-        {/* ── Sidebar ─────────────────────────────────────────── */}
-        <div style={{
+        {/* ── Sidebar (desktop only) ───────────────────────────── */}
+        {!isMobile && <div style={{
           position: 'sticky', top: 16,
           background: 'var(--surface)',
           border: '1px solid var(--border)',
@@ -1000,18 +1010,21 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
               <SparkChart data={sparkline} />
             </div>
           )}
-        </div>
+        </div>}
 
         {/* ── Feed content (Broadsheet card grid) ────────────── */}
         <div>
 
           {/* Controls bar */}
           <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: isMobile ? 'stretch' : 'center',
+            justifyContent: 'space-between',
             marginBottom: 10, flexWrap: 'wrap', gap: 8,
           }}>
             {/* Topic filters */}
-            <div style={{ display: 'flex', gap: 3, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 3 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 3 }}>
               {TAG_LIST.map(tag => {
                 const active = activeTag === tag
                 const m      = TOPIC_META[tag]
@@ -1128,8 +1141,8 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
             <>
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
-                gap: 14,
+                gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))',
+                gap: isMobile ? 10 : 14,
                 alignItems: 'start',
               }}>
                 {filtered.map(item => (
@@ -1183,6 +1196,7 @@ export function TrendFeed({ items: init, stats }: { items: FeedItem[]; stats: St
           }}
           hasPrev={expandedIdx > 0}
           hasNext={expandedIdx < filtered.length - 1}
+          isMobile={isMobile ?? false}
         />
       )}
     </div>

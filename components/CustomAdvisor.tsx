@@ -184,6 +184,13 @@ export function CustomAdvisor() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <style>{`
+        @media (max-width: 767px) {
+          .adv-main-grid  { grid-template-columns: 1fr !important; }
+          .adv-title-grid { grid-template-columns: 1fr !important; }
+          .adv-brief-inner { padding: 20px 18px 26px !important; }
+        }
+      `}</style>
 
       {/* ── Input panel ──────────────────────────────────────────────── */}
       <div style={{
@@ -282,7 +289,7 @@ export function CustomAdvisor() {
 
       {/* ── Results ──────────────────────────────────────────────────── */}
       {ideas.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: '310px 1fr', gap: 24, alignItems: 'start' }}>
+        <div className="adv-main-grid" style={{ display: 'grid', gridTemplateColumns: '310px 1fr', gap: 24, alignItems: 'start' }}>
 
           {/* LEFT: mission selector */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -407,9 +414,9 @@ export function CustomAdvisor() {
                 </div>
               </div>
 
-              <div style={{ padding: '26px 30px 34px' }}>
+              <div className="adv-brief-inner" style={{ padding: '26px 30px 34px' }}>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 20, alignItems: 'start', marginBottom: 24 }}>
+                <div className="adv-title-grid" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 20, alignItems: 'start', marginBottom: 24 }}>
                   <h2 style={{ color: '#f4f4f5', fontSize: 26, fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                     {idea.title}
                   </h2>

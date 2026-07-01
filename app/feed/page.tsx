@@ -41,7 +41,7 @@ export default async function FeedPage() {
   const items = await getFeed()
 
   return (
-    <main className="mx-auto max-w-screen-2xl px-10 py-8">
+    <main className="mx-auto max-w-screen-2xl px-4 sm:px-10 py-6 sm:py-8">
       <div className="mb-7">
         <p className="eyebrow mb-2">Intel Feed</p>
         <h1 style={{

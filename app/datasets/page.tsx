@@ -74,9 +74,9 @@ function DataRow({ d, maxDownloads }: { d: Dataset; maxDownloads: number }) {
         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
       >
         {/* Modality strip + type badge */}
-        <td style={{ width: 110, padding: '0 14px 0 0', verticalAlign: 'middle' }}>
-          <div style={{ paddingLeft: 18, borderLeft: `3px solid ${meta.color}`, display: 'flex', alignItems: 'center' }}>
-            <span style={{
+        <td className="ds-type-cell" style={{ width: 110, padding: '0 14px 0 0', verticalAlign: 'middle' }}>
+          <div className="ds-type-inner" style={{ paddingLeft: 18, borderLeft: `3px solid ${meta.color}`, display: 'flex', alignItems: 'center' }}>
+            <span className="ds-type-badge" style={{
               fontSize: 16, fontWeight: 900, letterSpacing: '0.1em',
               color: meta.color,
               background: `rgba(${meta.rgb},0.1)`,
@@ -90,7 +90,7 @@ function DataRow({ d, maxDownloads }: { d: Dataset; maxDownloads: number }) {
         </td>
 
         {/* Source + name */}
-        <td style={{ padding: '20px 18px 20px 0', verticalAlign: 'middle', maxWidth: 260 }}>
+        <td className="ds-name-cell" style={{ padding: '20px 18px 20px 0', verticalAlign: 'middle', maxWidth: 260 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
             <span style={{
               flexShrink: 0,
@@ -104,15 +104,15 @@ function DataRow({ d, maxDownloads }: { d: Dataset; maxDownloads: number }) {
             </span>
             <div style={{ minWidth: 0 }}>
               <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                <span style={{ color: '#71717a', fontSize: 15 }}>{owner}/</span>
-                <span style={{ color: '#e4e4e7', fontSize: 16, fontWeight: 700 }}>{name}</span>
+                <span className="ds-name-owner" style={{ color: '#71717a', fontSize: 15 }}>{owner}/</span>
+                <span className="ds-name-val" style={{ color: '#e4e4e7', fontSize: 16, fontWeight: 700 }}>{name}</span>
               </div>
             </div>
           </div>
         </td>
 
         {/* Tasks */}
-        <td style={{ padding: '0 18px 0 0', verticalAlign: 'middle', width: 200 }}>
+        <td className="ds-col-tasks" style={{ padding: '0 18px 0 0', verticalAlign: 'middle', width: 200 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
             {task1 && (
               <span style={{
@@ -143,9 +143,9 @@ function DataRow({ d, maxDownloads }: { d: Dataset; maxDownloads: number }) {
         </td>
 
         {/* Downloads — bar + number */}
-        <td style={{ padding: '0 18px 0 0', verticalAlign: 'middle', width: 160 }}>
+        <td className="ds-dl-cell" style={{ padding: '0 18px 0 0', verticalAlign: 'middle', width: 160 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
+            <div className="ds-bar-track" style={{ flex: 1, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 99, overflow: 'hidden' }}>
               <div style={{
                 height: '100%',
                 width: `${Math.round(pct * 100)}%`,
@@ -154,21 +154,21 @@ function DataRow({ d, maxDownloads }: { d: Dataset; maxDownloads: number }) {
                 transition: 'width 0.4s ease',
               }} />
             </div>
-            <span style={{ fontSize: 15, color: '#71717a', fontWeight: 700, whiteSpace: 'nowrap', minWidth: 40, textAlign: 'right' }}>
+            <span className="ds-dl-num" style={{ fontSize: 15, color: '#71717a', fontWeight: 700, whiteSpace: 'nowrap', minWidth: 40, textAlign: 'right' }}>
               {fmt(d.downloads)}
             </span>
           </div>
         </td>
 
         {/* Likes */}
-        <td style={{ padding: '0 18px 0 0', verticalAlign: 'middle', width: 70, textAlign: 'right' }}>
+        <td className="ds-col-likes" style={{ padding: '0 18px 0 0', verticalAlign: 'middle', width: 70, textAlign: 'right' }}>
           <span style={{ fontSize: 15, color: '#52525b', fontWeight: 700 }}>
             <span style={{ color: '#f87171', marginRight: 3 }}>♥</span>{fmt(d.likes)}
           </span>
         </td>
 
         {/* Size */}
-        <td style={{ padding: '0 18px 0 0', verticalAlign: 'middle', width: 80 }}>
+        <td className="ds-col-size" style={{ padding: '0 18px 0 0', verticalAlign: 'middle', width: 80 }}>
           {sizeShort(d.size_category) && (
             <span style={{
               fontSize: 16, fontWeight: 700, color: '#71717a',
@@ -298,7 +298,24 @@ export default function DatasetsPage() {
   const taskLabel = TASK_FILTERS.find(f => f.key === activeTask)?.label ?? activeTask
 
   return (
-    <main className="mx-auto max-w-screen-2xl px-10 py-8">
+    <main className="mx-auto max-w-screen-2xl px-4 sm:px-10 py-8">
+      <style>{`
+        @media (max-width: 767px) {
+          .ds-col-tasks   { display: none !important; }
+          .ds-col-likes   { display: none !important; }
+          .ds-col-size    { display: none !important; }
+          .ds-bar-track   { display: none !important; }
+          .ds-orderby-row { flex-wrap: wrap !important; }
+          .ds-type-cell   { width: 76px !important; padding-right: 8px !important; }
+          .ds-type-inner  { padding-left: 10px !important; }
+          .ds-type-badge  { font-size: 12px !important; padding: 3px 6px !important; }
+          .ds-dl-cell     { width: 52px !important; padding-right: 6px !important; }
+          .ds-dl-num      { font-size: 13px !important; min-width: 0 !important; }
+          .ds-name-cell   { padding-right: 8px !important; }
+          .ds-name-owner  { font-size: 13px !important; }
+          .ds-name-val    { font-size: 14px !important; }
+        }
+      `}</style>
 
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="mb-7">
@@ -309,7 +326,7 @@ export default function DatasetsPage() {
 
         {/* Metrics strip */}
         <div
-          className="grid grid-cols-3 gap-px overflow-hidden"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-px overflow-hidden"
           style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14 }}
         >
           {[
@@ -387,7 +404,7 @@ export default function DatasetsPage() {
               )
             })}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="ds-orderby-row" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ color: '#60a5fa', marginLeft: 24 }}>ORDER BY </span>
             {['likes', 'recent'].map(s => {
               const active = activeSort === s
@@ -440,15 +457,15 @@ export default function DatasetsPage() {
               <thead>
                 <tr>
                   {[
-                    { label: 'TYPE',    w: 110  },
-                    { label: 'DATASET', w: 'auto' },
-                    { label: 'TASKS',   w: 200  },
-                    { label: '↓ DL',    w: 160  },
-                    { label: '♥',       w: 70   },
-                    { label: 'SIZE',    w: 80   },
-                    { label: '',        w: 36   },
+                    { label: 'TYPE',    w: 110,    cls: 'ds-type-cell'  },
+                    { label: 'DATASET', w: 'auto', cls: ''              },
+                    { label: 'TASKS',   w: 200,    cls: 'ds-col-tasks'  },
+                    { label: '↓ DL',    w: 160,    cls: 'ds-dl-cell'    },
+                    { label: '♥',       w: 70,     cls: 'ds-col-likes'  },
+                    { label: 'SIZE',    w: 80,     cls: 'ds-col-size'   },
+                    { label: '',        w: 36,     cls: ''              },
                   ].map((col, i) => (
-                    <th key={i} style={{
+                    <th key={i} className={col.cls} style={{
                       textAlign: 'left',
                       padding: i === 0 ? '14px 14px 14px 18px' : '14px 18px 14px 0',
                       fontSize: 15, fontWeight: 900, letterSpacing: '0.18em',
