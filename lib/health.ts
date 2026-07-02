@@ -14,14 +14,13 @@ export async function runHealthChecks(): Promise<HealthFailure[]> {
   const now = new Date()
   const since12h = new Date(now.getTime() - STALE_FEED_HOURS * 3600_000).toISOString()
   const since30d = new Date(now.getTime() - 30 * 24 * 3600_000).toISOString()
-  const since24h = new Date(now.getTime() - 24 * 3600_000).toISOString()
   const today = now.toISOString().split('T')[0]
 
   await Promise.all([
     checkFeedStaleness(failures, since12h, now),
     checkSourceSilence(failures, since12h, since30d),
     checkMissingBrief(failures, today),
-    checkCronFailures(failures, since24h),
+    checkCronFailures(failures),
     checkEvalQuality(failures),
   ])
 
@@ -104,21 +103,39 @@ async function checkMissingBrief(failures: HealthFailure[], today: string): Prom
   }
 }
 
+export interface EvalFlagRow {
+  targetType: string
+  targetId: string
+  groundedness: number | null
+  rationale: string | null
+  createdAt: string
+}
+
 // Cases the live groundedness judge (lib/eval/live-check.ts) flagged after a
-// real digest/brief generation. Stays in the alert on every run until
-// scripts/eval/export-flagged.mts marks it exported=1 — deliberate, since
-// that script is also the human review step before it becomes a fixture.
+// real digest/brief generation. Stays flagged until scripts/eval/export-flagged.mts
+// marks it exported=1 — deliberate, since that script is also the human review
+// step before it becomes a fixture.
+export async function getFlaggedEvalScores(): Promise<EvalFlagRow[]> {
+  const { rows } = await db.execute(
+    `SELECT target_type, target_id, groundedness, rationale, created_at
+     FROM eval_scores WHERE flagged = 1 AND exported = 0
+     ORDER BY created_at DESC`
+  )
+  return (rows as any[]).map(row => ({
+    targetType: row.target_type as string,
+    targetId: row.target_id as string,
+    groundedness: row.groundedness as number | null,
+    rationale: row.rationale as string | null,
+    createdAt: row.created_at as string,
+  }))
+}
+
 async function checkEvalQuality(failures: HealthFailure[]): Promise<void> {
   try {
-    const { rows } = await db.execute(
-      `SELECT target_type, target_id, groundedness, rationale, created_at
-       FROM eval_scores WHERE flagged = 1 AND exported = 0
-       ORDER BY created_at DESC`
-    )
-
-    for (const row of rows as any[]) {
+    const rows = await getFlaggedEvalScores()
+    for (const row of rows) {
       failures.push({
-        check: `EVAL QUALITY — ${row.target_type} ${row.target_id}`,
+        check: `EVAL QUALITY — ${row.targetType} ${row.targetId}`,
         detail: `Groundedness ${row.groundedness}/5 — ${row.rationale ?? 'no rationale recorded'}. Run scripts/eval/export-flagged.mts to review.`,
       })
     }
@@ -127,23 +144,38 @@ async function checkEvalQuality(failures: HealthFailure[]): Promise<void> {
   }
 }
 
-async function checkCronFailures(failures: HealthFailure[], since24h: string): Promise<void> {
-  try {
-    const { rows } = await db.execute({
-      sql: `
-        SELECT path, started_at, error_text
-        FROM cron_runs
-        WHERE status = 'failed' AND started_at >= ?
-        ORDER BY started_at DESC
-      `,
-      args: [since24h],
-    })
+export interface CronFailureRow {
+  path: string
+  startedAt: string
+  errorText: string | null
+}
 
-    for (const row of rows as any[]) {
-      const time = new Date(row.started_at as string).toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
+export async function getRecentCronFailures(hours: number): Promise<CronFailureRow[]> {
+  const since = new Date(Date.now() - hours * 3600_000).toISOString()
+  const { rows } = await db.execute({
+    sql: `
+      SELECT path, started_at, error_text
+      FROM cron_runs
+      WHERE status = 'failed' AND started_at >= ?
+      ORDER BY started_at DESC
+    `,
+    args: [since],
+  })
+  return (rows as any[]).map(row => ({
+    path: row.path as string,
+    startedAt: row.started_at as string,
+    errorText: row.error_text as string | null,
+  }))
+}
+
+async function checkCronFailures(failures: HealthFailure[]): Promise<void> {
+  try {
+    const rows = await getRecentCronFailures(24)
+    for (const row of rows) {
+      const time = new Date(row.startedAt).toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
       failures.push({
         check: `CRON FAILURE — ${row.path} (${time})`,
-        detail: row.error_text ?? 'No error detail recorded.',
+        detail: row.errorText ?? 'No error detail recorded.',
       })
     }
   } catch (err) {

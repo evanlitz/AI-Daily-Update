@@ -127,6 +127,15 @@ const NAV = [
       </svg>
     ),
   },
+  {
+    href: '/health',
+    label: 'Health',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
+        <path d="M3 12h4l2-8 4 16 2-8h6" strokeWidth="1.75" />
+      </svg>
+    ),
+  },
 ]
 
 function Sidebar() {

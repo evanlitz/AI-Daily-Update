@@ -58,7 +58,7 @@ function buildAlertHtml(failures: HealthFailure[], now: Date, appUrl: string): s
         <!-- Footer -->
         <tr>
           <td style="padding:18px 28px;background:#f9fafb;">
-            <a href="${appUrl}/api/health" style="color:#4f46e5;font-size:13px;font-weight:500;text-decoration:none;">View health dashboard &rarr;</a>
+            <a href="${appUrl}/health" style="color:#4f46e5;font-size:13px;font-weight:500;text-decoration:none;">View health dashboard &rarr;</a>
             <div style="color:#9ca3af;font-size:12px;margin-top:6px;">AI Pulse &nbsp;·&nbsp; automated alert</div>
           </td>
         </tr>
@@ -77,7 +77,7 @@ function buildAlertText(failures: HealthFailure[], now: Date): string {
     '',
     ...failures.flatMap(f => [f.check, `  ${f.detail}`, '']),
     '─'.repeat(40),
-    `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/api/health`,
+    `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/health`,
   ].join('\n')
 }
 
