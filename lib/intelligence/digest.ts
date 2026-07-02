@@ -1,10 +1,12 @@
 import crypto from 'crypto'
+import { after } from 'next/server'
 import db from '../db'
 import { anthropic, MODEL } from '../claude'
 import { recall, remember, embed, recallFeedItems } from '../memory'
 import type { RecallResult } from '../memory'
 import type { WeeklyDigest, DigestChange } from '../types'
 import { getMondayISO, sanitizeText } from '../utils'
+import { runLiveGroundednessCheck } from '../eval/live-check'
 
 // Extract meaningful words from a title for overlap comparison
 function titleTokens(title: string): Set<string> {
@@ -349,7 +351,7 @@ When an item is marked "covered by N sources", treat it as proportionally more s
 export async function generateWeeklyDigest(): Promise<WeeklyDigest> {
   const weekStart = getMondayISO()
   const context = await fetchDigestContext(weekStart)
-  const { content, highlights, changes } = await buildAndRunDigest(context, weekStart)
+  const { content, highlights, changes, sourceMaterial } = await buildAndRunDigest(context, weekStart)
 
   const id  = crypto.randomUUID()
   const now = new Date().toISOString()
@@ -394,6 +396,16 @@ export async function generateWeeklyDigest(): Promise<WeeklyDigest> {
         })),
     ] as any[]).catch(err => console.error('[digest] section memories failed:', err))
   }
+
+  // weekStart travels alongside context — buildAndRunDigest needs both to
+  // replay this fixture later, and DigestContext alone doesn't carry it.
+  // after() keeps this alive past the response the cron route already sent —
+  // an un-awaited call here would otherwise race the function freezing.
+  after(() =>
+    runLiveGroundednessCheck('digest', id, content, sourceMaterial, { weekStart, context }).catch(err =>
+      console.error('[digest] live groundedness check failed:', err)
+    )
+  )
 
   return { id, week_start: weekStart, content_md: content, highlights, changes, created_at: now }
 }

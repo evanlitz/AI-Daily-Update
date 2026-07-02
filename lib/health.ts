@@ -22,6 +22,7 @@ export async function runHealthChecks(): Promise<HealthFailure[]> {
     checkSourceSilence(failures, since12h, since30d),
     checkMissingBrief(failures, today),
     checkCronFailures(failures, since24h),
+    checkEvalQuality(failures),
   ])
 
   return failures
@@ -100,6 +101,29 @@ async function checkMissingBrief(failures: HealthFailure[], today: string): Prom
     }
   } catch (err) {
     failures.push({ check: 'MISSING BRIEF', detail: `Check failed: ${err instanceof Error ? err.message : String(err)}` })
+  }
+}
+
+// Cases the live groundedness judge (lib/eval/live-check.ts) flagged after a
+// real digest/brief generation. Stays in the alert on every run until
+// scripts/eval/export-flagged.mts marks it exported=1 — deliberate, since
+// that script is also the human review step before it becomes a fixture.
+async function checkEvalQuality(failures: HealthFailure[]): Promise<void> {
+  try {
+    const { rows } = await db.execute(
+      `SELECT target_type, target_id, groundedness, rationale, created_at
+       FROM eval_scores WHERE flagged = 1 AND exported = 0
+       ORDER BY created_at DESC`
+    )
+
+    for (const row of rows as any[]) {
+      failures.push({
+        check: `EVAL QUALITY — ${row.target_type} ${row.target_id}`,
+        detail: `Groundedness ${row.groundedness}/5 — ${row.rationale ?? 'no rationale recorded'}. Run scripts/eval/export-flagged.mts to review.`,
+      })
+    }
+  } catch (err) {
+    failures.push({ check: 'EVAL QUALITY', detail: `Check failed: ${err instanceof Error ? err.message : String(err)}` })
   }
 }
 

@@ -48,8 +48,12 @@ For each axis, declare a winner: "A", "B", or "tie" — only call a tie if they 
 // against a fixed source (the feed items the digest was built from), so it
 // doesn't need a comparison output — "is this claim in the source material or
 // not" is a yes/no question per claim, not a matter of taste.
-export async function judgeGroundedness(digestContent: string, sourceContext: string): Promise<GroundednessVerdict> {
-  const systemPrompt = `You are fact-checking an AI-generated weekly news digest against the source material it was built from. For every factual claim in the digest (a model release, a benchmark number, a company action, a paper's finding), check whether it is actually supported by the source material provided.
+export async function judgeGroundedness(
+  content: string,
+  sourceContext: string,
+  contentLabel: string = 'weekly news digest',
+): Promise<GroundednessVerdict> {
+  const systemPrompt = `You are fact-checking an AI-generated ${contentLabel} against the source material it was built from. For every factual claim in the ${contentLabel} (a model release, a benchmark number, a company action, a paper's finding), check whether it is actually supported by the source material provided.
 
 Score 1-5:
 5 — every claim traces back to the source material; any inference is clearly framed as analysis, not fact
@@ -58,9 +62,9 @@ Score 1-5:
 2 — multiple claims are unsupported, exaggerated, or overstated beyond what the sources say
 1 — contains claims that are fabricated or contradict the source material
 
-List specific unsupported claims if any exist — don't flag the "What This Means For You" or "Hot Takes" sections for being opinionated, since those are explicitly meant to be analysis rather than fact-reporting. Only flag factual claims (what happened, who did what, what a benchmark showed) that aren't backed by the source material.`
+List specific unsupported claims if any exist — don't flag sections explicitly framed as analysis, opinion, or forward-looking prediction (e.g. "what this means", "hot takes", "watch for") for being opinionated, since those are meant to be analysis rather than fact-reporting. Only flag factual claims (what happened, who did what, what a benchmark showed) that aren't backed by the source material.`
 
-  const userPrompt = `SOURCE MATERIAL:\n${sourceContext}\n\nGENERATED DIGEST:\n${digestContent}\n\nReturn ONLY a JSON object:\n{"groundedness":1-5,"unsupported_claims":["claim text", ...],"rationale":"2-3 sentences"}`
+  const userPrompt = `SOURCE MATERIAL:\n${sourceContext}\n\nGENERATED ${contentLabel.toUpperCase()}:\n${content}\n\nReturn ONLY a JSON object:\n{"groundedness":1-5,"unsupported_claims":["claim text", ...],"rationale":"2-3 sentences"}`
 
   const response = await anthropic.messages.create({
     model: MODEL,
@@ -69,13 +73,21 @@ List specific unsupported claims if any exist — don't flag the "What This Mean
     messages: [{ role: 'user', content: userPrompt }],
   })
 
-  const text = response.content[0].type === 'text' ? response.content[0].text : '{}'
+  const text = response.content[0].type === 'text' ? response.content[0].text : ''
   const match = text.match(/\{[\s\S]*\}/)
-  return safeJSON<GroundednessVerdict>(match ? match[0] : '{}', {
-    groundedness: 0,
-    unsupported_claims: [],
-    rationale: 'parse failed',
-  })
+  // safeJSON's fallback only fires on a parse *error* — a missing match still
+  // parses '{}' successfully to an empty object, so groundedness would be
+  // undefined rather than falling back. Check both cases explicitly and mark
+  // parseFailed so a broken judge is distinguishable from a real low score.
+  const parsed = match ? safeJSON<Partial<GroundednessVerdict> | null>(match[0], null) : null
+  if (!parsed || typeof parsed.groundedness !== 'number') {
+    return { groundedness: 0, unsupported_claims: [], rationale: 'parse failed', parseFailed: true }
+  }
+  return {
+    groundedness: parsed.groundedness,
+    unsupported_claims: parsed.unsupported_claims ?? [],
+    rationale: parsed.rationale ?? '',
+  }
 }
 
 // Advisor groundedness: the prompt explicitly instructs Claude to ground each

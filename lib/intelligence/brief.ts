@@ -1,7 +1,9 @@
 import crypto from 'crypto'
+import { after } from 'next/server'
 import db from '../db'
 import { anthropic, MODEL } from '../claude'
 import { safeJSON } from '../utils'
+import { runLiveGroundednessCheck } from '../eval/live-check'
 
 export interface DailyBrief {
   id: string
@@ -11,6 +13,21 @@ export interface DailyBrief {
   watch: string
   shift: string
   created_at: string
+}
+
+export interface BriefContext {
+  today: string
+  items: any[]
+  rising: any[]
+  preds: any[]
+  nudged: any[]
+}
+
+export interface BriefSections {
+  signal: string
+  rising: string
+  watch: string
+  shift: string
 }
 
 const SYSTEM_PROMPT = `You are the analytical intelligence layer of an AI tracking system. Your daily brief is read by developers and AI researchers who want signal — not summaries of everything, but what actually matters and what it means for the future of AI.
@@ -28,19 +45,11 @@ CRITICAL: Only reference events, facts, and entities that appear explicitly in t
 Return ONLY valid JSON with this exact shape — no markdown, no explanation:
 {"signal":"...","rising":"...","watch":"...","shift":"..."}`
 
-export async function generateDailyBrief(): Promise<DailyBrief | null> {
+// DB-touching half — kept separate from buildAndRunBrief so the eval harness
+// (and the live groundedness check on every real generation) can snapshot a
+// context once and replay/inspect it without needing a live database.
+export async function fetchBriefContext(): Promise<BriefContext> {
   const today = new Date().toISOString().split('T')[0]
-
-  // Idempotent — skip if already generated today
-  const { rows: existing } = await db.execute({
-    sql: `SELECT id FROM daily_briefs WHERE date = ?`,
-    args: [today],
-  })
-  if (existing.length > 0) {
-    console.log('[brief] already generated for today, skipping')
-    return null
-  }
-
   const since24h = new Date(Date.now() - 24 * 3600_000).toISOString()
   const since7d  = new Date(Date.now() -  7 * 24 * 3600_000).toISOString()
   const nextYear = new Date().getFullYear() + 1
@@ -84,10 +93,22 @@ export async function generateDailyBrief(): Promise<DailyBrief | null> {
     }),
   ])
 
-  const items   = itemsRes.rows   as any[]
-  const rising  = risingRes.rows  as any[]
-  const preds   = predsRes.rows   as any[]
-  const nudged  = nudgedRes.rows  as any[]
+  return {
+    today,
+    items:  itemsRes.rows  as any[],
+    rising: risingRes.rows as any[],
+    preds:  predsRes.rows  as any[],
+    nudged: nudgedRes.rows as any[],
+  }
+}
+
+// Pure prompt-building + Claude call — no DB access. Reused by both the live
+// pipeline (generateDailyBrief) and the eval harness (replaying a frozen
+// BriefContext fixture).
+export async function buildAndRunBrief(
+  context: BriefContext
+): Promise<{ brief: BriefSections; sourceMaterial: string } | null> {
+  const { today, items, rising, preds, nudged } = context
 
   if (items.length === 0 && rising.length === 0) {
     console.log('[brief] insufficient data to generate brief today')
@@ -130,24 +151,50 @@ ${nudgedBlock}
 
 Generate the daily brief now.`
 
+  // Everything the brief was actually grounded in — used by the groundedness
+  // judge, same convention as digest.ts's sourceMaterial.
+  const sourceMaterial = `${itemBlock}\n\n${risingBlock}\n\n${predBlock}\n\n${nudgedBlock}`
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 600,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: 'user', content: userMessage }],
+  })
+
+  const raw = response.content[0].type === 'text' ? response.content[0].text : ''
+  const match = raw.match(/\{[\s\S]*\}/)
+  if (!match) {
+    throw new Error(`Claude returned no parseable JSON: ${raw.slice(0, 200)}`)
+  }
+
+  const parsed = safeJSON(match[0], {}) as Partial<BriefSections>
+  if (!parsed?.signal || !parsed?.rising || !parsed?.watch || !parsed?.shift) {
+    throw new Error(`Claude returned incomplete brief — missing fields: ${JSON.stringify(Object.keys(parsed))}`)
+  }
+
+  return { brief: parsed as BriefSections, sourceMaterial }
+}
+
+export async function generateDailyBrief(): Promise<DailyBrief | null> {
+  const today = new Date().toISOString().split('T')[0]
+
+  // Idempotent — skip if already generated today
+  const { rows: existing } = await db.execute({
+    sql: `SELECT id FROM daily_briefs WHERE date = ?`,
+    args: [today],
+  })
+  if (existing.length > 0) {
+    console.log('[brief] already generated for today, skipping')
+    return null
+  }
+
+  const context = await fetchBriefContext()
+
   try {
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 600,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userMessage }],
-    })
-
-    const raw = response.content[0].type === 'text' ? response.content[0].text : ''
-    const match = raw.match(/\{[\s\S]*\}/)
-    if (!match) {
-      throw new Error(`Claude returned no parseable JSON: ${raw.slice(0, 200)}`)
-    }
-
-    const parsed = safeJSON(match[0], {}) as { signal?: string; rising?: string; watch?: string; shift?: string }
-    if (!parsed?.signal || !parsed?.rising || !parsed?.watch || !parsed?.shift) {
-      throw new Error(`Claude returned incomplete brief — missing fields: ${JSON.stringify(Object.keys(parsed))}`)
-    }
+    const result = await buildAndRunBrief(context)
+    if (!result) return null
+    const { brief, sourceMaterial } = result
 
     const id  = crypto.randomUUID()
     const now = new Date().toISOString()
@@ -155,11 +202,22 @@ Generate the daily brief now.`
     await db.execute({
       sql: `INSERT OR IGNORE INTO daily_briefs (id, date, signal, rising, watch, shift, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      args: [id, today, parsed.signal, parsed.rising, parsed.watch, parsed.shift, now],
+      args: [id, today, brief.signal, brief.rising, brief.watch, brief.shift, now],
     })
 
     console.log('[brief] generated for', today)
-    return { id, date: today, ...parsed, created_at: now } as DailyBrief
+
+    const joinedContent = `SIGNAL: ${brief.signal}\n\nRISING: ${brief.rising}\n\nWATCH: ${brief.watch}\n\nSHIFT: ${brief.shift}`
+    // date travels alongside context so an exported fixture matches BriefGoldenSet's shape.
+    // after() keeps this alive past the response the cron route already sent —
+    // an un-awaited call here would otherwise race the function freezing.
+    after(() =>
+      runLiveGroundednessCheck('brief', id, joinedContent, sourceMaterial, { date: context.today, context }).catch(err =>
+        console.error('[brief] live groundedness check failed:', err)
+      )
+    )
+
+    return { id, date: today, ...brief, created_at: now } as DailyBrief
   } catch (err) {
     console.error('[brief] generation failed:', err)
     throw err

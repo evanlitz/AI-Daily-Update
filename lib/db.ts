@@ -436,4 +436,25 @@ try { await db.execute(`
 `) } catch {}
 try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_cron_runs_started_at ON cron_runs (started_at)`) } catch {}
 
+// Live LLM-judge scoring of every real digest/brief generation (lib/eval/live-check.ts).
+// Rows scoring groundedness <= 3 are flagged and carry a snapshot of the input
+// context in context_json — the live filesystem is read-only on Vercel, so this
+// is where flagged cases wait until scripts/eval/export-flagged.mts (run locally)
+// turns them into real golden-set fixture files and marks them exported.
+try { await db.execute(`
+  CREATE TABLE IF NOT EXISTS eval_scores (
+    id                 TEXT PRIMARY KEY,
+    target_type        TEXT NOT NULL,
+    target_id          TEXT NOT NULL,
+    groundedness       INTEGER,
+    unsupported_claims TEXT DEFAULT '[]',
+    rationale          TEXT,
+    flagged            INTEGER NOT NULL DEFAULT 0,
+    exported           INTEGER NOT NULL DEFAULT 0,
+    context_json       TEXT,
+    created_at         TEXT NOT NULL
+  )
+`) } catch {}
+try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_eval_scores_flagged ON eval_scores (flagged, exported)`) } catch {}
+
 export default db

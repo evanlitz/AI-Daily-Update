@@ -12,7 +12,9 @@
     "eval:advisor:capture": "node --env-file=.env.local --import tsx scripts/eval/capture-advisor-golden-set.mts",
     "eval:advisor:run": "node --env-file=.env.local --import tsx scripts/eval/run-eval-advisor.mts",
     "eval:prediction:capture": "node --env-file=.env.local --import tsx scripts/eval/capture-prediction-golden-set.mts",
-    "eval:prediction:run": "node --env-file=.env.local --import tsx scripts/eval/run-eval-prediction.mts"
+    "eval:prediction:run": "node --env-file=.env.local --import tsx scripts/eval/run-eval-prediction.mts",
+    "eval:brief:run": "node --env-file=.env.local --import tsx scripts/eval/run-eval-brief.mts",
+    "eval:export-flagged": "node --env-file=.env.local --import tsx scripts/eval/export-flagged.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",

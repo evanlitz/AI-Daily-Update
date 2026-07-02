@@ -1,6 +1,7 @@
 import type { DigestContext } from '../intelligence/digest'
 import type { TrendingAdvisorContext } from '../intelligence/advisor'
 import type { PredictionContext } from '../intelligence/predictions'
+import type { BriefContext, BriefSections } from '../intelligence/brief'
 
 export interface GoldenSet {
   id: string
@@ -38,6 +39,9 @@ export interface GroundednessVerdict {
   groundedness: number
   unsupported_claims: string[]
   rationale: string
+  // Set when the judge's response couldn't be parsed at all — distinguishes
+  // "judge is broken" from a genuine low groundedness score of 0.
+  parseFailed?: boolean
 }
 
 export interface ActionabilityVerdict {
@@ -50,4 +54,17 @@ export interface PredictionGoldenSet {
   id: string
   capturedAt: string
   context: PredictionContext
+}
+
+export interface BriefGoldenSet {
+  id: string
+  date: string
+  capturedAt: string
+  context: BriefContext
+}
+
+export interface BriefBaseline {
+  date: string
+  brief: BriefSections
+  promotedAt: string
 }
