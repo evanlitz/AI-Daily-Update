@@ -68,7 +68,11 @@ List specific unsupported claims if any exist — don't flag sections explicitly
 
   const response = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 800,
+    // Digests are ~6x longer than briefs and can surface many more unsupported
+    // claims — 800 was tuned for brief-sized rationale and was truncating the
+    // trailing JSON before the closing brace on verbose digest verdicts,
+    // which read as a judge "parse failure" instead of a real score.
+    max_tokens: 1600,
     system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: userPrompt }],
   })

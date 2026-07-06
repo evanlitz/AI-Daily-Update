@@ -228,7 +228,9 @@ export async function updateStoryThreads(
 
 When a thread has a history field, use it to write summaries with genuine continuity — reference how the story has evolved over prior weeks, note reversals or accelerations, and avoid restating context that has not changed.
 
-Be selective: not every item deserves a thread. A story needs multiple future developments to be worth tracking. A single product announcement is an event, not a story. A competitive dynamic, an ongoing safety debate, a technology adoption curve — those are stories.`
+Be selective: not every item deserves a thread. A story needs multiple future developments to be worth tracking. A single product announcement is an event, not a story. A competitive dynamic, an ongoing safety debate, a technology adoption curve — those are stories.
+
+CRITICAL: update_text, new_summary, and watch_for are read downstream by the weekly digest and daily brief as source-of-truth context, not as your own commentary — treat every fact, statistic, and named event in them as something a fact-checker will trace back to the itemContext items or existing thread history provided above. Do not introduce specifics (numbers, dates, named developments) from outside knowledge, even to make the synthesis read more complete.`
 
   const userPrompt = `Current story threads (ref = integer index; history = prior weeks' summaries oldest→newest; recent_events = last 1-2 weekly updates; manual_note = human curator annotation, treat as high-priority signal):
 ${JSON.stringify(threadContext, null, 2)}

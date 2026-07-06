@@ -42,6 +42,8 @@ SHIFT — The development today most significant for the long-term trajectory of
 
 CRITICAL: Only reference events, facts, and entities that appear explicitly in the data provided below. Do not introduce claims, statistics, or events not present in this data. If today's data is thin, say so directly rather than filling in from background knowledge.
 
+If multiple items describe the same event with different specific figures (a duration, a percentage, a dollar amount), don't pick whichever number sounds most dramatic — use the framing the item's own title/hook supports, or describe it qualitatively rather than stating a precise figure you can't confirm.
+
 Return ONLY valid JSON with this exact shape — no markdown, no explanation:
 {"signal":"...","rising":"...","watch":"...","shift":"..."}`
 

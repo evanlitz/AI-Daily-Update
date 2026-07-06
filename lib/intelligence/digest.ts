@@ -228,7 +228,7 @@ export async function fetchDigestContext(weekStart: string): Promise<DigestConte
 // pipeline (generateWeeklyDigest) and the eval harness (replaying a frozen
 // DigestContext fixture).
 export async function buildAndRunDigest(
-  { raw, sectionMap, sectionPastCoverage, storyContext, priorDigests, affinityContext }: DigestContext,
+  { raw, sectionMap = {}, sectionPastCoverage = {}, storyContext, priorDigests, affinityContext }: DigestContext,
   weekStart: string
 ): Promise<{ content: string; highlights: string[]; changes: DigestChange[]; sourceMaterial: string }> {
   // Source diversity cap: max 8 per source
@@ -308,7 +308,9 @@ export async function buildAndRunDigest(
         type: 'text',
         text: `You are an expert AI analyst writing a weekly briefing for a self-taught developer who wants to stay current with AI. Be direct, opinionated, and practical. No hype. Format your response in markdown.
 
-When an item is marked "covered by N sources", treat it as proportionally more significant — multiple outlets covering the same story is a strong signal of importance. Prioritize those stories.`,
+When an item is marked "covered by N sources", treat it as proportionally more significant — multiple outlets covering the same story is a strong signal of importance. Prioritize those stories.
+
+CRITICAL: Only reference events, facts, statistics, and entities that appear explicitly in the data provided below. Making a bold call about what a story MEANS is encouraged and expected — but the underlying facts that call rests on must come from the data provided, never from background knowledge. If a section's provided data is thin, say so directly rather than filling in specifics (numbers, names, dates) from outside knowledge.`,
         cache_control: { type: 'ephemeral' },
       },
     ],
