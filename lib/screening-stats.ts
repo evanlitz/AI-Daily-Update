@@ -32,10 +32,16 @@ export interface RecentStats {
 // for "is mit-tech-review's accept rate trending up or staying at zero") — the
 // underlying screening_stats rows already have per-run timestamps, so nothing
 // new is recorded here, this just reads the existing history two ways.
-export async function getRecentStats(windowDays = 14): Promise<RecentStats> {
+//
+// `daily` costs a third GROUP BY query most callers don't need — the health
+// dashboard only reads bySource/usageByTask and was paying for it on every
+// page load — so it's opt-in via includeDaily, defaulting on for
+// /api/screening-stats (the one caller that actually renders it).
+export async function getRecentStats(windowDays = 14, opts: { includeDaily?: boolean } = {}): Promise<RecentStats> {
+  const { includeDaily = true } = opts
   const sinceISO = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString()
 
-  const [{ rows: sourceRows }, { rows: usageRows }, { rows: dailyRows }] = await Promise.all([
+  const [{ rows: sourceRows }, { rows: usageRows }, dailyRows] = await Promise.all([
     db.execute({
       sql: `SELECT source,
                    SUM(accepted_count) AS accepted,
@@ -54,17 +60,19 @@ export async function getRecentStats(windowDays = 14): Promise<RecentStats> {
             GROUP BY task`,
       args: [sinceISO],
     }),
-    db.execute({
-      sql: `SELECT date(run_at) AS day, source,
-                   SUM(accepted_count) AS accepted,
-                   SUM(rejected_count) AS rejected,
-                   SUM(fast_tracked_count) AS fast_tracked
-            FROM screening_stats
-            WHERE run_at >= ?
-            GROUP BY day, source
-            ORDER BY day DESC, source ASC`,
-      args: [sinceISO],
-    }),
+    includeDaily
+      ? db.execute({
+          sql: `SELECT date(run_at) AS day, source,
+                       SUM(accepted_count) AS accepted,
+                       SUM(rejected_count) AS rejected,
+                       SUM(fast_tracked_count) AS fast_tracked
+                FROM screening_stats
+                WHERE run_at >= ?
+                GROUP BY day, source
+                ORDER BY day DESC, source ASC`,
+          args: [sinceISO],
+        }).then(r => r.rows)
+      : Promise.resolve([]),
   ])
 
   return {

@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { relTime } from '@/lib/utils'
 import type { HealthDashboard, SourceHealthRow } from '@/lib/health-dashboard'
+import {
+  RepoGlyph as SharedRepoGlyph,
+  DatasetGlyph as SharedDatasetGlyph,
+  PaperGlyph as SharedPaperGlyph,
+  ModelGlyph as SharedModelGlyph,
+} from '@/components/icons'
 
 // ── Icon primitives ──────────────────────────────────────────────────────────
 // Same stroke language as the sidebar nav (app/layout.tsx): 24x24 viewBox,
@@ -18,8 +24,20 @@ function Icon({ children, size = 15, style }: { children: React.ReactNode; size?
   )
 }
 
+// These four also appear in the sidebar/mobile nav (app/layout.tsx) — delegate
+// to the shared glyphs in components/icons.tsx so the path data lives in one
+// place, just overriding the default 22px nav size down to this page's 15px.
 function RepoGlyph(p: { style?: React.CSSProperties }) {
-  return <Icon {...p}><circle cx="6" cy="4" r="2" strokeWidth="1.75" /><circle cx="6" cy="20" r="2" strokeWidth="1.75" /><circle cx="18" cy="10" r="2" strokeWidth="1.75" /><path d="M6 6v10M6 10h6a6 6 0 016 6" strokeWidth="1.75" /></Icon>
+  return <SharedRepoGlyph size={15} {...p} />
+}
+function DatasetGlyph(p: { style?: React.CSSProperties }) {
+  return <SharedDatasetGlyph size={15} {...p} />
+}
+function PaperGlyph(p: { style?: React.CSSProperties }) {
+  return <SharedPaperGlyph size={15} {...p} />
+}
+function ModelGlyph(p: { style?: React.CSSProperties }) {
+  return <SharedModelGlyph size={15} {...p} />
 }
 function FeedGlyph(p: { style?: React.CSSProperties }) {
   return <Icon {...p}><circle cx="6" cy="18" r="1.75" fill="currentColor" stroke="none" /><path d="M4 11a9 9 0 019 9" strokeWidth="1.75" /><path d="M4 4a16 16 0 0116 16" strokeWidth="1.75" /></Icon>
@@ -27,17 +45,8 @@ function FeedGlyph(p: { style?: React.CSSProperties }) {
 function PlayGlyph(p: { style?: React.CSSProperties }) {
   return <Icon {...p}><rect x="2.5" y="5" width="19" height="14" rx="3.5" strokeWidth="1.75" /><path d="M10.5 9.5l5 2.5-5 2.5z" fill="currentColor" stroke="none" /></Icon>
 }
-function PaperGlyph(p: { style?: React.CSSProperties }) {
-  return <Icon {...p}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8L14 2z" strokeWidth="1.75" /><path d="M14 2v6h6M8 13h8M8 17h5" strokeWidth="1.75" /></Icon>
-}
 function DiscussionGlyph(p: { style?: React.CSSProperties }) {
   return <Icon {...p}><path d="M21 11.5a8.38 8.38 0 01-4.5 7.5 8.4 8.4 0 01-8-.3L3 21l1.9-5.7a8.4 8.4 0 01-.3-8A8.38 8.38 0 0112 3h.5a8.48 8.48 0 018 8v.5z" strokeWidth="1.75" /></Icon>
-}
-function ModelGlyph(p: { style?: React.CSSProperties }) {
-  return <Icon {...p}><rect x="2" y="3" width="20" height="5" rx="1.5" strokeWidth="1.75" /><rect x="2" y="10" width="20" height="5" rx="1.5" strokeWidth="1.75" /><rect x="2" y="17" width="20" height="5" rx="1.5" strokeWidth="1.75" /></Icon>
-}
-function DatasetGlyph(p: { style?: React.CSSProperties }) {
-  return <Icon {...p}><ellipse cx="12" cy="5" rx="9" ry="3" strokeWidth="1.75" /><path d="M21 12c0 1.66-4.03 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5" strokeWidth="1.75" /></Icon>
 }
 function BenchGlyph(p: { style?: React.CSSProperties }) {
   return <Icon {...p}><path d="M4 20V10M12 20V4M20 20v-7" strokeWidth="1.75" /></Icon>
@@ -51,9 +60,9 @@ function sourceGlyph(source: string): React.ComponentType<{ style?: React.CSSPro
   if (source.startsWith('rss:')) return FeedGlyph
   if (source.startsWith('youtube:')) return PlayGlyph
   if (source === 'arxiv' || source === 'semanticscholar') return PaperGlyph
-  if (source === 'hackernews') return DiscussionGlyph
+  if (source === 'hn') return DiscussionGlyph
+  if (source === 'hf-datasets' || source === 'kaggle') return DatasetGlyph
   if (source === 'huggingface' || source.startsWith('hf-')) return ModelGlyph
-  if (source === 'kaggle') return DatasetGlyph
   if (source === 'benchmark-sync') return BenchGlyph
   return DotGlyph
 }
@@ -184,6 +193,13 @@ export default function HealthPage() {
 
   return (
     <main className="mx-auto max-w-screen-2xl px-4 sm:px-10 py-8">
+      <style>{`
+        @media (max-width: 767px) {
+          .health-stats { gap: 20px 16px !important; }
+          .health-row-header { flex-wrap: wrap !important; gap: 4px 12px !important; }
+        }
+      `}</style>
+
       {/* Header */}
       <div className="mb-6">
         <p className="eyebrow mb-2">Ops · Data Quality</p>
@@ -200,7 +216,7 @@ export default function HealthPage() {
       </div>
 
       {/* Stat strip — flat, no per-metric card chrome */}
-      <div className="flex flex-wrap items-start gap-x-8 gap-y-4 mb-8 pb-6" style={{ borderBottom: `1px solid ${LINE}` }}>
+      <div className="health-stats flex flex-wrap items-start gap-x-8 gap-y-4 mb-8 pb-6" style={{ borderBottom: `1px solid ${LINE}` }}>
         <StatBlock label="OK" value={data.summary.ok} color={FAINT} />
         <StatBlock label="Warn" value={data.summary.warn} color={data.summary.warn ? STATUS_COLOR.warn : FAINT} />
         <StatBlock label="Stale" value={data.summary.stale} color={data.summary.stale ? STATUS_COLOR.stale : FAINT} />
@@ -259,28 +275,30 @@ export default function HealthPage() {
           {data.screening.usageByTask.length === 0 ? (
             <div style={{ padding: '4px 16px' }}><EmptyRow text="No Claude usage recorded in this window." /></div>
           ) : (
-            <table className="w-full" style={{ borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: `1px solid ${LINE}` }}>
-                  <Th>Task</Th>
-                  <Th align="right">Input</Th>
-                  <Th align="right">Output</Th>
-                  <Th align="right">Total</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.screening.usageByTask.map((u, i) => (
-                  <tr key={u.task} style={{ borderBottom: i === data.screening.usageByTask.length - 1 ? 'none' : `1px solid ${LINE}` }}>
-                    <td style={{ padding: '9px 16px', color: INK, fontSize: 13, fontWeight: 600 }}>{u.task}</td>
-                    <td style={{ padding: '9px 16px', color: MUTE, fontSize: 12, textAlign: 'right', ...MONO }}>{u.inputTokens.toLocaleString()}</td>
-                    <td style={{ padding: '9px 16px', color: MUTE, fontSize: 12, textAlign: 'right', ...MONO }}>{u.outputTokens.toLocaleString()}</td>
-                    <td style={{ padding: '9px 16px', color: INK, fontSize: 12, fontWeight: 700, textAlign: 'right', ...MONO }}>
-                      {(u.inputTokens + u.outputTokens).toLocaleString()}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 480 }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${LINE}` }}>
+                    <Th>Task</Th>
+                    <Th align="right">Input</Th>
+                    <Th align="right">Output</Th>
+                    <Th align="right">Total</Th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.screening.usageByTask.map((u, i) => (
+                    <tr key={u.task} style={{ borderBottom: i === data.screening.usageByTask.length - 1 ? 'none' : `1px solid ${LINE}` }}>
+                      <td style={{ padding: '9px 16px', color: INK, fontSize: 13, fontWeight: 600 }}>{u.task}</td>
+                      <td style={{ padding: '9px 16px', color: MUTE, fontSize: 12, textAlign: 'right', ...MONO }}>{u.inputTokens.toLocaleString()}</td>
+                      <td style={{ padding: '9px 16px', color: MUTE, fontSize: 12, textAlign: 'right', ...MONO }}>{u.outputTokens.toLocaleString()}</td>
+                      <td style={{ padding: '9px 16px', color: INK, fontSize: 12, fontWeight: 700, textAlign: 'right', ...MONO }}>
+                        {(u.inputTokens + u.outputTokens).toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>
@@ -296,7 +314,7 @@ export default function HealthPage() {
             <div className="flex flex-col">
               {data.cronFailures.map((f, i) => (
                 <div key={i} style={{ padding: '10px 0 10px 12px', borderLeft: '2px solid #ef4444', borderBottom: i === data.cronFailures.length - 1 ? 'none' : `1px solid ${LINE}`, marginBottom: 2 }}>
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="health-row-header flex items-center justify-between mb-1">
                     <span style={{ color: INK, fontSize: 13, fontWeight: 600 }}>{f.path}</span>
                     <span style={{ color: FAINT, fontSize: 11 }}>{relTime(f.startedAt)}</span>
                   </div>
@@ -316,8 +334,8 @@ export default function HealthPage() {
             <div className="flex flex-col">
               {data.evalFlags.map((f, i) => (
                 <div key={i} style={{ padding: '10px 0 10px 12px', borderLeft: '2px solid #eab308', borderBottom: i === data.evalFlags.length - 1 ? 'none' : `1px solid ${LINE}`, marginBottom: 2 }}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span style={{ color: INK, fontSize: 13, fontWeight: 600 }}>{f.targetType} {f.targetId}</span>
+                  <div className="health-row-header flex items-center justify-between mb-1">
+                    <span style={{ color: INK, fontSize: 13, fontWeight: 600, wordBreak: 'break-word' }}>{f.targetType} {f.targetId}</span>
                     <span style={{ color: '#eab308', fontSize: 12, fontWeight: 700, ...MONO }}>{f.groundedness ?? '—'}/5</span>
                   </div>
                   <p style={{ color: MUTE, fontSize: 12 }}>{truncate(f.rationale, 140)}</p>

@@ -4,19 +4,9 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { RepoGlyph, DatasetGlyph, PaperGlyph, ModelGlyph } from '@/components/icons'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
-
-// ── SVG icons ────────────────────────────────────────────────────────────────
-
-function Icon({ d, ...props }: { d: string | React.ReactNode } & React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"
-      width={22} height={22} {...props}>
-      {typeof d === 'string' ? <path d={d} strokeWidth="1.75" /> : d}
-    </svg>
-  )
-}
 
 const NAV = [
   {
@@ -41,12 +31,7 @@ const NAV = [
   {
     href: '/digest',
     label: 'Digest',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
-        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8L14 2z" strokeWidth="1.75" />
-        <path d="M14 2v6h6M8 13h8M8 17h5" strokeWidth="1.75" />
-      </svg>
-    ),
+    icon: <PaperGlyph />,
   },
   {
     href: '/stories',
@@ -61,12 +46,7 @@ const NAV = [
   {
     href: '/datasets',
     label: 'Datasets',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
-        <ellipse cx="12" cy="5" rx="9" ry="3" strokeWidth="1.75" />
-        <path d="M21 12c0 1.66-4.03 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5" strokeWidth="1.75" />
-      </svg>
-    ),
+    icon: <DatasetGlyph />,
   },
   {
     href: '/advisor',
@@ -81,28 +61,12 @@ const NAV = [
   {
     href: '/repos',
     label: 'Repos',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
-        <circle cx="6" cy="4" r="2" strokeWidth="1.75" />
-        <circle cx="6" cy="20" r="2" strokeWidth="1.75" />
-        <circle cx="18" cy="10" r="2" strokeWidth="1.75" />
-        <path d="M6 6v10M6 10h6a6 6 0 016 6" strokeWidth="1.75" />
-      </svg>
-    ),
+    icon: <RepoGlyph />,
   },
   {
     href: '/models',
     label: 'Models',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" width={22} height={22}>
-        <rect x="2" y="3" width="20" height="5" rx="1.5" strokeWidth="1.75" />
-        <rect x="2" y="10" width="20" height="5" rx="1.5" strokeWidth="1.75" />
-        <rect x="2" y="17" width="20" height="5" rx="1.5" strokeWidth="1.75" />
-        <circle cx="6" cy="5.5" r="1" fill="currentColor" stroke="none" />
-        <circle cx="6" cy="12.5" r="1" fill="currentColor" stroke="none" />
-        <circle cx="6" cy="19.5" r="1" fill="currentColor" stroke="none" />
-      </svg>
-    ),
+    icon: <ModelGlyph />,
   },
   {
     href: '/predictions',
@@ -217,9 +181,17 @@ function Sidebar() {
   )
 }
 
+// Curated independently of NAV's (desktop sidebar) ordering, so the mobile
+// bar's contents don't silently change if NAV gets reordered — Health is
+// deliberately included here even though it's last in NAV, since it's the
+// page actively used to triage alerts from a phone.
+const MOBILE_NAV_HREFS = ['/', '/feed', '/digest', '/stories', '/advisor', '/health']
+
 function MobileNav() {
   const pathname = usePathname()
-  const primary = NAV.slice(0, 6)
+  const primary = MOBILE_NAV_HREFS
+    .map(href => NAV.find(item => item.href === href))
+    .filter((item): item is typeof NAV[number] => Boolean(item))
   return (
     <nav className="mobile-nav">
       {primary.map(({ href, label, icon }) => {

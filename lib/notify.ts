@@ -91,11 +91,16 @@ export async function sendAlert(failures: HealthFailure[]): Promise<void> {
   const subject = `[AI Pulse] ${failures.length} issue${s} — ${now.toISOString().split('T')[0]}`
   const from = process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev'
 
-  await resend.emails.send({
+  // resend.emails.send() resolves (doesn't throw) on API-level delivery
+  // failures — bad API key, unverified from-domain, rate limit — returning
+  // { data: null, error } instead. Left unchecked, the one time this cron
+  // matters (real failures exist) looks identical to a clean run.
+  const { error } = await resend.emails.send({
     from: `AI Pulse <${from}>`,
     to,
     subject,
     html: buildAlertHtml(failures, now, appUrl),
     text: buildAlertText(failures, now),
   })
+  if (error) throw new Error(`Resend failed to send alert email: ${error.message}`)
 }
