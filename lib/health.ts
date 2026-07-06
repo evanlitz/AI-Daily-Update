@@ -150,21 +150,33 @@ export interface CronFailureRow {
   errorText: string | null
 }
 
+// Functions killed by their route's own `maxDuration` (or a crash before the
+// catch block runs) never reach finishCronRun() and stay stuck at
+// status='running' forever — the largest maxDuration across all cron routes
+// is 300s, so anything still 'running' well past that has definitely died,
+// not just run long. Treated as a failure here so a hang isn't invisible to
+// both the alert check and the dashboard.
+const STUCK_CRON_MINUTES = 10
+
 export async function getRecentCronFailures(hours: number): Promise<CronFailureRow[]> {
   const since = new Date(Date.now() - hours * 3600_000).toISOString()
+  const stuckBefore = new Date(Date.now() - STUCK_CRON_MINUTES * 60_000).toISOString()
   const { rows } = await db.execute({
     sql: `
-      SELECT path, started_at, error_text
+      SELECT path, started_at, status, error_text
       FROM cron_runs
-      WHERE status = 'failed' AND started_at >= ?
+      WHERE started_at >= ?
+        AND (status = 'failed' OR (status = 'running' AND started_at < ?))
       ORDER BY started_at DESC
     `,
-    args: [since],
+    args: [since, stuckBefore],
   })
   return (rows as any[]).map(row => ({
     path: row.path as string,
     startedAt: row.started_at as string,
-    errorText: row.error_text as string | null,
+    errorText: row.status === 'running'
+      ? `Still marked "running" after ${STUCK_CRON_MINUTES} minutes — likely timed out or crashed before it could record a failure.`
+      : (row.error_text as string | null),
   }))
 }
 

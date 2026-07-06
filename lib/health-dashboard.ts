@@ -27,7 +27,7 @@ const SEVERITY: Record<SourceStatus, number> = { dead: 3, stale: 2, warn: 1, ok:
 export async function getHealthDashboard(): Promise<HealthDashboard> {
   const [sourceReport, screening, cronFailures, evalFlags] = await Promise.all([
     getSourceStatuses(),
-    getRecentStats(14),
+    getRecentStats(14, { includeDaily: false }),
     getRecentCronFailures(24 * 7),
     getFlaggedEvalScores(),
   ])
