@@ -1,5 +1,7 @@
 # AI Daily Update
 
+**Live:** [ai-daily-update-ktnf.vercel.app](https://ai-daily-update-ktnf.vercel.app/)
+
 A personal AI intelligence dashboard that aggregates 14+ sources, uses Claude to screen for relevance and extract signal, and surfaces what actually matters in the AI landscape — updated twice daily.
 
 ## What it does
@@ -14,6 +16,7 @@ A personal AI intelligence dashboard that aggregates 14+ sources, uses Claude to
 - **Predictions** — AI milestone predictions with confidence levels and automatic evidence tracking.
 - **Advisor** — Claude generates personalized project ideas based on trending developments.
 - **Timeline** — Visual history of AI events and predictions from 2015 through projected 2030+.
+- **Health** — Ops dashboard: per-source fetch/screening status, Claude token usage, cron failures, and eval quality flags, all in one page.
 
 ## Stack
 
@@ -21,6 +24,7 @@ A personal AI intelligence dashboard that aggregates 14+ sources, uses Claude to
 - **Styling:** Tailwind CSS 4
 - **Database:** SQLite (local dev) / Turso libsql (production)
 - **AI:** Anthropic Claude — Sonnet 4.6 for analysis, Haiku 4.5 for screening and hooks
+- **Alerts:** Resend (health-check failure emails)
 - **Deploy:** Vercel
 
 ## Local setup
@@ -95,10 +99,13 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/cron/fetch-intel" `
 
 | Job | Schedule | What it does |
 |---|---|---|
-| `/api/cron/fetch-ingest` | 8:00am, 8:00pm | Fetches all 14 sources, inserts raw items |
-| `/api/cron/fetch-intel` | 8:10am, 8:10pm | Claude screening + all intelligence tasks |
+| `/api/cron/fetch-ingest` | 8:00am, 8:00pm | Fetches all sources, inserts raw items |
+| `/api/cron/fetch-intel` | 8:20am, 8:20pm | Claude screening + all intelligence tasks |
 | `/api/cron/brief` | 8:45am | Generates the daily brief if not yet done today |
 | `/api/cron/digest` | 9:00am | Generates the weekly digest if not yet done this week |
+| `/api/cron/predictions` | 10:00am Mon | Refreshes AI milestone prediction confidence/evidence |
+| `/api/cron/benchmarks` | 9:00am on the 1st/11th/21st | Syncs model benchmark scores |
+| `/api/cron/health-notify` | 9:30am | Runs health checks, emails failures via Resend |
 
 The fetch pipeline is split into two cron jobs so each stays within Vercel Hobby's 10-second function timeout. Ingest does HTTP fetches and DB writes only. Intel handles all Claude calls.
 
@@ -118,11 +125,12 @@ No test suite.
 ```
 app/
 ├── api/
-│   ├── cron/          # fetch-ingest, fetch-intel, brief, digest
-│   └── ...            # feed, stories, digest, advisor, etc.
+│   ├── cron/          # fetch-ingest, fetch-intel, brief, digest, predictions, benchmarks, health-notify
+│   └── ...            # feed, stories, digest, advisor, health, etc.
 ├── feed/
 ├── stories/
 ├── digest/
+├── health/
 └── ...                # models, repos, datasets, predictions, advisor, timeline
 
 lib/
@@ -130,7 +138,15 @@ lib/
 ├── db.ts              # libsql client + schema init + migrations
 ├── claude.ts          # Anthropic client + model constants
 ├── sources/           # one fetcher per source
-└── intelligence/      # Claude-powered enrichment (hooks, stories, digest, ...)
+├── intelligence/      # Claude-powered enrichment (hooks, stories, digest, ...)
+├── eval/              # LLM-judge groundedness/pairwise scoring for digest & brief
+└── health*.ts, screening-stats.ts, notify.ts, cronRuns.ts   # ops/health-dashboard data
+
+components/
+└── icons.tsx          # shared nav + in-page glyphs
+
+scripts/
+└── eval/              # capture golden sets, replay evals, export flagged cases for review
 ```
 
 ## Sources
@@ -142,3 +158,5 @@ lib/
 - Local dev uses `data/pulse.db` — no Turso account needed
 - Schema migrations are append-only `ALTER TABLE` blocks in `lib/db.ts` — never drop and recreate tables
 - Items inserted by `fetch-ingest` are hidden from the feed (`screened = 0`) until `fetch-intel` processes them
+- Every real digest/brief generation is scored for groundedness by an LLM judge (`lib/eval/`) — low-scoring cases are flagged, reviewed locally, and turned into golden-set regression fixtures via `scripts/eval/export-flagged.mts`
+- `/health` surfaces the live state of all of the above — source status, screening quality, Claude spend, cron failures, and open eval flags
