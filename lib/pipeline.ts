@@ -225,6 +225,17 @@ async function pruneOldFeedItems(): Promise<void> {
   if (rowsAffected > 0) console.log(`[pipeline] pruned ${rowsAffected} old feed items`)
 }
 
+// Rolling 7-day window on the rejected-items diagnostic log (lib/db.ts,
+// written by lib/intelligence/hooks.ts) — a debugging aid, not an archive.
+async function pruneOldRejectedItemsLog(): Promise<void> {
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const { rowsAffected } = await db.execute({
+    sql: `DELETE FROM rejected_items_log WHERE rejected_at < ?`,
+    args: [cutoff],
+  })
+  if (rowsAffected > 0) console.log(`[pipeline] pruned ${rowsAffected} old rejected-item log entries`)
+}
+
 // Phase 1 of the pipeline: fetch all sources and insert raw items (screened = 0).
 // No Claude calls — designed to complete within Vercel Hobby's 10s function limit.
 export async function fetchIngest(): Promise<number> {
@@ -319,6 +330,7 @@ export async function fetchIntelligence(): Promise<void> {
     { label: 'seedRadarIfEmpty', promise: seedRadarIfEmpty() },
     { label: 'reclassifyStaleTools', promise: reclassifyStaleTools() },
     { label: 'pruneOldFeedItems', promise: pruneOldFeedItems() },
+    { label: 'pruneOldRejectedItemsLog', promise: pruneOldRejectedItemsLog() },
     { label: 'updateAccelerationScores', promise: updateAccelerationScores() },
   ]
 

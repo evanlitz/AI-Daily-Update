@@ -30,8 +30,14 @@ function stableId(url: string): string {
   return crypto.createHash('sha1').update(url).digest('hex').slice(0, 16)
 }
 
+// Missing the /shorts/ form meant every Shorts upload got screened on title
+// alone (extractVideoId returned null, so getTranscript was never called) —
+// confirmed against dwarkesh-patel, whose Shorts clips from long interviews
+// were getting rejected ~70% of the time with empty raw_content, since a
+// clip's title rarely states the topic explicitly the way the full episode's
+// does. Real transcripts fetch fine for these once the ID is extracted correctly.
 function extractVideoId(url: string): string | null {
-  const m = url.match(/[?&]v=([^&]+)/) ?? url.match(/youtu\.be\/([^?]+)/)
+  const m = url.match(/[?&]v=([^&]+)/) ?? url.match(/youtu\.be\/([^?]+)/) ?? url.match(/\/shorts\/([^?]+)/)
   return m?.[1] ?? null
 }
 
