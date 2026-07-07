@@ -77,6 +77,13 @@ const FEEDS = [
   { url: 'https://bair.berkeley.edu/blog/feed.xml',                      source: 'rss:bair',                tags: ['research'] },
   // Stanford HAI: policy and governance angle — the only institute-level AI policy source.
   { url: 'https://hai.stanford.edu/news/rss.xml',                        source: 'rss:stanford-hai',        tags: ['industry'] },
+  { url: 'https://news.mit.edu/rss/topic/artificial-intelligence2',      source: 'rss:mit-news',            tags: ['research'] },
+
+  // ── Global AI Coverage ───────────────────────────────────────────────────────
+  // ChinaTalk: US-China tech policy plus direct coverage of Chinese labs (DeepSeek,
+  // Qwen, Zhipu, MiniMax, etc.) — none of the labs themselves publish English RSS,
+  // so this newsletter is the only feed-based route to that half of the frontier.
+  { url: 'https://chinatalk.media/feed',                                 source: 'rss:chinatalk',           tags: ['industry', 'research'] },
 
   // ── Model Labs / Infra ───────────────────────────────────────────────────────
   { url: 'https://www.together.ai/blog/rss.xml',                         source: 'rss:together-ai',         tags: ['models', 'infrastructure'] },
@@ -93,6 +100,10 @@ const FEEDS = [
   // IEEE Spectrum AI: engineering and hardware angle — inference chips, data center
   // builds, practical deployment. Underrepresented in the current software-skewed mix.
   { url: 'https://spectrum.ieee.org/feeds/topic/artificial-intelligence.rss', source: 'rss:ieee-spectrum-ai', tags: ['infrastructure', 'research'] },
+  // SemiAnalysis: the most-cited chips/compute/datacenter deep-dive newsletter in AI —
+  // GPU supply, training cluster economics, export-control fallout. Complements IEEE
+  // Spectrum's engineering angle with the compute-economics angle.
+  { url: 'https://www.semianalysis.com/feed',                            source: 'rss:semianalysis',        tags: ['infrastructure', 'industry'] },
   { url: 'https://techcrunch.com/category/artificial-intelligence/feed/', source: 'rss:techcrunch-ai',      tags: ['industry'] },
   { url: 'https://www.technologyreview.com/feed/',                        source: 'rss:mit-tech-review',    tags: ['research'] },
   { url: 'https://venturebeat.com/category/ai/feed',                      source: 'rss:venturebeat-ai',     tags: ['industry'] },
