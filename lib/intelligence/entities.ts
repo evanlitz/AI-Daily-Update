@@ -38,8 +38,12 @@ export async function saveEntityMentions(
 
   // Build lookup: normalized form → entity id
   const nameToId = new Map<string, string>()
+  // id → row, so a fuzzy-match hit can read its aliases in O(1) instead of a
+  // linear existingRows.find() — matters once the entities table has grown.
+  const byId = new Map<string, any>()
   for (const e of existingRows) {
     nameToId.set(e.name.toLowerCase().trim(), e.id)
+    byId.set(e.id, e)
     for (const alias of JSON.parse(e.aliases ?? '[]') as string[]) {
       nameToId.set(alias.toLowerCase().trim(), e.id)
     }
@@ -85,7 +89,7 @@ export async function saveEntityMentions(
           if (entityId) break
         }
         if (entityId) {
-          const entity = existingRows.find(e => e.id === entityId)
+          const entity = byId.get(entityId)
           if (entity) {
             const aliases: string[] = aliasUpdates.get(entityId) ?? JSON.parse(entity.aliases ?? '[]')
             if (!aliases.includes(name)) {
@@ -101,7 +105,7 @@ export async function saveEntityMentions(
         entityId = crypto.randomUUID()
         newEntities.push({ id: entityId, name, type })
         nameToId.set(key, entityId)
-        existingRows.push({ id: entityId, name, aliases: '[]' })
+        byId.set(entityId, { id: entityId, name, aliases: '[]' })
         const bucket = byLength.get(key.length) ?? []
         bucket.push(key)
         byLength.set(key.length, bucket)

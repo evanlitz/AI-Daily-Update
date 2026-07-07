@@ -60,7 +60,7 @@ async function classifyBatch(tools: string[]): Promise<void> {
     for (const row of existing as any[]) existingMap.set(row.name, row)
   }
 
-  for (const item of valid) {
+  const statements = valid.map(item => {
     const prev = existingMap.get(item.name)
     let history: any[] = []
     if (prev) {
@@ -69,12 +69,13 @@ async function classifyBatch(tools: string[]): Promise<void> {
         history.push({ from: prev.quadrant, to: item.quadrant ?? 'assess', date: now })
       }
     }
-    await db.execute({
+    return {
       sql: `INSERT INTO tech_radar (id, name, category, quadrant, rationale, last_updated, ring_history) VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(name) DO UPDATE SET category=excluded.category, quadrant=excluded.quadrant, rationale=excluded.rationale, last_updated=excluded.last_updated, ring_history=excluded.ring_history`,
       args: [crypto.randomUUID(), item.name, item.category ?? 'tool', item.quadrant ?? 'assess', item.rationale ?? '', now, JSON.stringify(history)],
-    })
-  }
+    }
+  })
+  if (statements.length > 0) await db.batch(statements as any)
   console.log(`[radar] classified ${valid.length}/${classified.length} items (${classified.length - valid.length} filtered)`)
 }
 
@@ -96,6 +97,18 @@ export async function classifyToolNames(names: string[]): Promise<void> {
   for (let i = 0; i < newTools.length; i += 20) await classifyBatch(newTools.slice(i, i + 20))
 }
 
+// Manual-only backstop — NOT called by pipeline.ts, so it never runs on the
+// automatic twice-daily cron. The live, automatic path for populating the
+// radar is Claude's own tool extraction during screening (hooks.ts, capped
+// at 5 tools from a 600-char snippet) feeding classifyToolNames() above.
+// This function instead regex-matches TOOL_PATTERNS against an item's FULL
+// raw_content, so it can catch a tool mentioned past that 600-char cutoff —
+// but only tools whose name was hand-written into TOOL_PATTERNS already; it
+// will never recognize something released after that list was last updated,
+// unlike Claude's own extraction. Reachable via POST /api/radar/scan when
+// you want a fuller manual sweep — deliberately not wired into the pipeline
+// (that would trade a real but ongoing cron cost for a narrow, static-list
+// benefit that hasn't been measured).
 export async function classifyForRadar(items: FeedItem[]): Promise<void> {
   const allText  = items.map(i => `${i.title} ${i.raw_content ?? ''}`).join(' ')
   const matches  = allText.match(TOOL_PATTERNS) ?? []
