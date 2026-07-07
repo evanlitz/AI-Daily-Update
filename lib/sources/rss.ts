@@ -46,7 +46,10 @@ const FEEDS = [
   { url: 'https://mistral.ai/rss.xml',                                   source: 'rss:mistral',             tags: ['models', 'industry'] },
 
   // ── Big Tech AI Blogs ────────────────────────────────────────────────────────
-  { url: 'https://blog.google/innovation-and-ai/technology/ai/rss/',     source: 'rss:google-ai',           tags: ['models'] },
+  // rss:google-ai (blog.google's broader "innovation and AI" category) dropped:
+  // 9.4% accept rate over 32 screened items — it's Google's general innovation
+  // blog, not an AI-specific one, and deepmind's own feed already covers
+  // Google's actual model/research news far more precisely.
   { url: 'https://research.google/blog/rss',                             source: 'rss:google-research',     tags: ['research'] },
   { url: 'https://www.microsoft.com/en-us/research/blog/feed/',          source: 'rss:microsoft-research',  tags: ['research'] },
   { url: 'https://news.microsoft.com/source/topics/ai/feed/',            source: 'rss:microsoft-ai',        tags: ['industry', 'tools'] },
@@ -90,10 +93,10 @@ const FEEDS = [
   { url: 'https://stability.ai/news-updates?format=rss',                  source: 'rss:stability-ai',        tags: ['models'] },
 
   // ── Tech News ────────────────────────────────────────────────────────────────
-  // The Verge covers AI company drama, policy, and competitive moves — exactly
-  // the stories that don't appear in lab blogs or research feeds (e.g. IP disputes,
-  // regulatory news, industry conflicts). Best free source for this gap.
-  { url: 'https://www.theverge.com/rss/index.xml',                        source: 'rss:the-verge',           tags: ['industry'] },
+  // The Verge (rss:the-verge) dropped: 12.1% accept rate over 33 screened items —
+  // its general tech-culture coverage was diluting the feed, not filling a gap
+  // (regulatory/IP-dispute stories it does carry already surface via Ars/Wired/
+  // The Decoder). Measured via screening_stats, see lib/intelligence/hooks.ts.
   // Wired AI: investigative/longform journalism — deep company profiles, policy pieces.
   // Different cadence from TechCrunch/Ars which are news-cycle oriented.
   { url: 'https://www.wired.com/feed/tag/ai/latest/rss',                  source: 'rss:wired-ai',            tags: ['industry'] },
@@ -108,7 +111,9 @@ const FEEDS = [
   { url: 'https://www.technologyreview.com/feed/',                        source: 'rss:mit-tech-review',    tags: ['research'] },
   { url: 'https://venturebeat.com/category/ai/feed',                      source: 'rss:venturebeat-ai',     tags: ['industry'] },
   { url: 'https://www.marktechpost.com/feed/',                            source: 'rss:marktechpost',       tags: ['research', 'industry'] },
-  { url: 'https://techcrunch.com/category/venture/feed/',                 source: 'rss:techcrunch-venture',  tags: ['industry'] },
+  // rss:techcrunch-venture dropped: 8.1% accept rate over 99 screened items, the
+  // lowest of any RSS source — general VC/funding news rarely touches AI, and
+  // rss:techcrunch-ai already covers this outlet's actual AI stories.
   // No free primary-source feed exists for anthropic/cohere/meta-ai (see note above) —
   // these two news aggregators pick up their announcements editorially instead.
   { url: 'https://the-decoder.com/feed/',                                  source: 'rss:the-decoder',         tags: ['models', 'industry'] },

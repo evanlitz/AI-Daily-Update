@@ -315,6 +315,9 @@ export async function screenPendingItems(): Promise<ScreenResult> {
   const toolsSeen = new Map<string, string>()
   const toDelete: string[] = []
   const toRetry: string[] = []
+  // Diagnostic-only record of what's about to be hard-deleted (see db.ts) —
+  // never read by any prompt-building code, purely for post-hoc inspection.
+  const rejectedLog: { id: string; source: string; title: string; url: string; reason: 'relevance' | 'retries_exhausted' }[] = []
   let totalInputTokens = 0, totalOutputTokens = 0
 
   // On Claude failure, leave items unscreened so they retry next run instead of
@@ -325,6 +328,7 @@ export async function screenPendingItems(): Promise<ScreenResult> {
     for (const item of batch) {
       if ((item.screen_attempts ?? 0) + 1 >= MAX_SCREEN_ATTEMPTS) {
         toDelete.push(item.id)
+        rejectedLog.push({ id: item.id, source: item.source, title: item.title, url: item.url, reason: 'retries_exhausted' })
         bumpTally(tallies, item.source, 'rejected')
       } else {
         toRetry.push(item.id)
@@ -372,6 +376,7 @@ export async function screenPendingItems(): Promise<ScreenResult> {
         }
         if (entry.relevant === false) {
           toDelete.push(item.id)
+          rejectedLog.push({ id: item.id, source: item.source, title: item.title, url: item.url, reason: 'relevance' })
           dropped++
           bumpTally(tallies, item.source, 'rejected')
           continue
@@ -404,6 +409,7 @@ export async function screenPendingItems(): Promise<ScreenResult> {
       if (toDeleteSet.has(repId)) {
         for (const d of dups) {
           toDelete.push(d.id)
+          rejectedLog.push({ id: d.id, source: d.source, title: d.title, url: d.url, reason: 'relevance' })
           bumpTally(tallies, d.source, 'rejected')
         }
         continue
@@ -437,6 +443,15 @@ export async function screenPendingItems(): Promise<ScreenResult> {
       await db.execute({ sql: `DELETE FROM feed_items WHERE id IN (${chunk.map(() => '?').join(',')})`, args: chunk })
     }
     console.log(`[hooks] deleted ${toDelete.length} irrelevant items`)
+  }
+
+  // Log what was deleted before it's gone for good — diagnostic-only, see db.ts.
+  if (rejectedLog.length > 0) {
+    const now = new Date().toISOString()
+    await db.batch(rejectedLog.map(r => ({
+      sql: `INSERT INTO rejected_items_log (id, source, title, url, reason, rejected_at) VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [r.id, r.source, r.title, r.url ?? null, r.reason, now],
+    })))
   }
 
   // Bump retry count for items left unscreened after a failed batch, so the next

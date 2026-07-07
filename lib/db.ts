@@ -457,4 +457,25 @@ try { await db.execute(`
 `) } catch {}
 try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_eval_scores_flagged ON eval_scores (flagged, exported)`) } catch {}
 
+// Diagnostic-only record of items screenPendingItems() rejected, since the
+// feed_items row itself is hard-deleted (lib/intelligence/hooks.ts) and would
+// otherwise leave zero trace beyond an aggregate screening_stats counter —
+// which is exactly why a real bug (dwarkesh-patel Shorts screened on title
+// alone, ~70% wrongly rejected) took a manual DB query to find instead of a
+// glance at recent titles. Rolling 7-day window, pruned in lib/pipeline.ts
+// alongside pruneOldFeedItems(). Read-only for humans/debugging — nothing in
+// the codebase may query this table when building a screening/Claude prompt;
+// it must never influence a live screening decision.
+try { await db.execute(`
+  CREATE TABLE IF NOT EXISTS rejected_items_log (
+    id          TEXT PRIMARY KEY,
+    source      TEXT NOT NULL,
+    title       TEXT NOT NULL,
+    url         TEXT,
+    reason      TEXT NOT NULL,
+    rejected_at TEXT NOT NULL
+  )
+`) } catch {}
+try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_rejected_items_log_rejected_at ON rejected_items_log (rejected_at)`) } catch {}
+
 export default db
