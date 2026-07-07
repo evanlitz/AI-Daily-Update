@@ -20,6 +20,7 @@ const CHANNELS = [
   { channelId: 'UCxBcwypKK-W3GHd_RZ9FZrQ', slug: 'latent-space',      tags: ['tools', 'industry'] as string[] },
   { channelId: 'UCSI7h9hydQ40K5MJHnCrQvw', slug: 'no-priors',         tags: ['industry'] as string[] },
   { channelId: 'UCfV5_thTSP0Wvi0odqxG96Q', slug: 'cognitive-revolution', tags: ['industry', 'tools'] as string[] },
+  { channelId: 'UCNJ1Ymd5yFuUPtn21xtRbbw', slug: 'ai-explained',         tags: ['research'] as string[] },
 ]
 
 const CUTOFF_DAYS = 7
