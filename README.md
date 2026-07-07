@@ -100,14 +100,15 @@ Invoke-RestMethod -Uri "http://localhost:3000/api/cron/fetch-intel" `
 | Job | Schedule | What it does |
 |---|---|---|
 | `/api/cron/fetch-ingest` | 8:00am, 8:00pm | Fetches all sources, inserts raw items |
-| `/api/cron/fetch-intel` | 8:20am, 8:20pm | Claude screening + all intelligence tasks |
+| `/api/cron/fetch-intel` | 8:20am, 8:20pm | Claude screening + hooks + story threads + entity extraction |
+| `/api/cron/fetch-intel-2` | 8:29am, 8:29pm | DB-only: thread linking, prediction/entity backfill, radar, pruning, acceleration scores |
 | `/api/cron/brief` | 8:45am | Generates the daily brief if not yet done today |
 | `/api/cron/digest` | 9:00am | Generates the weekly digest if not yet done this week |
 | `/api/cron/predictions` | 10:00am Mon | Refreshes AI milestone prediction confidence/evidence |
 | `/api/cron/benchmarks` | 9:00am on the 1st/11th/21st | Syncs model benchmark scores |
 | `/api/cron/health-notify` | 9:30am | Runs health checks, emails failures via Resend |
 
-The fetch pipeline is split into two cron jobs so each stays within Vercel Hobby's 10-second function timeout. Ingest does HTTP fetches and DB writes only. Intel handles all Claude calls.
+The fetch pipeline is split into three cron jobs so each stays within Vercel's 300s function timeout. Ingest does HTTP fetches and DB writes only. Intel (phase 1) does the Claude-heavy work — screening, hooks, story threads, entity extraction. Intel-2 (phase 2) is DB-only follow-up work with no in-memory dependency on phase 1's output, so it runs as a separate invocation on its own schedule.
 
 ## Dev commands
 

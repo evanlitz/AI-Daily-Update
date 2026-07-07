@@ -292,8 +292,25 @@ export async function fetchIngest(): Promise<number> {
 
 // Phase 2 of the pipeline: screen pending items and run all intelligence tasks.
 // Runs 10 minutes after fetchIngest to give ingest time to complete.
-export async function fetchIntelligence(): Promise<void> {
-  console.log('[pipeline] starting intelligence phase...')
+function collectFailures(labels: string[], results: PromiseSettledResult<void>[]): string[] {
+  return results
+    .map((r, i) => {
+      if (r.status === 'rejected') {
+        const msg = r.reason instanceof Error ? r.reason.message : String(r.reason)
+        console.error(`[pipeline] ${labels[i]} failed:`, r.reason)
+        return `${labels[i]}: ${msg}`
+      }
+      return null
+    })
+    .filter((e): e is string => e !== null)
+}
+
+// Split into two cron-sized invocations (see fetch-intel / fetch-intel-2 routes) —
+// running both phases in one function regularly exceeded Vercel's 300s function
+// timeout on heavy news days. Phase 2 is deliberately DB-driven only (no
+// in-memory hand-off from phase 1) so the two can run as separate invocations.
+export async function fetchIntelligencePhase1(): Promise<void> {
+  console.log('[pipeline] starting intelligence phase 1...')
 
   const { items: newItems, entityMap, toolNames } = await screenPendingItems()
   console.log(`[pipeline] ${newItems.length} items passed relevance screen`)
@@ -323,6 +340,17 @@ export async function fetchIntelligence(): Promise<void> {
     phase1.push({ label: 'saveEntityMentions', promise: saveEntityMentions(newItems, entityMap) })
   }
 
+  const p1Results = await Promise.allSettled(phase1.map(t => t.promise))
+  const failures = collectFailures(phase1.map(t => t.label), p1Results)
+
+  if (failures.length > 0) {
+    throw new Error(`Intelligence phase 1 completed with ${failures.length} task failure(s):\n${failures.join('\n')}`)
+  }
+}
+
+export async function fetchIntelligencePhase2(): Promise<void> {
+  console.log('[pipeline] starting intelligence phase 2...')
+
   const phase2: { label: string; promise: Promise<void> }[] = [
     { label: 'linkThreads', promise: linkThreads() },
     { label: 'backfillPredictionEvidence', promise: backfillPredictionEvidence() },
@@ -334,29 +362,31 @@ export async function fetchIntelligence(): Promise<void> {
     { label: 'updateAccelerationScores', promise: updateAccelerationScores() },
   ]
 
-  function collectFailures(tasks: typeof phase1, results: PromiseSettledResult<void>[]): string[] {
-    return results
-      .map((r, i) => {
-        if (r.status === 'rejected') {
-          const msg = r.reason instanceof Error ? r.reason.message : String(r.reason)
-          console.error(`[pipeline] ${tasks[i].label} failed:`, r.reason)
-          return `${tasks[i].label}: ${msg}`
-        }
-        return null
-      })
-      .filter((e): e is string => e !== null)
-  }
-
-  const p1Results = await Promise.allSettled(phase1.map(t => t.promise))
   const p2Results = await Promise.allSettled(phase2.map(t => t.promise))
-  const failures = [...collectFailures(phase1, p1Results), ...collectFailures(phase2, p2Results)]
+  const failures = collectFailures(phase2.map(t => t.label), p2Results)
 
   if (failures.length > 0) {
-    throw new Error(`Intelligence phase completed with ${failures.length} task failure(s):\n${failures.join('\n')}`)
+    throw new Error(`Intelligence phase 2 completed with ${failures.length} task failure(s):\n${failures.join('\n')}`)
   }
 }
 
-// Convenience wrapper for manual triggering (calls both phases sequentially).
+// Kept for manual/local triggering (instrumentation.ts's dev boot, /api/feed/refresh,
+// /api/cron/fetch) where both phases need to run in one call. Runs them concurrently,
+// not sequentially — phase 2 has no in-memory dependency on phase 1 (see the phase
+// functions above), and awaiting phase 1 to completion first would double this
+// wrapper's wall time and put single-invocation callers at *more* risk of the same
+// 300s timeout the phase split was meant to avoid.
+export async function fetchIntelligence(): Promise<void> {
+  const results = await Promise.allSettled([fetchIntelligencePhase1(), fetchIntelligencePhase2()])
+  const failures = results
+    .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+    .map(r => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+  if (failures.length > 0) {
+    throw new Error(`Intelligence phases completed with failure(s):\n${failures.join('\n')}`)
+  }
+}
+
+// Runs ingest then intelligence in one call, for manual/local triggering only.
 export async function fetchAll(): Promise<number> {
   const count = await fetchIngest()
   await fetchIntelligence()
