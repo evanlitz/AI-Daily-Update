@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { refreshPredictionAnalysis, checkPredictionResolution, generateNewPredictions } from '@/lib/intelligence/predictions'
+import { startCronRun, finishCronRun } from '@/lib/cronRuns'
 
 export const maxDuration = 180
 
@@ -16,9 +17,24 @@ export async function GET(req: Request) {
     return new Response('Unauthorized', { status: 401 })
   }
 
-  await refreshPredictionAnalysis().catch(console.error)
-  await checkPredictionResolution().catch(console.error)
-  await generateNewPredictions().catch(console.error)
+  const runId = await startCronRun('/api/cron/predictions')
 
+  // Each step is independently idempotent (see above), so one step's failure
+  // shouldn't block the others from still running this week — but a failure
+  // must be visible, not just logged: without a cron_runs row here, a total
+  // failure of all three was previously invisible to /health and health-notify.
+  const errors: string[] = []
+  await refreshPredictionAnalysis().catch(err => errors.push(`refreshPredictionAnalysis: ${err instanceof Error ? err.message : String(err)}`))
+  await checkPredictionResolution().catch(err => errors.push(`checkPredictionResolution: ${err instanceof Error ? err.message : String(err)}`))
+  await generateNewPredictions().catch(err => errors.push(`generateNewPredictions: ${err instanceof Error ? err.message : String(err)}`))
+
+  if (errors.length > 0) {
+    const message = errors.join('\n')
+    console.error('[cron/predictions] failed:', message)
+    await finishCronRun(runId, 'failed', message)
+    return NextResponse.json({ ok: false, error: message }, { status: 500 })
+  }
+
+  await finishCronRun(runId, 'success')
   return NextResponse.json({ ok: true })
 }

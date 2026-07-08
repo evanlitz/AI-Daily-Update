@@ -1,4 +1,4 @@
-import db from './db'
+import db, { batchWithDiagnostics } from './db'
 import { fetchArxiv } from './sources/arxiv'
 import { fetchHackerNews } from './sources/hackernews'
 import { fetchRSS } from './sources/rss'
@@ -44,6 +44,11 @@ async function step<T>(label: string, fn: () => Promise<T>): Promise<T> {
 // timeout, but a future source (or a library timeout that silently fails to
 // abort under some network condition) could still hang Promise.all forever.
 // This guarantees fetch-sources unblocks within `ms` regardless.
+//
+// Also guards rejections, not just hangs: `promise` is one entry in the single
+// Promise.all() all 13 sources share (see fetchIngest below) — an uncaught
+// throw from any one source would otherwise fail that Promise.all and abort
+// ingest for every other source in the same run, not just the failing one.
 function withTimeout<T>(label: string, promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   let timer: ReturnType<typeof setTimeout>
   const timeout = new Promise<T>(resolve => {
@@ -52,7 +57,11 @@ function withTimeout<T>(label: string, promise: Promise<T>, ms: number, fallback
       resolve(fallback)
     }, ms)
   })
-  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+  const guarded = promise.catch(err => {
+    console.error(`[pipeline] ${label} failed — using empty fallback:`, err)
+    return fallback
+  })
+  return Promise.race([guarded, timeout]).finally(() => clearTimeout(timer))
 }
 
 // Defensive cap: a source returning far more than expected (API quirk, missing
@@ -61,33 +70,6 @@ function cap<T>(label: string, items: T[], max: number): T[] {
   if (items.length <= max) return items
   console.warn(`[pipeline] ${label} returned ${items.length} items, capping to ${max}`)
   return items.slice(0, max)
-}
-
-// db.batch() is all-or-nothing — if one statement is rejected (e.g. Turso's stricter
-// remote type validation vs local SQLite), the whole batch fails with a generic
-// "SERVER_ERROR: ... 400" that doesn't say which row caused it. On failure, retry
-// each statement individually, log + skip whichever row is rejected, and let the
-// rest of the batch (and the pipeline) continue.
-async function batchWithDiagnostics(
-  statements: { sql: string; args: unknown[] }[],
-  rowLabel: (i: number) => string
-): Promise<{ rowsAffected: number }[]> {
-  try {
-    return await db.batch(statements as any)
-  } catch (batchErr) {
-    const results: { rowsAffected: number }[] = []
-    for (let i = 0; i < statements.length; i++) {
-      try {
-        const result = await db.execute(statements[i] as any)
-        results.push(result)
-      } catch (rowErr) {
-        const msg = rowErr instanceof Error ? rowErr.message : String(rowErr)
-        console.error(`[pipeline] row ${rowLabel(i)} rejected, skipping: ${msg}`)
-        results.push({ rowsAffected: 0 })
-      }
-    }
-    return results
-  }
 }
 
 async function insertItems(items: FeedItem[]): Promise<{ count: number; newItems: FeedItem[] }> {

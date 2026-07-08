@@ -478,4 +478,33 @@ try { await db.execute(`
 `) } catch {}
 try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_rejected_items_log_rejected_at ON rejected_items_log (rejected_at)`) } catch {}
 
+// db.batch() is all-or-nothing — if one statement is rejected (e.g. Turso's stricter
+// remote type validation vs local SQLite, or a PRIMARY KEY collision), the whole batch
+// fails with one generic error that doesn't say which row caused it. On failure, retry
+// each statement individually, log + skip whichever row is rejected, and let the rest
+// of the batch continue. Shared here (not private to pipeline.ts) so any caller writing
+// batched rows — including diagnostic-only tables in lib/intelligence/*.ts — gets the
+// same per-row-safe behavior instead of re-solving this with a coarser all-or-nothing catch.
+export async function batchWithDiagnostics(
+  statements: { sql: string; args: unknown[] }[],
+  rowLabel: (i: number) => string
+): Promise<{ rowsAffected: number }[]> {
+  try {
+    return await db.batch(statements as any)
+  } catch (batchErr) {
+    const results: { rowsAffected: number }[] = []
+    for (let i = 0; i < statements.length; i++) {
+      try {
+        const result = await db.execute(statements[i] as any)
+        results.push(result)
+      } catch (rowErr) {
+        const msg = rowErr instanceof Error ? rowErr.message : String(rowErr)
+        console.error(`[db] row ${rowLabel(i)} rejected, skipping: ${msg}`)
+        results.push({ rowsAffected: 0 })
+      }
+    }
+    return results
+  }
+}
+
 export default db

@@ -1,5 +1,5 @@
 import { anthropic, MODEL_FAST } from '../claude'
-import db from '../db'
+import db, { batchWithDiagnostics } from '../db'
 import type { FeedItem } from '../types'
 import type { ExtractedEntity } from './entities'
 import { findRecentDuplicateFeedItem } from '../memory'
@@ -446,12 +446,23 @@ export async function screenPendingItems(): Promise<ScreenResult> {
   }
 
   // Log what was deleted before it's gone for good — diagnostic-only, see db.ts.
+  // item.id is a stable hash of the URL (see lib/sources/*), not a fresh UUID per
+  // rejection — the same URL reappearing in a later ingest (still-live RSS entry,
+  // re-trending repo) before its prior log row ages out of the 7-day window would
+  // collide on the PRIMARY KEY. ON CONFLICT refreshes the row instead of failing.
+  // batchWithDiagnostics also isolates any other single bad row (rather than an
+  // all-or-nothing catch) so one collision can't drop the whole run's diagnostic
+  // log — same per-row-safe pattern pipeline.ts already uses for its own batches.
   if (rejectedLog.length > 0) {
     const now = new Date().toISOString()
-    await db.batch(rejectedLog.map(r => ({
-      sql: `INSERT INTO rejected_items_log (id, source, title, url, reason, rejected_at) VALUES (?, ?, ?, ?, ?, ?)`,
-      args: [r.id, r.source, r.title, r.url ?? null, r.reason, now],
-    })))
+    await batchWithDiagnostics(
+      rejectedLog.map(r => ({
+        sql: `INSERT INTO rejected_items_log (id, source, title, url, reason, rejected_at) VALUES (?, ?, ?, ?, ?, ?)
+              ON CONFLICT(id) DO UPDATE SET reason = excluded.reason, rejected_at = excluded.rejected_at`,
+        args: [r.id, r.source, r.title, r.url ?? null, r.reason, now],
+      })),
+      i => `rejected_items_log:${rejectedLog[i].id}`
+    )
   }
 
   // Bump retry count for items left unscreened after a failed batch, so the next
