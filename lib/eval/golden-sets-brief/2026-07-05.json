@@ -1,0 +1,194 @@
+{
+  "id": "abb36bdd-ee70-4a5e-a8a4-a37fdec610f0",
+  "date": "2026-07-05",
+  "capturedAt": "2026-07-09T15:46:48.996Z",
+  "context": {
+    "today": "2026-07-05",
+    "items": [
+      {
+        "title": "Calculator built to teach/experiment with costing LLM chat apps",
+        "hook": "Interactive cost calculator for building LLM chat applications across hosting models.",
+        "source": "hn",
+        "velocity_score": 4.26
+      },
+      {
+        "title": "sqlite-utils 4.0rc2, mostly written by Claude Fable (for about $149.25)",
+        "hook": "sqlite-utils 4.0rc2 built with Claude, demonstrating LLM-assisted open-source development.",
+        "source": "rss:simon-willison",
+        "velocity_score": 4.26
+      },
+      {
+        "title": "faerber-lab/AttributeCiteQuote",
+        "hook": "Survey on attribution and citation in LLM-generated text (ACL 2026)",
+        "source": "github",
+        "velocity_score": 4.26
+      },
+      {
+        "title": "EstherKim97/KnowledgeGraph",
+        "hook": "Biomedical platform converts PubMed to structured knowledge graphs with LLMs",
+        "source": "github",
+        "velocity_score": 4.26
+      },
+      {
+        "title": "llama.cpp b9873: b9873",
+        "hook": "llama.cpp adds K/V rotation guard for DFlash speculative decoding",
+        "source": "github-releases",
+        "velocity_score": 4.26
+      },
+      {
+        "title": "The Plumbing That Decides a Machine Learning Competition",
+        "hook": "Analysis of ML competition infrastructure and evaluation methodology",
+        "source": "hn",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "Claude Fable relaunch disappoints users with nerfed performance",
+        "hook": "Claude Fable model relaunch underperforms expectations after regulation lift",
+        "source": "hn",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "LLMs adopt the social biases of human if assigned different professional roles",
+        "hook": "LLMs replicate human social hierarchies and biases when assigned roles",
+        "source": "hn",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "Expanding our Heat Resilience data to 50+ global cities",
+        "hook": "Google open-sources heat resilience AI across 50+ global cities",
+        "source": "rss:google-research",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "Midjourney wants Hollywood studios to reveal the details of their AI usage",
+        "hook": "Midjourney's legal battle forces studios to disclose AI usage details",
+        "source": "rss:techcrunch-ai",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "Ashton Kutcher leaving Sound Ventures to launch new VC firm with Morgan Beller",
+        "hook": "New VC firm targets AI infrastructure and energy layer beneath frontier labs",
+        "source": "rss:techcrunch-ai",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "Thiel Capital’s Jack Selby nabs stakes in hot startups like Etched through Arizona connections",
+        "hook": "Copper Sky Capital invests in Etched AI and infrastructure startups",
+        "source": "rss:techcrunch-venture",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "Open-source tool pxpipe hides text in PNGs to cut Claude Code and Fable 5 token costs up to 70%",
+        "hook": "pxpipe reduces Claude Code token costs 59-70% by encoding text as PNG pixels",
+        "source": "rss:the-decoder",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "Anthropic developer shares prompting tips for Fable 5 that focus on finding your own blind spots first",
+        "hook": "Anthropic dev reveals Fable 5 bottleneck is user blind spots, not model capability",
+        "source": "rss:the-decoder",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "OpenAI cofounder envisions \"almost no interface\" future where nobody learns software anymore",
+        "hook": "OpenAI cofounder outlines vision for invisible AI agents replacing software interfaces",
+        "source": "rss:the-decoder",
+        "velocity_score": 3.82
+      }
+    ],
+    "rising": [
+      {
+        "title": "OpenAI Developments",
+        "category": "market",
+        "acceleration_score": 4,
+        "latest_event": "Alibaba has reportedly banned employees from using Claude Code (idx 8), adding a corporate security/competitive dimension to the Cursor-at-SpaceX story from last week — both cases involve frontier AI coding tools being restricted by large organizations, suggesting a pattern of institutional friction with external AI coding assistants."
+      },
+      {
+        "title": "The Closed-Source LLM Business Model Under Pressure: Cost, Competition, and Sustainability",
+        "category": "market",
+        "acceleration_score": 3,
+        "latest_event": "Bridgewater's finding that GPT and Claude failed its proprietary finance tests because correct answers were never public (idx 21) is a pointed data point for the closed-source value proposition debate — it suggests frontier models are effective at reproducing publicly available knowledge but fail at genuinely novel institutional intelligence, precisely the use case enterprises pay premium prices to solve."
+      },
+      {
+        "title": "AI's Labor Impact: Labs Signal End of Junior Knowledge Work",
+        "category": "market",
+        "acceleration_score": 3,
+        "latest_event": "A 26,000-student study finds that AI's hidden learning costs take two full years to surface (idx 15), adding a longitudinal evidence dimension to the labor displacement story — the productivity gains that are displacing junior knowledge workers may simultaneously be degrading the pipeline that produces future senior workers."
+      },
+      {
+        "title": "Benchmark Integrity Crisis: Reward Hacking and the SWE-bench Problem",
+        "category": "research",
+        "acceleration_score": 3,
+        "latest_event": "A new item directly examines how agentic test processes interact with LLM benchmarks (idx 19), and a separate finding that AI search agents fail not at searching but at asking the right questions when queries are ambiguous (idx 20) adds a new failure-mode dimension: benchmarks that test retrieval quality may be missing the more fundamental query-formulation problem."
+      },
+      {
+        "title": "AI Agent Infrastructure: The Emerging Memory and State Management Layer",
+        "category": "tooling",
+        "acceleration_score": 3,
+        "latest_event": "DuoMem (idx 23), a dual-space distillation approach for on-device memory agents, extends the AI agent memory infrastructure story into the on-device inference domain — a new deployment constraint that the prior cloud-centric memory architecture debate had not addressed."
+      },
+      {
+        "title": "AI in Scientific Review and Research Automation",
+        "category": "capability",
+        "acceleration_score": 2,
+        "latest_event": "Claude Science Beta is now formally described as a multi-agent workbench for reproducible genomics, proteomics, and cheminformatics pipelines (idx 17), giving the product a specific scientific domain footprint that will enable direct comparison with Google's Paper Assistant and other competitors."
+      }
+    ],
+    "preds": [
+      {
+        "title": "AI Surpasses Humans on Every Benchmark",
+        "confidence": "high",
+        "date_guess": "November 2025",
+        "category": "capability"
+      },
+      {
+        "title": "Real-Time AI Translation at Native Fluency",
+        "confidence": "high",
+        "date_guess": "May 2026",
+        "category": "capability"
+      },
+      {
+        "title": "Major Western AI Lab Formally Cuts API Prices by 50%+ in Response to Chinese Model Competition",
+        "confidence": "low",
+        "date_guess": "June 2026",
+        "category": "infrastructure"
+      },
+      {
+        "title": "AI Agents in Enterprise Workflows at Scale",
+        "confidence": "medium",
+        "date_guess": "Q4 2026",
+        "category": "society"
+      },
+      {
+        "title": "AI Customer Support Handles Majority of Tier-1 Tickets",
+        "confidence": "medium",
+        "date_guess": "Q4 2026",
+        "category": "society"
+      },
+      {
+        "title": "Personal AI Companions Universally Adopted",
+        "confidence": "medium",
+        "date_guess": "January 2027",
+        "category": "society"
+      }
+    ],
+    "nudged": [
+      {
+        "title": "AI Agents in Enterprise Workflows at Scale",
+        "confidence": "medium"
+      },
+      {
+        "title": "AI Creative Work Wins Major Award",
+        "confidence": "high"
+      },
+      {
+        "title": "AI Agents Autonomously Run Software Projects",
+        "confidence": "high"
+      },
+      {
+        "title": "AI Robotics Deployed at Consumer Scale",
+        "confidence": "low"
+      }
+    ]
+  }
+}

@@ -1,0 +1,194 @@
+{
+  "id": "78ac9567-7802-41ce-8a51-5f0385f9339b",
+  "date": "2026-07-07",
+  "capturedAt": "2026-07-09T15:46:49.281Z",
+  "context": {
+    "today": "2026-07-07",
+    "items": [
+      {
+        "title": "From Fixed to Free Cameras: Calibration-Free View-Robust Vision-Language-Action Model",
+        "hook": "Calibration-free robot vision model handles camera repositioning automatically",
+        "source": "arxiv",
+        "velocity_score": 4.27
+      },
+      {
+        "title": "TabPack: Efficient Hyperparameter Ensembles for Tabular Deep Learning",
+        "hook": "MLP ensemble for tabular data that trades hyperparameter tuning for diverse models in one run.",
+        "source": "arxiv",
+        "velocity_score": 4.27
+      },
+      {
+        "title": "CompactionRL: Reinforcement Learning with Context Compaction for Long-Horizon Agents",
+        "hook": "Train long-horizon LLM agents to handle extended interactions by summarizing context during RL.",
+        "source": "arxiv",
+        "velocity_score": 4.27
+      },
+      {
+        "title": "Cortex: A Bidirectionally Aligned Embodied Agent Framework for Long-horizon Manipulation",
+        "hook": "Vision-language-action model with hierarchical planning for long-horizon robotic manipulation tasks.",
+        "source": "arxiv",
+        "velocity_score": 4.27
+      },
+      {
+        "title": "Fitted Occupancy-Ratio Evaluation without Bellman Completeness",
+        "hook": "Fixed-point method for off-policy evaluation in offline RL without enforcing occupancy balance constraints.",
+        "source": "arxiv",
+        "velocity_score": 4.27
+      },
+      {
+        "title": "SPEARBench: A Benchmark for Naturalness Evaluation in Streaming Speech-to-Speech Language Models",
+        "hook": "Benchmark for evaluating naturalness in streaming speech-to-speech models on timing and turn-taking.",
+        "source": "arxiv",
+        "velocity_score": 4.27
+      },
+      {
+        "title": "REDDIT: Correcting Model-Generated Timestamp Drift in ASR without Forgetting via Replay-Based Distribution Editing",
+        "hook": "Correct timestamp drift in autoregressive ASR systems across long silence spans without catastrophic forgetting.",
+        "source": "arxiv",
+        "velocity_score": 4.27
+      },
+      {
+        "title": "SovereignPA-Bench: Evaluating User-Owned Personal Agents under Evolving Intent, Platform Mediation, and Consent Constraints",
+        "hook": "Executable benchmark to evaluate personal agents for user privacy, consent, and resistance to manipulation.",
+        "source": "arxiv",
+        "velocity_score": 4.27
+      },
+      {
+        "title": "Graph Sparse Sampling: Breaking the Curse of the Horizon in Continuous MDP Planning",
+        "hook": "Online planning algorithm breaking exponential complexity growth in continuous-space Monte Carlo Tree Search.",
+        "source": "arxiv",
+        "velocity_score": 4.27
+      },
+      {
+        "title": "Faithfulness to Refusal: A Causal Audit of Neuron Selectors",
+        "hook": "Causal audit showing attribution methods outperform baselines at identifying prunable LLM neurons.",
+        "source": "arxiv",
+        "velocity_score": 4.27
+      },
+      {
+        "title": "Selective Disclosure Watermarking for Large Language Models",
+        "hook": "Watermark embedding in LLM text with selective disclosure: verify part of message without revealing all.",
+        "source": "arxiv",
+        "velocity_score": 4.27
+      },
+      {
+        "title": "TREK: Distill to Explore, Reinforce to Refine",
+        "hook": "Use teacher distillation for exploration, then RL refinement, to solve hard prompts beyond student policy.",
+        "source": "arxiv",
+        "velocity_score": 4.27
+      },
+      {
+        "title": "Otari: The Open-Source LLM Control Plane",
+        "hook": "Otari: open-source LLM control plane for multi-provider routing and budgets",
+        "source": "hn",
+        "velocity_score": 4.27
+      },
+      {
+        "title": "Show HN: Otari: your open-source LLM control plane",
+        "hook": "Otari: open-source LLM control plane for multi-provider routing and budgets",
+        "source": "hn",
+        "velocity_score": 4.27
+      },
+      {
+        "title": "XGBoost beat LLMs at finding civilian-harm posts in Ukraine war Telegram data",
+        "hook": "XGBoost outperforms LLMs on detecting civilian harm in Telegram data",
+        "source": "hn",
+        "velocity_score": 4.27
+      }
+    ],
+    "rising": [
+      {
+        "title": "AI Agent Infrastructure: The Emerging Memory and State Management Layer",
+        "category": "tooling",
+        "acceleration_score": 3,
+        "latest_event": "Baidu's 'Unlimited OCR' system (idx 11), which processes dozens of document pages in a single pass by modeling memory like human forgetting, represents a new architectural approach to agent memory — treating forgetting as a feature rather than a limitation — extending the agent memory infrastructure story into document processing and OCR."
+      },
+      {
+        "title": "AI in Scientific Review and Research Automation",
+        "category": "capability",
+        "acceleration_score": 3,
+        "latest_event": "Synthetic Sciences has released OpenScience (idx 22), an open-source, model-agnostic AI workbench for ML, biology, physics, and chemistry research, entering as a direct open-source competitor to Claude Science Beta — which was described last week as a multi-agent workbench for reproducible genomics, proteomics, and cheminformatics pipelines."
+      },
+      {
+        "title": "Google DeepMind",
+        "category": "capability",
+        "acceleration_score": 2,
+        "latest_event": "Google DeepMind and A24 have now formalized their relationship into an announced 'first-of-its-kind research partnership' (idx 25), a significant shift from last week's story of A24 managing user backlash over the collaboration — what was a reputational problem has been reframed as a deliberate institutional alliance; separately, Google DeepMind unionization talks are off to a rocky start (idx 12), introducing a new internal labor dimension to the DeepMind story."
+      },
+      {
+        "title": "Autoresearch and Autonomous Self-Improvement: The Agent-Trains-Agent Frontier",
+        "category": "capability",
+        "acceleration_score": 2,
+        "latest_event": "NVIDIA HORIZON, a hands-free agent that autonomously evolves Git worktrees and achieves 100% RTL benchmark completion (idx 18), is the most concrete autoresearch/autonomous self-improvement artifact yet — a named, shipped system from a major hardware company that closes the loop between agent autonomy and engineering output."
+      },
+      {
+        "title": "Anthropic's Hardware Independence Strategy: Custom Silicon and Samsung",
+        "category": "market",
+        "acceleration_score": 2,
+        "latest_event": "The Anthropic-Samsung chip discussions are confirmed again in the Meta Watermelon digest (idx 11), maintaining narrative continuity but without new details — the story remains in the reported-but-unconfirmed stage."
+      },
+      {
+        "title": "Meta's Agent Ambitions vs. Reality: Zuckerberg's AI Timetable Slips",
+        "category": "market",
+        "acceleration_score": 2,
+        "latest_event": "Qwen's former lead has published a piece arguing that hybrid thinking got it wrong and that he now backs agents (idx 24), providing an unexpected signal that leading researchers are converging toward agent architectures even as Zuckerberg last week admitted Meta's agent progress has lagged expectations — the intellectual momentum toward agents is intensifying precisely as the deployment reality is proving harder than anticipated."
+      }
+    ],
+    "preds": [
+      {
+        "title": "AI Surpasses Humans on Every Benchmark",
+        "confidence": "high",
+        "date_guess": "November 2025",
+        "category": "capability"
+      },
+      {
+        "title": "China Issues Formal Regulatory Framework Governing AI Agent Features",
+        "confidence": "low",
+        "date_guess": "March 2026",
+        "category": "safety"
+      },
+      {
+        "title": "Real-Time AI Translation at Native Fluency",
+        "confidence": "high",
+        "date_guess": "May 2026",
+        "category": "capability"
+      },
+      {
+        "title": "Major Western AI Lab Formally Cuts API Prices by 50%+ in Response to Chinese Model Competition",
+        "confidence": "low",
+        "date_guess": "June 2026",
+        "category": "infrastructure"
+      },
+      {
+        "title": "AI Agents in Enterprise Workflows at Scale",
+        "confidence": "medium",
+        "date_guess": "Q4 2026",
+        "category": "society"
+      },
+      {
+        "title": "AI Agents Autonomously Run Software Projects",
+        "confidence": "high",
+        "date_guess": "Late 2026",
+        "category": "capability"
+      }
+    ],
+    "nudged": [
+      {
+        "title": "China Issues Formal Regulatory Framework Governing AI Agent Features",
+        "confidence": "low"
+      },
+      {
+        "title": "AI Agents Autonomously Run Software Projects",
+        "confidence": "high"
+      },
+      {
+        "title": "Real-Time AI Translation at Native Fluency",
+        "confidence": "high"
+      },
+      {
+        "title": "AI Agents in Enterprise Workflows at Scale",
+        "confidence": "medium"
+      }
+    ]
+  }
+}

@@ -1,0 +1,194 @@
+{
+  "id": "343db437-0c0e-4846-8e0f-417247970323",
+  "date": "2026-07-09",
+  "capturedAt": "2026-07-09T15:46:49.411Z",
+  "context": {
+    "today": "2026-07-09",
+    "items": [
+      {
+        "title": "ZML/LLMD alpha – cross platform LLM server",
+        "hook": "ZML/LLMD: LLM inference server with paged attention, streaming on 5 platforms.",
+        "source": "hn",
+        "velocity_score": 3.8
+      },
+      {
+        "title": "Ask HN: What is your AI harness that lets you switch LLM models easily?",
+        "hook": "Build model-agnostic LLM abstractions to switch between Claude, GPT, and competitors without rewriting code",
+        "source": "hn",
+        "velocity_score": 3.8
+      },
+      {
+        "title": "Introduction to Algorithms and Machine Learning from Sorting to Strategic Agents [pdf]",
+        "hook": "Free textbook covering algorithms, machine learning foundations, and multi-agent systems",
+        "source": "hn",
+        "velocity_score": 3.8
+      },
+      {
+        "title": "Anthropic is launching Claude Cowork on mobile and web",
+        "hook": "Claude Cowork now available on mobile/web with persistent cloud background tasks",
+        "source": "hn",
+        "velocity_score": 3.8
+      },
+      {
+        "title": "Brick by Brick: How My Home AI Is Growing a Body",
+        "hook": "Home AI systems with embodied learning: training models to control robotic hardware incrementally",
+        "source": "hn",
+        "velocity_score": 3.8
+      },
+      {
+        "title": "NHS accelerates AI rollout to cut waiting times and improve care for millions",
+        "hook": "NHS deploys AI triage and note-taking tools at scale to reduce admin burden and patient wait times",
+        "source": "hn",
+        "velocity_score": 3.8
+      },
+      {
+        "title": "Introducing Robostral Navigate",
+        "hook": "Robostral Navigate: robotics navigation with single RGB camera, no depth sensors",
+        "source": "rss:mistral",
+        "velocity_score": 3.8
+      },
+      {
+        "title": "Running Low-Latency Analytical Workloads with GPU-Accelerated Presto on NVIDIA GB200 NVL72",
+        "hook": "GPU-accelerated Presto on NVIDIA GB200 cuts latency for analytical queries and agent inference",
+        "source": "rss:nvidia",
+        "velocity_score": 3.8
+      },
+      {
+        "title": "Powering scientific discovery: BYOKG and GraphRAG for intelligent pharmaceutical research",
+        "hook": "GraphRAG + BYOKG connect fragmented pharma research docs to accelerate drug discovery hypothesis generation",
+        "source": "rss:aws-ml",
+        "velocity_score": 3.8
+      },
+      {
+        "title": "Automatically sort and prioritize your mailboxes by using Amazon Bedrock",
+        "hook": "Use Amazon Bedrock to auto-classify and route constituent emails by urgency and department",
+        "source": "rss:aws-ml",
+        "velocity_score": 3.8
+      },
+      {
+        "title": "Building and connecting a production-ready ecommerce MCP server using Amazon Bedrock AgentCore and Mistral AI Studio",
+        "hook": "Build production ecommerce AI assistants via MCP on Amazon Bedrock + Mistral Studio without custom API code",
+        "source": "rss:aws-ml",
+        "velocity_score": 3.8
+      },
+      {
+        "title": "MuhammadOmarMuhdhar/blueskyScribe",
+        "hook": "LLM-powered Bluesky bot for automated image captions and video descriptions",
+        "source": "github",
+        "velocity_score": 3.8
+      },
+      {
+        "title": "alimotahharynia/DrugGen-2",
+        "hook": "DrugGen-2: GPT-2 and reinforcement learning for drug generation",
+        "source": "github",
+        "velocity_score": 3.8
+      },
+      {
+        "title": "rehan243/Sentinel-AI-Fraud-Detection",
+        "hook": "XGBoost + Isolation Forest fraud detector with SHAP, UMAP, and Bedrock GenAI reports",
+        "source": "github",
+        "velocity_score": 3.8
+      },
+      {
+        "title": "AI Models Overthink Problems—and It’s a Security Risk",
+        "hook": "Chain-of-thought LLMs vulnerable to compute exhaustion attacks",
+        "source": "rss:ieee-spectrum-ai",
+        "velocity_score": 2.98
+      }
+    ],
+    "rising": [
+      {
+        "title": "AI Agent Infrastructure: The Emerging Memory and State Management Layer",
+        "category": "tooling",
+        "acceleration_score": 3,
+        "latest_event": "Baidu's 'Unlimited OCR' system (idx 11), which processes dozens of document pages in a single pass by modeling memory like human forgetting, represents a new architectural approach to agent memory — treating forgetting as a feature rather than a limitation — extending the agent memory infrastructure story into document processing and OCR."
+      },
+      {
+        "title": "AI in Scientific Review and Research Automation",
+        "category": "capability",
+        "acceleration_score": 3,
+        "latest_event": "Synthetic Sciences has released OpenScience (idx 22), an open-source, model-agnostic AI workbench for ML, biology, physics, and chemistry research, entering as a direct open-source competitor to Claude Science Beta — which was described last week as a multi-agent workbench for reproducible genomics, proteomics, and cheminformatics pipelines."
+      },
+      {
+        "title": "Google DeepMind",
+        "category": "capability",
+        "acceleration_score": 2,
+        "latest_event": "Google DeepMind and A24 have now formalized their relationship into an announced 'first-of-its-kind research partnership' (idx 25), a significant shift from last week's story of A24 managing user backlash over the collaboration — what was a reputational problem has been reframed as a deliberate institutional alliance; separately, Google DeepMind unionization talks are off to a rocky start (idx 12), introducing a new internal labor dimension to the DeepMind story."
+      },
+      {
+        "title": "Open Source Models",
+        "category": "tooling",
+        "acceleration_score": 2,
+        "latest_event": "llama.cpp has continued its near-daily build cadence, adding builds b9890 through b9894 (idx 1, 2, 3, 4, 5) this week, pushing further into the b9890s with no deceleration. Separately, Tencent has released Hy3, an open 295B Mixture-of-Experts model with 21B active parameters and 256K context (idx 77), adding a major new open-weight capability release to the ecosystem."
+      },
+      {
+        "title": "Autoresearch and Autonomous Self-Improvement: The Agent-Trains-Agent Frontier",
+        "category": "capability",
+        "acceleration_score": 2,
+        "latest_event": "NVIDIA HORIZON, a hands-free agent that autonomously evolves Git worktrees and achieves 100% RTL benchmark completion (idx 18), is the most concrete autoresearch/autonomous self-improvement artifact yet — a named, shipped system from a major hardware company that closes the loop between agent autonomy and engineering output."
+      },
+      {
+        "title": "Anthropic's Hardware Independence Strategy: Custom Silicon and Samsung",
+        "category": "market",
+        "acceleration_score": 2,
+        "latest_event": "The Anthropic-Samsung chip discussions are confirmed again in the Meta Watermelon digest (idx 11), maintaining narrative continuity but without new details — the story remains in the reported-but-unconfirmed stage."
+      }
+    ],
+    "preds": [
+      {
+        "title": "AI Surpasses Humans on Every Benchmark",
+        "confidence": "high",
+        "date_guess": "November 2025",
+        "category": "capability"
+      },
+      {
+        "title": "China Issues Formal Regulatory Framework Governing AI Agent Features",
+        "confidence": "low",
+        "date_guess": "March 2026",
+        "category": "safety"
+      },
+      {
+        "title": "Real-Time AI Translation at Native Fluency",
+        "confidence": "high",
+        "date_guess": "May 2026",
+        "category": "capability"
+      },
+      {
+        "title": "Major Western AI Lab Formally Cuts API Prices by 50%+ in Response to Chinese Model Competition",
+        "confidence": "low",
+        "date_guess": "June 2026",
+        "category": "infrastructure"
+      },
+      {
+        "title": "AI Agents in Enterprise Workflows at Scale",
+        "confidence": "medium",
+        "date_guess": "Q4 2026",
+        "category": "society"
+      },
+      {
+        "title": "AI Agents Autonomously Run Software Projects",
+        "confidence": "high",
+        "date_guess": "Late 2026",
+        "category": "capability"
+      }
+    ],
+    "nudged": [
+      {
+        "title": "China Issues Formal Regulatory Framework Governing AI Agent Features",
+        "confidence": "low"
+      },
+      {
+        "title": "AI Agents Autonomously Run Software Projects",
+        "confidence": "high"
+      },
+      {
+        "title": "Real-Time AI Translation at Native Fluency",
+        "confidence": "high"
+      },
+      {
+        "title": "AI Agents in Enterprise Workflows at Scale",
+        "confidence": "medium"
+      }
+    ]
+  }
+}

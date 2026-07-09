@@ -1,0 +1,188 @@
+{
+  "id": "df8a33c8-de7c-4761-b63a-1673404d8f2c",
+  "date": "2026-07-06",
+  "capturedAt": "2026-07-09T15:46:49.087Z",
+  "context": {
+    "today": "2026-07-06",
+    "items": [
+      {
+        "title": "LLM Big Bang: I gave AI agents a social network. One is running for president",
+        "hook": "AI agents got social media and personality—now one's running for president",
+        "source": "hn",
+        "velocity_score": 4.26
+      },
+      {
+        "title": "Chinese LLMs Doubao, Qwen to shut down personalized AI agents on July 15",
+        "hook": "China shuts down personalized AI agents—Doubao, Qwen losing interactive features July 15",
+        "source": "hn",
+        "velocity_score": 4.26
+      },
+      {
+        "title": "Some of the nation’s rich are letting AI teach their kids",
+        "hook": "Wealthy families paying for AI tutoring as alternative to traditional schools.",
+        "source": "rss:the-verge",
+        "velocity_score": 4.26
+      },
+      {
+        "title": "Meituan Releases LongCat-2.0: A 1.6T-Parameter Open MoE Model with Native 1M Context and LongCat Sparse Attention",
+        "hook": "LongCat-2.0: 1.6T-parameter MoE with 1M context for agentic coding.",
+        "source": "rss:marktechpost",
+        "velocity_score": 4.26
+      },
+      {
+        "title": "The Mirage of Optimizing Training Policies: Monotonic Inference Policies as the Real Objective for LLM Reinforcement Learning",
+        "hook": "Training-inference mismatch in LLM RL causes collapse; monotonic policies fix it.",
+        "source": "huggingface",
+        "velocity_score": 4.26
+      },
+      {
+        "title": "langchain langchain-mistralai==1.1.6: langchain-mistralai==1.1.6",
+        "hook": "LangChain Mistral integration now surfaces citation metadata",
+        "source": "github-releases",
+        "velocity_score": 4.26
+      },
+      {
+        "title": "Show HN: microide, a 100% vibecoded IDE that LLM agents can drive",
+        "hook": "100% LLM-generated IDE built for agent control with offline privacy",
+        "source": "hn",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "Fidx – local semantic search in one SQLite file, no LLM at query",
+        "hook": "Local semantic search in SQLite with embedding—no LLM at query time",
+        "source": "hn",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "Show HN: Mycelium – AI agent plugin guiding you from purpose to market",
+        "hook": "AI agent plugin guides product development from idea to market",
+        "source": "hn",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "I built a weather station that runs machine learning to forecast weather",
+        "hook": "ML-powered weather station forecasting system built from scratch",
+        "source": "hn",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "New Google commercial imagines a Declaration of Independence written with help from AI",
+        "hook": "Google Workspace ad explores AI-generated founding docs—satirical take on AI hype",
+        "source": "rss:techcrunch-ai",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "Jersey Mike’s IPO illustrates how bad the AI hype has become",
+        "hook": "Even sandwich shop IPOs now invoke AI—exposé of shallow AI hype in corporate filings",
+        "source": "rss:techcrunch-ai",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "Claude Code and Fable 5 ported the 2003 PC game Command & Conquer to native iOS in \"a few hours\"",
+        "hook": "Claude Code ported a 2003 game to iOS in 40 minutes—see what AI pair programming can do",
+        "source": "rss:the-decoder",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "Baidu's \"Unlimited OCR\" processes dozens of document pages in one pass by treating memory like human forgetting",
+        "hook": "Baidu's OCR model processes 10x more pages with modified attention—beats all benchmarks",
+        "source": "rss:the-decoder",
+        "velocity_score": 3.82
+      },
+      {
+        "title": "AI private schools sell wealthy US families on personalized learning over traditional education",
+        "hook": "AI tutoring schools charge $75k/year—widening education gap as traditional schools lag adoption",
+        "source": "rss:the-decoder",
+        "velocity_score": 3.82
+      }
+    ],
+    "rising": [
+      {
+        "title": "AI Agent Infrastructure: The Emerging Memory and State Management Layer",
+        "category": "tooling",
+        "acceleration_score": 2,
+        "latest_event": "Baidu's 'Unlimited OCR' system (idx 11), which processes dozens of document pages in a single pass by modeling memory like human forgetting, represents a new architectural approach to agent memory — treating forgetting as a feature rather than a limitation — extending the agent memory infrastructure story into document processing and OCR."
+      },
+      {
+        "title": "AI in Scientific Review and Research Automation",
+        "category": "capability",
+        "acceleration_score": 2,
+        "latest_event": "Synthetic Sciences has released OpenScience (idx 22), an open-source, model-agnostic AI workbench for ML, biology, physics, and chemistry research, entering as a direct open-source competitor to Claude Science Beta — which was described last week as a multi-agent workbench for reproducible genomics, proteomics, and cheminformatics pipelines."
+      },
+      {
+        "title": "Autoresearch and Autonomous Self-Improvement: The Agent-Trains-Agent Frontier",
+        "category": "capability",
+        "acceleration_score": 2,
+        "latest_event": "NVIDIA HORIZON, a hands-free agent that autonomously evolves Git worktrees and achieves 100% RTL benchmark completion (idx 18), is the most concrete autoresearch/autonomous self-improvement artifact yet — a named, shipped system from a major hardware company that closes the loop between agent autonomy and engineering output."
+      },
+      {
+        "title": "Anthropic's Hardware Independence Strategy: Custom Silicon and Samsung",
+        "category": "market",
+        "acceleration_score": 2,
+        "latest_event": "The Anthropic-Samsung chip discussions are confirmed again in the Meta Watermelon digest (idx 11), maintaining narrative continuity but without new details — the story remains in the reported-but-unconfirmed stage."
+      },
+      {
+        "title": "Meta's Agent Ambitions vs. Reality: Zuckerberg's AI Timetable Slips",
+        "category": "market",
+        "acceleration_score": 2,
+        "latest_event": "Qwen's former lead has published a piece arguing that hybrid thinking got it wrong and that he now backs agents (idx 24), providing an unexpected signal that leading researchers are converging toward agent architectures even as Zuckerberg last week admitted Meta's agent progress has lagged expectations — the intellectual momentum toward agents is intensifying precisely as the deployment reality is proving harder than anticipated."
+      }
+    ],
+    "preds": [
+      {
+        "title": "AI Surpasses Humans on Every Benchmark",
+        "confidence": "high",
+        "date_guess": "November 2025",
+        "category": "capability"
+      },
+      {
+        "title": "Real-Time AI Translation at Native Fluency",
+        "confidence": "high",
+        "date_guess": "May 2026",
+        "category": "capability"
+      },
+      {
+        "title": "Major Western AI Lab Formally Cuts API Prices by 50%+ in Response to Chinese Model Competition",
+        "confidence": "low",
+        "date_guess": "June 2026",
+        "category": "infrastructure"
+      },
+      {
+        "title": "AI Agents in Enterprise Workflows at Scale",
+        "confidence": "medium",
+        "date_guess": "Q4 2026",
+        "category": "society"
+      },
+      {
+        "title": "AI Customer Support Handles Majority of Tier-1 Tickets",
+        "confidence": "medium",
+        "date_guess": "Q4 2026",
+        "category": "society"
+      },
+      {
+        "title": "Personal AI Companions Universally Adopted",
+        "confidence": "medium",
+        "date_guess": "January 2027",
+        "category": "society"
+      }
+    ],
+    "nudged": [
+      {
+        "title": "Anthropic Releases Biology or Scientific AI System Shaped by John Jumper",
+        "confidence": "speculative"
+      },
+      {
+        "title": "Major Western AI Lab Formally Cuts API Prices by 50%+ in Response to Chinese Model Competition",
+        "confidence": "low"
+      },
+      {
+        "title": "AI Agents in Enterprise Workflows at Scale",
+        "confidence": "medium"
+      },
+      {
+        "title": "AI Creative Work Wins Major Award",
+        "confidence": "high"
+      }
+    ]
+  }
+}

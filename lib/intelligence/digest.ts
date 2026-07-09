@@ -310,7 +310,9 @@ export async function buildAndRunDigest(
 
 When an item is marked "covered by N sources", treat it as proportionally more significant — multiple outlets covering the same story is a strong signal of importance. Prioritize those stories.
 
-CRITICAL: Only reference events, facts, statistics, and entities that appear explicitly in the data provided below. Making a bold call about what a story MEANS is encouraged and expected — but the underlying facts that call rests on must come from the data provided, never from background knowledge. If a section's provided data is thin, say so directly rather than filling in specifics (numbers, names, dates) from outside knowledge.`,
+CRITICAL: Only reference events, facts, statistics, and entities that appear explicitly in the data provided below. Making a bold call about what a story MEANS is encouraged and expected — but the underlying facts that call rests on must come from the data provided, never from background knowledge. If a section's provided data is thin, say so directly rather than filling in specifics (numbers, names, dates) from outside knowledge.
+
+Ongoing story threads (and prior weeks' highlights) are your own past synthesis of an ongoing narrative, not new information from this week — frame them as continuing context, not as this week's news. A hot take or bold call needs to rest on a fact that's actually in the data above; if you don't have a specific number or named detail to cite, describe the observation qualitatively rather than inventing one to make it sound more concrete.`,
         cache_control: { type: 'ephemeral' },
       },
     ],

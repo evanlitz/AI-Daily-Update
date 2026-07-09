@@ -71,8 +71,12 @@ List specific unsupported claims if any exist — don't flag sections explicitly
     // Digests are ~6x longer than briefs and can surface many more unsupported
     // claims — 800 was tuned for brief-sized rationale and was truncating the
     // trailing JSON before the closing brace on verbose digest verdicts,
-    // which read as a judge "parse failure" instead of a real score.
-    max_tokens: 1600,
+    // which read as a judge "parse failure" instead of a real score. Two more
+    // parse failures at 1600 (both badly-grounded generations with long
+    // unsupported_claims lists) show the same failure mode recurring — the
+    // worse the groundedness, the more claims the judge needs room to list,
+    // so a bad score is exactly when truncation is most likely.
+    max_tokens: 2400,
     system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: userPrompt }],
   })

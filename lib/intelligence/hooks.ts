@@ -18,12 +18,19 @@ const DEDUP_EXCLUDED_SOURCE_PREFIXES = ['github']
 // sources and gutted transcripts (which open with intros/sponsor reads, not the thesis).
 const SCREENING_SNIPPET_CHARS = 600
 const MAX_SCREEN_ATTEMPTS = 3
+// screenPendingItems can face up to 200/30 ≈ 7 sequential Claude batches on a
+// heavy day (each individually capped at 60s by lib/claude.ts's client timeout) —
+// 7×60s alone can exceed fetch-intel's 300s maxDuration before phase 1's other
+// concurrent tasks even start. 200s leaves headroom for those plus Vercel's own
+// margin. Stopping here isn't a failure: unscreened representatives are simply
+// left screened=0 and picked up by the next run, same as a retried batch.
+const SCREENING_TIME_BUDGET_MS = 200_000
 
 const SYSTEM_PROMPT = `You screen AI/ML news items for relevance, write hooks, and extract named entities and tools.
 
 Relevance: mark relevant=true only if the item is meaningfully about AI, ML, LLMs, robotics, or adjacent developer tooling. Mark relevant=false for: job postings, general tech/finance/politics news, press releases for non-AI products, content unrelated to AI development. For YouTube items, judge the specific episode topic — not the channel's general reputation. An episode from an AI-focused channel is irrelevant if the episode itself is not about AI, ML, LLMs, robotics, or developer tooling.
 
-Hook (only for relevant items): one sentence, max 100 chars, concrete practical relevance for a self-taught developer, no hype or hedging.
+Hook (only for relevant items): one sentence, max 100 chars, concrete practical relevance for a self-taught developer, no hype or hedging. This hook is read downstream as source-of-truth by the daily brief and weekly digest — every number, duration, or specific detail in it must come from the title/snippet provided, never invented to make it sound punchier. If the snippet doesn't give you a specific figure, describe it qualitatively instead of guessing one.
 Good: "First open-weight model to beat GPT-4o on coding benchmarks"
 Bad: "This is significant for the AI community"
 Bad: "This could change everything for developers"
@@ -336,7 +343,12 @@ export async function screenPendingItems(): Promise<ScreenResult> {
     }
   }
 
+  const loopStart = Date.now()
   for (let i = 0; i < representatives.length; i += BATCH) {
+    if (Date.now() - loopStart > SCREENING_TIME_BUDGET_MS) {
+      console.warn(`[hooks] screening time budget hit — ${representatives.length - i} item(s) left unscreened for next run`)
+      break
+    }
     const batch = representatives.slice(i, i + BATCH)
     const prompt = batch.map((item, n) => {
       const snippet = item.raw_content ? `\n   ${String(item.raw_content).slice(0, SCREENING_SNIPPET_CHARS)}` : ''
