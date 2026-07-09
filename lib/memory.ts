@@ -9,17 +9,42 @@ const voyage = new VoyageAIClient()
 const EMBED_MODEL = 'voyage-3-lite'
 const EMBED_DIM = 512
 
+// Every source fetcher in lib/pipeline.ts is capped by withTimeout(), and Claude
+// calls go through the SDK's own timeout — this was the one external call in the
+// pipeline with neither, so a slow/degraded Voyage response could hang the whole
+// invocation until Vercel's platform-level 300s kill (which never runs our own
+// catch/finally, leaving cron_runs stuck at 'running' instead of recording a
+// failure). Every caller of embed() already anticipates a *rejection* (recall(),
+// findRecentDuplicateFeedItem(), the remember()/embedFeedItems() call sites all
+// degrade or .catch() already) — this only needed to turn a hang into a timely
+// rejection so those existing fallbacks actually get to run.
+const EMBED_TIMEOUT_MS = 25000
+
 // Voyage's asymmetric embedding mode: embed stored content as 'document' and
 // search queries as 'query' — the two get different internal representations
 // tuned for retrieval, which beats embedding both sides identically.
 export async function embed(texts: string[], inputType: 'document' | 'query'): Promise<number[][]> {
   if (!texts.length) return []
-  const response = await voyage.embed({
+  const call = voyage.embed({
     input: texts,
     model: EMBED_MODEL,
     inputType,
     outputDimension: EMBED_DIM,
   })
+  // Attaches a handler to the real request so a rejection arriving after the
+  // timeout already won the race below doesn't surface as an unhandled
+  // rejection — `call` itself is still what's raced, this is a side effect only.
+  call.catch(() => {})
+  // Same race-with-cleanup shape as lib/pipeline.ts's withTimeout() — without
+  // the .finally(), every successful (fast-path) call leaves its timer running
+  // for the full EMBED_TIMEOUT_MS for no reason.
+  let timer: ReturnType<typeof setTimeout>
+  const response = await Promise.race([
+    call,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`Voyage embed() exceeded ${EMBED_TIMEOUT_MS}ms`)), EMBED_TIMEOUT_MS)
+    }),
+  ]).finally(() => clearTimeout(timer))
   return (response.data ?? []).map(d => d.embedding ?? [])
 }
 
