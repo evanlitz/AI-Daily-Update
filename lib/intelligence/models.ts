@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import db from '../db'
+import db, { batchWithDiagnostics } from '../db'
 import { anthropic, MODEL, MODEL_FAST } from '../claude'
 import type { AIModel, FeedItem } from '../types'
 import { safeJSON } from '../utils'
@@ -720,12 +720,13 @@ const UPSERT_MODEL_SQL = `
 
 export async function ensureAllModels(): Promise<void> {
   const now = new Date().toISOString()
-  for (const m of MODEL_SEEDS) {
-    await db.execute({
+  await batchWithDiagnostics(
+    MODEL_SEEDS.map(m => ({
       sql: UPSERT_MODEL_SQL,
       args: [crypto.randomUUID(), m.name, m.slug, m.lab, m.family, m.release_date, m.status, m.context_window ?? null, m.input_cost_per_mtok ?? null, m.output_cost_per_mtok ?? null, m.knowledge_cutoff ?? null, JSON.stringify(m.modalities), JSON.stringify(m.benchmarks), JSON.stringify(m.highlights), m.notes ?? null, null, now, now],
-    })
-  }
+    })),
+    i => MODEL_SEEDS[i].slug
+  )
   console.log(`[models] seeded/updated ${MODEL_SEEDS.length} models`)
 }
 

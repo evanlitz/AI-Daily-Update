@@ -297,8 +297,11 @@ export async function fetchIntelligencePhase1(): Promise<void> {
   const { items: newItems, entityMap, toolNames } = await screenPendingItems()
   console.log(`[pipeline] ${newItems.length} items passed relevance screen`)
 
-  // Recompute velocity now that newly screened items are visible
-  await updateVelocityScores()
+  // No velocity recompute here (removed — was a duplicate of fetchIngest's call,
+  // scanning/rewriting the same 30-day window a second time with no new rows in
+  // between). Newly-screened items pick up their velocity_score on the next
+  // fetchIngest run; that's an acceptable staleness window, not a correctness bug —
+  // screened=0 items were already excluded from feed display regardless of score.
 
   // Query recent screened items for model refresh context
   const { rows: recentRows } = await db.execute({
