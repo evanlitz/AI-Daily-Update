@@ -62,7 +62,7 @@ async function persistIdea(raw: any, source: 'trending' | 'custom'): Promise<Pro
 }
 
 export async function generateCustomProjectIdeas(userInput: string, context?: AdvisorContext): Promise<ProjectIdea[]> {
-  const ctx = await gatherAdvisorContext()
+  const ctx = await gatherAdvisorContext(userInput)
 
   const contextLines = [
     context?.level ? `Experience level: ${context.level}.` : '',
@@ -78,6 +78,9 @@ Rules:
 - If they describe a problem, design projects that solve that exact problem
 - Pick tools from the current AI landscape below when relevant
 - When a trending repo, dataset, or model below fits naturally, ground the idea in that specific named resource (and its link) instead of a generic placeholder
+- The context blocks below are more current and more trustworthy than your own training data on what's new in AI right now — treat them as the authoritative source for any SPECIFIC named tool, model, library, dataset, repo, or paper you put in tech_stack or description. Never invent a specific product name, however standard or well-known, that isn't named there
+- General techniques, architecture, and engineering approach are yours to judge — deciding how the named resources above fit together into a real project, what steps make sense, and how to scope it is exactly the reasoning you're here to contribute, not something that needs to trace back to a context block
+- If the context doesn't support a strong idea for some angle, favor a simpler idea grounded in what is present over inventing a named resource to fill the gap
 - Scope each project to 1-20 hours of solo work
 
 Current trending AI developments:
@@ -144,7 +147,7 @@ export async function buildAndRunTrendingIdeas(
     context?.hoursPerWeek ? `Available ~${context.hoursPerWeek} hours per week — calibrate project scope accordingly.` : '',
   ].filter(Boolean).join(' ')
 
-  const systemText = `You are a senior developer mentoring a self-taught developer learning AI/ML. ${contextLines} Suggest realistic, achievable projects that: (1) can be built solo in 1-20 hours, (2) use current AI tools from the list below, (3) teach real skills, (4) produce a tangible shareable output — an API, demo app, or CLI tool a developer can show. The developer knows basic Python and JavaScript and is comfortable with APIs. When a trending repo, dataset, or model below fits naturally, ground the idea in that specific named resource (and its link) instead of a generic placeholder.
+  const systemText = `You are a senior developer mentoring a self-taught developer learning AI/ML. ${contextLines} Suggest realistic, achievable projects that: (1) can be built solo in 1-20 hours, (2) use current AI tools from the list below, (3) teach real skills, (4) produce a tangible shareable output — an API, demo app, or CLI tool a developer can show. The developer knows basic Python and JavaScript and is comfortable with APIs. When a trending repo, dataset, or model below fits naturally, ground the idea in that specific named resource (and its link) instead of a generic placeholder. The context blocks below are more current and more trustworthy than your own training data on what's new in AI right now — treat them as the authoritative source for any SPECIFIC named tool, model, library, dataset, repo, or paper you put in tech_stack or description; never invent a specific product name, however standard or well-known, that isn't named there. General technique, architecture, and engineering approach are yours to judge — deciding how the named resources fit together into a real project is exactly the reasoning you're here to contribute. If the context doesn't support a strong idea for some angle, favor a simpler idea grounded in what is present over inventing a named resource to fill the gap.
 
 Recent research papers:
 ${ctx.papers}
@@ -189,10 +192,29 @@ export async function generateProjectIdeas(context?: AdvisorContext): Promise<Pr
 // tech_stack, or also the checklist steps that reference React-specific setup?)
 // Left as a minimal working placeholder so the feature isn't broken in the
 // meantime — but the scoping behavior below is a guess, not a considered one.
-const REFINE_SYSTEM_PROMPT = `You are adjusting an existing AI project idea based on a user's follow-up request. Apply the change the user asked for, and only that change — don't rewrite fields they didn't mention unless the change clearly requires it elsewhere too. Keep the same JSON shape as the input idea.`
+//
+// Grounded against models/radar (not the full 6-block advisor context) — a
+// refinement request is a targeted single-field edit, not a fresh idea pass,
+// so it only needs enough of the current AI landscape to stop Claude from
+// substituting a tool/model from training knowledge that isn't one you're
+// actually tracking.
+function buildRefineSystemPrompt(models: string, radar: string): string {
+  return `You are adjusting an existing AI project idea based on a user's follow-up request. Apply the change the user asked for, and only that change — don't rewrite fields they didn't mention unless the change clearly requires it elsewhere too. Keep the same JSON shape as the input idea.
+
+If the request calls for a different SPECIFIC named tool, model, or resource, only substitute one from the current AI landscape below (more current and more trustworthy than your own training data) — never invent a specific product name that isn't listed there. If nothing below fits, say so in your reply instead of inventing one. General technique and architecture decisions are yours to judge as normal.
+
+Recently released models:
+${models}
+
+Currently recommended AI tools (adopt/trial):
+${radar}`
+}
 
 export async function refineProjectIdea(ideaId: string, userMessage: string): Promise<ProjectIdea> {
-  const { rows } = await db.execute({ sql: `SELECT * FROM project_ideas WHERE id = ?`, args: [ideaId] })
+  const [{ rows }, ctx] = await Promise.all([
+    db.execute({ sql: `SELECT * FROM project_ideas WHERE id = ?`, args: [ideaId] }),
+    gatherAdvisorContext(),
+  ])
   const row = (rows as any[])[0]
   if (!row) throw new Error('Idea not found')
 
@@ -220,7 +242,7 @@ export async function refineProjectIdea(ideaId: string, userMessage: string): Pr
 
   const response = await anthropic.messages.create({
     model: MODEL, max_tokens: 2000,
-    system: [{ type: 'text', text: REFINE_SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+    system: [{ type: 'text', text: buildRefineSystemPrompt(ctx.models, ctx.radar), cache_control: { type: 'ephemeral' } }],
     messages: [{
       role: 'user',
       content: `Current idea:\n${JSON.stringify({ title: current.title, description: current.description, difficulty: current.difficulty, skills_learned: current.skills_learned, estimated_hours: current.estimated_hours, starter_checklist: current.starter_checklist, tech_stack: current.tech_stack }, null, 2)}\n\n${historyText ? `Conversation so far:\n${historyText}\n\n` : ''}User's new request:\n"${userMessage}"\n\nReturn JSON only (no markdown fences):\n{"idea": {"title": "...", "description": "...", "difficulty": 1-5, "skills_learned": ["..."], "estimated_hours": 5, "tech_stack": ["..."], "starter_checklist": ["..."]}, "reply": "one short sentence confirming what changed"}`,
