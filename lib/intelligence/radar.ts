@@ -85,6 +85,15 @@ export async function seedRadarIfEmpty(): Promise<void> {
   await classifyBatch(SEED_TOOLS)
 }
 
+// Sequential batches, each a Claude call — same overrun risk as
+// youtube_summaries.ts's SUMMARY_TIME_BUDGET_MS. Tool names aren't persisted
+// anywhere between runs (they're extracted fresh from each run's screened
+// items), so a name skipped here for time isn't retried — it's simply not
+// added to the radar this cycle. Acceptable: popular tools get re-extracted
+// on their next mention, and this only trips on an unusually large batch of
+// brand-new tool names in one run.
+const CLASSIFY_TIME_BUDGET_MS = 60_000
+
 // Classify tool names extracted by Claude during screening.
 // Skips any name already in the radar; classifies the rest in batches of 20.
 export async function classifyToolNames(names: string[]): Promise<void> {
@@ -93,7 +102,14 @@ export async function classifyToolNames(names: string[]): Promise<void> {
   const existingKeys = new Set((existing as any[]).map(r => normalizeKey(r.name as string)))
   const newTools = names.filter(t => !existingKeys.has(normalizeKey(t)))
   if (!newTools.length) return
-  for (let i = 0; i < newTools.length; i += 20) await classifyBatch(newTools.slice(i, i + 20))
+  const loopStart = Date.now()
+  for (let i = 0; i < newTools.length; i += 20) {
+    if (Date.now() - loopStart > CLASSIFY_TIME_BUDGET_MS) {
+      console.warn(`[radar] classify time budget hit — ${newTools.length - i} tool name(s) left for next run`)
+      break
+    }
+    await classifyBatch(newTools.slice(i, i + 20))
+  }
 }
 
 export async function classifyForRadar(items: FeedItem[]): Promise<void> {
@@ -145,8 +161,15 @@ export async function reclassifyStaleTools(): Promise<void> {
   const toReclassify = [...seen.values()].filter(t => staleNames.has(t.toLowerCase()))
   if (!toReclassify.length) return
 
+  const loopStart = Date.now()
+  let reclassified = 0
   for (let i = 0; i < toReclassify.length; i += 20) {
+    if (Date.now() - loopStart > CLASSIFY_TIME_BUDGET_MS) {
+      console.warn(`[radar] reclassify time budget hit — ${toReclassify.length - i} stale tool(s) left for next run`)
+      break
+    }
     await classifyBatch(toReclassify.slice(i, i + 20))
+    reclassified += Math.min(20, toReclassify.length - i)
   }
-  console.log(`[radar] reclassified ${toReclassify.length} stale tools`)
+  console.log(`[radar] reclassified ${reclassified} stale tools`)
 }
