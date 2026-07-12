@@ -49,10 +49,37 @@ async function withBusyRetry<T>(fn: () => Promise<T>): Promise<T> {
   throw new Error('unreachable')
 }
 
+// Turso/libsql has no built-in per-request timeout, and none of this codebase's
+// db.execute()/db.batch() calls had one — unlike every other external dependency
+// (Anthropic client, Voyage embed, source fetches). That blind spot was real: a
+// fetch-intel timeout traced back to a single query (see idx_feed_items_embedding_null
+// below) taking several seconds under fully healthy conditions, no Turso outage
+// involved. A custom `fetch` passed to createClient() was tried first, but the
+// hrana HTTP transport constructs its own Request-like object internally that
+// Node's native fetch can't parse when wrapped that way — reverted after it broke
+// every query in a local test. Wrapping execute()/batch() here instead — same
+// race-with-cleanup shape as lib/memory.ts's embed() timeout — avoids touching
+// transport internals entirely. This bounds how long we wait, not the live request
+// itself (same "race, not cancellation" limitation as runCronJob's own deadline).
+const DB_QUERY_TIMEOUT_MS = 20_000
+
+function withDbTimeout<T>(call: Promise<T>): Promise<T> {
+  // Attaches a handler to the real call so a rejection arriving after the
+  // timeout already won the race below doesn't surface as an unhandled rejection.
+  call.catch(() => {})
+  let timer: ReturnType<typeof setTimeout>
+  return Promise.race([
+    call,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`Turso query exceeded ${DB_QUERY_TIMEOUT_MS}ms`)), DB_QUERY_TIMEOUT_MS)
+    }),
+  ]).finally(() => clearTimeout(timer))
+}
+
 const rawExecute = db.execute.bind(db)
 const rawBatch = db.batch.bind(db)
-db.execute = ((...args: Parameters<typeof rawExecute>) => withBusyRetry(() => rawExecute(...args))) as typeof db.execute
-db.batch = ((...args: Parameters<typeof rawBatch>) => withBusyRetry(() => rawBatch(...args))) as typeof db.batch
+db.execute = ((...args: Parameters<typeof rawExecute>) => withDbTimeout(withBusyRetry(() => rawExecute(...args)))) as typeof db.execute
+db.batch = ((...args: Parameters<typeof rawBatch>) => withDbTimeout(withBusyRetry(() => rawBatch(...args)))) as typeof db.batch
 
 // Helper: run multiple statements at startup
 async function exec(sql: string) {
@@ -477,6 +504,18 @@ try { await db.execute(`
   )
 `) } catch {}
 try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_rejected_items_log_rejected_at ON rejected_items_log (rejected_at)`) } catch {}
+
+// embedAnyMissing() (lib/pipeline.ts) runs `WHERE embedding IS NULL ORDER BY
+// fetched_at DESC LIMIT 200` every phase-1 cron invocation. With most rows
+// already embedded, that query had nothing but idx_feed_items_fetched_at to
+// use — SQLite scans the whole fetched_at index checking embedding IS NULL
+// row by row, since neither existing index (fetched_at, or the vector
+// similarity index) actually serves the IS NULL filter. Measured at 4-8s
+// against production with only ~5.5k rows and no other load — traced as the
+// real cause of a fetch-intel run burning its full time budget with an
+// otherwise-instant screening pass (0 items) and no Claude-side culprit. A
+// partial index — only the NULL rows — stays tiny regardless of table size.
+try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_feed_items_embedding_null ON feed_items (fetched_at) WHERE embedding IS NULL`) } catch {}
 
 // db.batch() is all-or-nothing — if one statement is rejected (e.g. Turso's stricter
 // remote type validation vs local SQLite, or a PRIMARY KEY collision), the whole batch
