@@ -165,6 +165,13 @@ Rules:
 - Generic terms are NOT entities: "AI", "LLM", "transformer", "neural network", "model", "paper"
 - If nothing specific is named, return an empty entities array — do not fabricate`
 
+// Same overrun risk as youtube_summaries.ts/radar.ts's per-task budgets — each
+// batch is a sequential Claude call capped at 60s by claude.ts's client
+// timeout. LIMIT 60 / BATCH 30 caps this at 2 batches today, so tripping this
+// budget would mean the first batch alone ran long (API slowness, not volume),
+// but it's cheap insurance and keeps this function consistent with its siblings.
+const BACKFILL_TIME_BUDGET_MS = 60_000
+
 // Processes feed items that have no entity mentions yet, up to 60 per pipeline run.
 // Runs every pipeline cycle; naturally stops when all items are covered.
 export async function backfillEntities(): Promise<void> {
@@ -184,9 +191,16 @@ export async function backfillEntities(): Promise<void> {
 
   const BATCH = 30
   const entityMap: Record<string, ExtractedEntity[]> = {}
+  const loopStart = Date.now()
+  let processed = 0
 
   for (let i = 0; i < feedRows.length; i += BATCH) {
+    if (Date.now() - loopStart > BACKFILL_TIME_BUDGET_MS) {
+      console.warn(`[entities] backfill time budget hit — ${feedRows.length - i} item(s) left for next run`)
+      break
+    }
     const batch = feedRows.slice(i, i + BATCH)
+    processed += batch.length
     const prompt = batch.map((item: any, n: number) => {
       const snippet = item.raw_content ? `\n   ${String(item.raw_content).slice(0, 200)}` : ''
       return `${n + 1}. (${item.source}) ${item.title}${snippet}`
@@ -220,5 +234,5 @@ export async function backfillEntities(): Promise<void> {
 
   const items = feedRows.map((r: any) => ({ id: r.id, topic_tags: [] }) as unknown as FeedItem)
   await saveEntityMentions(items, entityMap)
-  console.log(`[entities] backfilled ${feedRows.length} feed items`)
+  console.log(`[entities] backfilled ${processed} feed items`)
 }
