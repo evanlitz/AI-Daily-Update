@@ -417,13 +417,13 @@ try { await db.execute(`
     created_at TEXT NOT NULL
   )
 `) } catch {}
-try { await db.execute(`CREATE INDEX IF NOT EXISTS memories_vec_idx ON memories(libsql_vector_idx(embedding, 'metric=cosine'))`) } catch {}
+try { await db.execute(`CREATE INDEX IF NOT EXISTS memories_vec_idx ON memories(libsql_vector_idx(embedding, 'metric=cosine', 'compress_neighbors=float1bit'))`) } catch {}
 try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_memories_kind ON memories (kind)`) } catch {}
 
 // feed_items: embedding column for semantic recall of raw ingested content
 // (populated at ingest time in lib/pipeline.ts — see lib/memory.ts).
 try { await db.execute(`ALTER TABLE feed_items ADD COLUMN embedding F32_BLOB(512)`) } catch {}
-try { await db.execute(`CREATE INDEX IF NOT EXISTS feed_items_vec_idx ON feed_items(libsql_vector_idx(embedding, 'metric=cosine'))`) } catch {}
+try { await db.execute(`CREATE INDEX IF NOT EXISTS feed_items_vec_idx ON feed_items(libsql_vector_idx(embedding, 'metric=cosine', 'compress_neighbors=float1bit'))`) } catch {}
 
 // Per-source screening outcomes and Claude token spend, written once per
 // pipeline run (lib/intelligence/hooks.ts) — lets /api/stats answer "where is
@@ -516,6 +516,29 @@ try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_rejected_items_log_reject
 // otherwise-instant screening pass (0 items) and no Claude-side culprit. A
 // partial index — only the NULL rows — stays tiny regardless of table size.
 try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_feed_items_embedding_null ON feed_items (fetched_at) WHERE embedding IS NULL`) } catch {}
+
+// The DiskANN vector index at its default settings stores ~68 uncompressed
+// float32 copies of neighbor vectors per graph node — ~140KB of index per 2KB
+// embedding. On production that made feed_items_vec_idx_shadow 579MB of a
+// 623MB database, enough to thrash the Turso instance's page cache during
+// cron windows: every query from every route (including single-row cron_runs
+// writes) degraded past 20s, which is what actually produced the recurring
+// cron timeouts, the collateral digest/brief failures, and the
+// stuck-'running' rows. compress_neighbors=float1bit stores sign bits only
+// for graph navigation — the final ranking always recomputes exact distances
+// via vector_distance_cos in lib/memory.ts — measured at 99.3% recall@10 with
+// the index shrinking 579MB → 44MB. One-time rebuild for any DB whose index
+// predates the compressed definitions above (production was rebuilt manually
+// 2026-07-13, so this is a no-op there; it mainly converges local dev DBs).
+try {
+  const stale = await db.execute(`SELECT name FROM sqlite_master WHERE type='index' AND name IN ('feed_items_vec_idx','memories_vec_idx') AND sql NOT LIKE '%compress_neighbors%'`)
+  for (const row of stale.rows) {
+    const name = String(row.name)
+    const table = name === 'memories_vec_idx' ? 'memories' : 'feed_items'
+    await db.execute(`DROP INDEX IF EXISTS ${name}`)
+    await db.execute(`CREATE INDEX IF NOT EXISTS ${name} ON ${table}(libsql_vector_idx(embedding, 'metric=cosine', 'compress_neighbors=float1bit'))`)
+  }
+} catch {}
 
 // db.batch() is all-or-nothing — if one statement is rejected (e.g. Turso's stricter
 // remote type validation vs local SQLite, or a PRIMARY KEY collision), the whole batch
