@@ -273,12 +273,16 @@ Rules:
 
   let parsed: { thread_updates?: any[]; new_threads?: any[] } = {}
   try {
+    // Long-form generation — same class as digest.ts's call: 6000 max_tokens
+    // can't reliably finish inside claude.ts's 60s client default. Single
+    // attempt bounded at 180s so the worst case stays inside phase 1's 280s
+    // soft budget (cronRuns.ts); this catch block already contains a failure.
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 6000,
       system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: userPrompt }],
-    })
+    }, { timeout: 180_000, maxRetries: 0 })
     const text = response.content[0].type === 'text' ? response.content[0].text : '{}'
     const match = text.match(/\{[\s\S]*\}/)
     if (match) parsed = safeJSON(match[0], {})

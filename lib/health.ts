@@ -95,7 +95,7 @@ async function checkMissingBrief(failures: HealthFailure[], today: string): Prom
     if (rows.length === 0) {
       failures.push({
         check: 'MISSING BRIEF',
-        detail: `No brief was generated for ${today}. Brief cron ran at 8:45am UTC — check cron_runs for the failure.`,
+        detail: `No brief was generated for ${today}. The brief runs chained after /api/cron/fetch-intel (~8:20 and 20:20 UTC) — check cron_runs rows for /api/cron/brief and /api/cron/fetch-intel.`,
       })
     }
   } catch (err) {

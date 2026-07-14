@@ -4,6 +4,7 @@ import db from '../db'
 import { anthropic, MODEL } from '../claude'
 import { safeJSON } from '../utils'
 import { runLiveGroundednessCheck } from '../eval/live-check'
+import { startCronRun, finishCronRun } from '../cronRuns'
 
 export interface DailyBrief {
   id: string
@@ -180,7 +181,11 @@ Generate the daily brief now.`
   return { brief: parsed as BriefSections, sourceMaterial }
 }
 
-export async function generateDailyBrief(): Promise<DailyBrief | null> {
+export type BriefGenerationResult =
+  | { brief: DailyBrief }
+  | { skipped: 'already-generated' | 'no-data' }
+
+export async function generateDailyBrief(): Promise<BriefGenerationResult> {
   const today = new Date().toISOString().split('T')[0]
 
   // Idempotent — skip if already generated today
@@ -190,14 +195,31 @@ export async function generateDailyBrief(): Promise<DailyBrief | null> {
   })
   if (existing.length > 0) {
     console.log('[brief] already generated for today, skipping')
-    return null
+    return { skipped: 'already-generated' }
   }
 
   const context = await fetchBriefContext()
 
+  // Readiness gate: zero hooked items while raw items in the same window are
+  // still awaiting screening means fetch-intel hasn't processed them yet — that
+  // is "data not ready", not a quiet news day, and must fail loudly. (2026-07-14:
+  // cron jitter ran the brief before screening; the resulting skip recorded plain
+  // success and the missing brief was invisible until the daily health alert.)
+  if (context.items.length === 0) {
+    const since24h = new Date(Date.now() - 24 * 3600_000).toISOString()
+    const { rows } = await db.execute({
+      sql: `SELECT COUNT(*) AS n FROM feed_items WHERE fetched_at >= ? AND screened = 0`,
+      args: [since24h],
+    })
+    const pending = Number((rows[0] as any).n)
+    if (pending > 0) {
+      throw new Error(`data not ready: ${pending} items in the last 24h still awaiting screening`)
+    }
+  }
+
   try {
     const result = await buildAndRunBrief(context)
-    if (!result) return null
+    if (!result) return { skipped: 'no-data' }
     const { brief, sourceMaterial } = result
 
     const id  = crypto.randomUUID()
@@ -221,10 +243,37 @@ export async function generateDailyBrief(): Promise<DailyBrief | null> {
       )
     )
 
-    return { id, date: today, ...brief, created_at: now } as DailyBrief
+    return { brief: { id, date: today, ...brief, created_at: now } as DailyBrief }
   } catch (err) {
     console.error('[brief] generation failed:', err)
     throw err
+  }
+}
+
+export type BriefJobResult =
+  | { ok: true; date: string }
+  | { ok: true; skipped: string }
+  | { ok: false; error: string }
+
+// One brief attempt recorded as its own cron_runs row. Shared by the manual
+// /api/cron/brief route and the chained after() call in /api/cron/fetch-intel —
+// the brief has no cron schedule of its own anymore (see vercel.json history:
+// ordering it by schedule offset raced Vercel's cron jitter and lost).
+// Never throws; failures are recorded in cron_runs and returned as { ok: false }.
+export async function runDailyBriefJob(): Promise<BriefJobResult> {
+  const runId = await startCronRun('/api/cron/brief')
+  try {
+    const result = await generateDailyBrief()
+    if ('skipped' in result) {
+      await finishCronRun(runId, 'success', `skipped: ${result.skipped}`)
+      return { ok: true, skipped: result.skipped }
+    }
+    await finishCronRun(runId, 'success')
+    return { ok: true, date: result.brief.date }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    await finishCronRun(runId, 'failed', message)
+    return { ok: false, error: message }
   }
 }
 

@@ -300,6 +300,12 @@ export async function buildAndRunDigest(
         .join('\n\n')
     : ''
 
+  // Long-form generation: ~3800 output tokens takes 75-110s of wall time, well
+  // past claude.ts's 60s client default (every digest 2026-07-13/14 timed out
+  // at exactly that default, 3 attempts ≈ 3min). 240s bounds a single attempt
+  // under the route's maxDuration=300; no retries because a second attempt
+  // can't fit in that budget — the daily cron with its weekly idempotency
+  // check is the retry mechanism.
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 3800,
@@ -325,7 +331,7 @@ Ongoing story threads (and prior weeks' highlights) are your own past synthesis 
 }\n\n## The Big Moves\n2-3 most important model/company developments. Lead with multi-source stories. Reference ongoing story threads where relevant.${hasPrior ? ' Note if anything from a prior week escalated or resolved.' : ''}\n\n## Tools Worth Your Time\nNew dev tools or frameworks worth trying. Be specific about what they do and why a developer should care.\n\n## Research That Matters\n3 papers explained in plain English. What can developers actually do with each?\n\n## Hot Takes\nExactly 5 surprising, contrarian, or uncomfortable observations from this week. Not the headline — the implication most people are missing, the bold call that challenges consensus, or the thing the hype cycle is getting wrong.\n\n## What This Means For You\n3-4 concrete, actionable takeaways. Each must name a specific tool, decision, or experiment: "Try X this week by doing Y" — not "explore the space of Z". No generic advice.\n\nEnd with this exact JSON block on its own line:\n{"highlights":["sentence","sentence","sentence"],"changes":[{"type":"escalated","text":"something from a prior week that got bigger"},{"type":"resolved","text":"something that concluded"},{"type":"new","text":"something with no prior coverage"}]}${hasPrior ? '\nOnly include changes entries that are genuinely meaningful.' : '\nOmit the changes array — no prior weeks to compare against.'}`,
       },
     ],
-  })
+  }, { timeout: 240_000, maxRetries: 0 })
 
   const content = response.content[0].type === 'text' ? response.content[0].text : ''
 

@@ -652,7 +652,11 @@ Return a JSON array only. No markdown fences. Only include predictions where the
         content: `Recent AI developments (top 30 by velocity):\n${feedList}\n\nFuture predictions to update:\n${predList}\n\nReturn updated predictions as JSON array.`,
       },
     ],
-  })
+    // Long-form generation — same class as digest.ts's call: 4000 max_tokens
+    // can outrun claude.ts's 60s client default. Single attempt bounded at 120s
+    // because the predictions route runs three sequential steps inside
+    // maxDuration=180 — this call can't be allowed to eat the whole budget.
+  }, { timeout: 120_000, maxRetries: 0 })
 
   const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
   let updated: any[] = []
