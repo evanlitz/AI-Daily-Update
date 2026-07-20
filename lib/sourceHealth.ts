@@ -2,6 +2,16 @@ import db from './db'
 
 export type SourceStatus = 'ok' | 'warn' | 'stale' | 'dead'
 
+// Sources deliberately removed from lib/sources/* (see the drop-site comments,
+// e.g. rss.ts's FEEDS list) — nothing fetches them anymore, so their last
+// source_runs/screening_stats row is frozen forever and would otherwise pin
+// the dashboard 'critical' permanently instead of reflecting a real incident.
+export const RETIRED_SOURCES = new Set([
+  'rss:google-ai',
+  'rss:techcrunch-venture',
+  'rss:the-verge',
+])
+
 // benchmark-sync runs every 10 days — use a wider staleness window for it
 const STALE_HOURS: Record<string, { warn: number; dead: number }> = {
   'benchmark-sync': { warn: 240, dead: 288 }, // 10d warn, 12d dead
@@ -46,7 +56,7 @@ export async function getSourceStatuses(): Promise<SourceHealthReport> {
     ORDER BY sr.source
   `)
 
-  const sources = (rows as any[]).map(row => {
+  const sources = (rows as any[]).filter(row => !RETIRED_SOURCES.has(row.source)).map(row => {
     const status = computeStatus(row.last_fetch, row.last_count, row.source)
     return {
       source: row.source as string,

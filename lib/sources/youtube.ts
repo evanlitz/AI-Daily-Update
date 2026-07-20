@@ -23,6 +23,8 @@ const CHANNELS = [
   { channelId: 'UCNJ1Ymd5yFuUPtn21xtRbbw', slug: 'ai-explained',         tags: ['research'] as string[] },
 ]
 
+export const YOUTUBE_SOURCE_NAMES = CHANNELS.map(ch => `youtube:${ch.slug}`)
+
 const CUTOFF_DAYS = 7
 const TRANSCRIPT_CHARS = 4000
 

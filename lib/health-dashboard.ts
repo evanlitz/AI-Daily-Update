@@ -1,4 +1,4 @@
-import { getSourceStatuses, type SourceStatusEntry, type SourceStatus } from './sourceHealth'
+import { getSourceStatuses, RETIRED_SOURCES, type SourceStatusEntry, type SourceStatus } from './sourceHealth'
 import { getRecentStats, type ClaudeUsageSummary } from './screening-stats'
 import { getRecentCronFailures, getFlaggedEvalScores, type CronFailureRow, type EvalFlagRow } from './health'
 
@@ -38,7 +38,9 @@ export async function getHealthDashboard(): Promise<HealthDashboard> {
   // source_runs (never goes through Claude screening), so it'd be dropped by
   // an inner join; a source present only in screening_stats but missing from
   // source_runs (shouldn't happen, but not guaranteed) defaults to 'dead'.
-  const allSources = new Set([...statusBySource.keys(), ...screenBySource.keys()])
+  const allSources = new Set(
+    [...statusBySource.keys(), ...screenBySource.keys()].filter(s => !RETIRED_SOURCES.has(s))
+  )
 
   const sources: SourceHealthRow[] = [...allSources]
     .map(source => {

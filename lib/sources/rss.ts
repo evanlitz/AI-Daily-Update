@@ -120,6 +120,8 @@ const FEEDS = [
   { url: 'https://arstechnica.com/ai/feed/',                               source: 'rss:ars-technica-ai',     tags: ['industry'] },
 ]
 
+export const RSS_SOURCE_NAMES = FEEDS.map(f => f.source)
+
 function timeout(ms: number): Promise<never> {
   return new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
 }

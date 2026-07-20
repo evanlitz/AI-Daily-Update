@@ -1,13 +1,13 @@
 import db, { batchWithDiagnostics } from './db'
 import { fetchArxiv } from './sources/arxiv'
 import { fetchHackerNews } from './sources/hackernews'
-import { fetchRSS } from './sources/rss'
+import { fetchRSS, RSS_SOURCE_NAMES } from './sources/rss'
 import { fetchGithubTrending } from './sources/github'
 import { fetchGithubTop } from './sources/github_top'
 import { fetchHuggingFace } from './sources/huggingface'
 import { fetchDatasets } from './sources/datasets'
 import { fetchKaggleDatasets } from './sources/kaggle'
-import { fetchYoutube } from './sources/youtube'
+import { fetchYoutube, YOUTUBE_SOURCE_NAMES } from './sources/youtube'
 import { fetchPapersWithCode } from './sources/paperswithcode'
 import { fetchSemanticScholar } from './sources/semanticscholar'
 import { fetchGithubReleases } from './sources/github_releases'
@@ -148,6 +148,19 @@ async function filterNewItems(items: FeedItem[]): Promise<FeedItem[]> {
   return deduped.filter(item => !existingIds.has(item.id) && !existingUrls.has(item.url))
 }
 
+// Sources whose fetcher always returns items tagged with one fixed `source`
+// string (multi-source fetchers like rss/youtube supply their own names above).
+const SINGLE_FEED_SOURCE_NAMES = [
+  'arxiv', 'hn', 'github', 'huggingface', 'paperswithcode', 'hf-models',
+  'semanticscholar', 'github-releases',
+]
+
+// Every source name the ingest phase can produce. Seeding recordSourceRuns with
+// zero-counts for all of these means a source that legitimately fetched but found
+// nothing new still gets a source_runs row (status 'warn'), instead of silently
+// skipping the row and drifting into a false 'stale'/'dead' after a few quiet days.
+const ALL_SOURCE_NAMES = [...SINGLE_FEED_SOURCE_NAMES, ...RSS_SOURCE_NAMES, ...YOUTUBE_SOURCE_NAMES]
+
 async function recordSourceRuns(counts: Map<string, number>): Promise<void> {
   if (!counts.size) return
   const now = new Date().toISOString()
@@ -248,7 +261,7 @@ export async function fetchIngest(): Promise<number> {
 
   const allFeedItems = [...arxiv, ...hn, ...rss, ...github, ...huggingface, ...pwc, ...hfModels, ...youtube, ...semanticScholar, ...ghReleases]
 
-  const sourceCounts = new Map<string, number>()
+  const sourceCounts = new Map<string, number>(ALL_SOURCE_NAMES.map(name => [name, 0]))
   for (const item of allFeedItems) {
     sourceCounts.set(item.source, (sourceCounts.get(item.source) ?? 0) + 1)
   }
