@@ -4,7 +4,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { RepoGlyph, DatasetGlyph, PaperGlyph, ModelGlyph } from '@/components/icons'
+import { RepoGlyph, DatasetGlyph, PaperGlyph, ModelGlyph, PersonGlyph, RadarGlyph } from '@/components/icons'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
@@ -67,6 +67,16 @@ const NAV = [
     href: '/models',
     label: 'Models',
     icon: <ModelGlyph />,
+  },
+  {
+    href: '/entities',
+    label: 'Entities',
+    icon: <PersonGlyph />,
+  },
+  {
+    href: '/radar',
+    label: 'Radar',
+    icon: <RadarGlyph />,
   },
   {
     href: '/predictions',

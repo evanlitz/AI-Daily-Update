@@ -3,6 +3,7 @@ import db from '../db'
 import { anthropic, MODEL_FAST } from '../claude'
 import type { FeedItem } from '../types'
 import { safeJSON } from '../utils'
+import { addEdge } from '../graph'
 
 export interface ExtractedEntity {
   name: string
@@ -235,4 +236,42 @@ export async function backfillEntities(): Promise<void> {
   const items = feedRows.map((r: any) => ({ id: r.id, topic_tags: [] }) as unknown as FeedItem)
   await saveEntityMentions(items, entityMap)
   console.log(`[entities] backfilled ${processed} feed items`)
+}
+
+const MIN_CO_MENTIONS = 3
+const CO_MENTION_WEIGHT_CAP = 10
+
+// SQL-only co-occurrence — entities mentioned in the same feed_item at least
+// MIN_CO_MENTIONS times. Deliberately not LLM-confirmed (unlike linkThreads()'s
+// Jaccard+Claude-confirm pattern) — validate this free version is useful before
+// spending a Claude budget on a semantic upgrade. em1.entity_id < em2.entity_id
+// both dedupes each pair to a single row and gives it a canonical ordering, so
+// only one direction is ever written; readers match symmetrically (see
+// app/api/entities/[id]/route.ts), same pattern thread_relations already uses.
+export async function linkCoMentionedEntities(): Promise<void> {
+  const { rows } = await db.execute({
+    sql: `SELECT em1.entity_id AS a, em2.entity_id AS b, COUNT(*) AS cnt
+          FROM entity_mentions em1
+          JOIN entity_mentions em2
+            ON em1.source_type = em2.source_type
+           AND em1.source_id   = em2.source_id
+           AND em1.entity_id   < em2.entity_id
+          WHERE em1.source_type = 'feed_item'
+          GROUP BY em1.entity_id, em2.entity_id
+          HAVING COUNT(*) >= ?`,
+    args: [MIN_CO_MENTIONS],
+  }) as { rows: any[] }
+
+  if (!rows.length) return
+
+  for (const row of rows) {
+    const weight = Math.min(Number(row.cnt) / CO_MENTION_WEIGHT_CAP, 1)
+    // Guarded so one bad write doesn't abort the loop and drop every remaining
+    // pair for this cycle — same convention as predictions.ts's evidence_for write.
+    await addEdge('entity', row.a as string, 'entity', row.b as string, 'co_mentioned', {
+      weight,
+      metadata: { count: Number(row.cnt) },
+    }).catch(err => console.error('[entities] addEdge co_mentioned failed:', err))
+  }
+  console.log(`[entities] linkCoMentionedEntities: ${rows.length} entity pairs linked`)
 }

@@ -2,12 +2,13 @@ import crypto from 'crypto'
 import db from '../db'
 import { anthropic, MODEL_FAST } from '../claude'
 import type { FeedItem } from '../types'
+import { addEdge } from '../graph'
 
 const TOOL_PATTERNS = /\b(GPT-?4o?|GPT-?[345][\w.-]*|o[134][\w-]*|Claude\s?(?:[34][\w.]*|Opus[\s\w.-]*|Sonnet[\s\w.-]*|Haiku[\s\w.-]*|Instant[\s\w.-]*|Code[\s\w.-]*)|Gemini[\s\w.-]+|Gemma[\s\d.-]*|Llama[\s-]?[23][\w.-]*|LLaMA[\s\d.-]*|Mistral[\s\w.-]*|Mixtral[\s\w.-]*|Grok[\s-]?[\w.-]*|DeepSeek[\s-]?[\w.-]*|Phi-[\w.-]+|Qwen[\s\d.-]*|Falcon[\s\d.-]*|Stable[\s-]?Diffusion[\s\w.-]*|SDXL|DALL-?E[\s\d.-]*|Midjourney|Flux[\s\d.-]*|Runway[\s\w.-]*|Sora|LangChain|LlamaIndex|LangGraph|DSPy|Instructor|CrewAI|AutoGen|Chroma|Pinecone|Weaviate|Qdrant|Ollama|LM Studio|vLLM|llama\.cpp|LoRA|QLoRA|RLHF|DPO|RAG|GraphRAG|Cursor\b|Copilot[\s\w.-]*|Codeium|Weights\s?&\s?Biases|MLflow|Hugging\s?Face|Transformers\b|PEFT|TRL|PyTorch|JAX|LiteLLM|Perplexity[\s\w.-]*|Groq\b|Cohere\b)\b/gi
 
 const SEED_TOOLS = ['Claude Sonnet','GPT-4o','Gemini 1.5 Pro','Llama 3','Mistral 7B','DeepSeek V3','Phi-3','Gemma 2','Cursor','GitHub Copilot','Codeium','LangChain','LlamaIndex','DSPy','CrewAI','AutoGen','Ollama','vLLM','LM Studio','Chroma','Qdrant','Pinecone','RAG','LoRA','QLoRA','RLHF','DPO','Weights & Biases','LiteLLM']
 
-function normalizeKey(s: string) {
+export function normalizeKey(s: string) {
   return s.toLowerCase().replace(/[\s\-_.]+/g, '')
 }
 
@@ -110,6 +111,37 @@ export async function classifyToolNames(names: string[]): Promise<void> {
     }
     await classifyBatch(newTools.slice(i, i + 20))
   }
+}
+
+// Unlike entities (entity_mentions), radar tools have never recorded which
+// feed_items mentioned them. toolMap is keyed by feed_item id (built alongside
+// entityMap in hooks.ts's screening pass) — resolve each tool name to its
+// tech_radar row by the same normalizeKey classifyBatch()/classifyToolNames()
+// already use for dedup. A name with no matching row yet (not classified this
+// cycle, or filtered out by classifyBatch as not a genuine tool) is skipped —
+// it'll link once classifyToolNames() catches up, same eventual-consistency
+// tradeoff linkCoMentionedEntities() already accepts against backfillEntities().
+export async function saveToolMentions(items: FeedItem[], toolMap: Record<string, string[]>): Promise<void> {
+  if (!items.length) return
+  const itemIds = items.map(i => i.id).filter(id => toolMap[id]?.length)
+  if (!itemIds.length) return
+
+  const { rows: radarRows } = await db.execute(`SELECT id, name FROM tech_radar`)
+  const nameToId = new Map<string, string>()
+  for (const row of radarRows as any[]) nameToId.set(normalizeKey(row.name), row.id)
+  if (!nameToId.size) return
+
+  let linked = 0
+  for (const id of itemIds) {
+    for (const toolName of toolMap[id]) {
+      const radarId = nameToId.get(normalizeKey(toolName))
+      if (!radarId) continue
+      await addEdge('feed_item', id, 'tech_radar', radarId, 'mentions', { weight: 1 })
+        .catch(err => console.error('[radar] addEdge mentions failed:', err))
+      linked++
+    }
+  }
+  if (linked) console.log(`[radar] saveToolMentions: ${linked} mention edges linked`)
 }
 
 export async function classifyForRadar(items: FeedItem[]): Promise<void> {

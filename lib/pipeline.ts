@@ -15,12 +15,12 @@ import { fetchHFModels } from './sources/hf_models'
 import type { Dataset, FeedItem, GithubRepo } from './types'
 import { sanitizeText } from './utils'
 import { updateVelocityScores, updateAccelerationScores } from './intelligence/velocity'
-import { classifyForRadar, classifyToolNames, seedRadarIfEmpty, reclassifyStaleTools } from './intelligence/radar'
-import { ensureAllModels, refreshModelsFromFeed } from './intelligence/models'
+import { classifyForRadar, classifyToolNames, seedRadarIfEmpty, reclassifyStaleTools, saveToolMentions } from './intelligence/radar'
+import { ensureAllModels, refreshModelsFromFeed, linkSupersededModels } from './intelligence/models'
 import { screenPendingItems, generateHooks } from './intelligence/hooks'
 import { updateStoryThreads, linkThreads } from './intelligence/stories'
 import { backfillPredictionEvidence } from './intelligence/predictions'
-import { saveEntityMentions, backfillEntities } from './intelligence/entities'
+import { saveEntityMentions, backfillEntities, linkCoMentionedEntities } from './intelligence/entities'
 import { generateYoutubeSummaries } from './intelligence/youtube_summaries'
 import { embedFeedItems } from './memory'
 
@@ -307,7 +307,7 @@ function collectFailures(labels: string[], results: PromiseSettledResult<void>[]
 export async function fetchIntelligencePhase1(): Promise<void> {
   console.log('[pipeline] starting intelligence phase 1...')
 
-  const { items: newItems, entityMap, toolNames } = await screenPendingItems()
+  const { items: newItems, entityMap, toolNames, toolMap } = await screenPendingItems()
   console.log(`[pipeline] ${newItems.length} items passed relevance screen`)
 
   // No velocity recompute here (removed — was a duplicate of fetchIngest's call,
@@ -332,7 +332,18 @@ export async function fetchIntelligencePhase1(): Promise<void> {
     { label: 'embedAnyMissing', promise: embedAnyMissing() },
   ]
   if (recentItems.length > 0) phase1.push({ label: 'refreshModelsFromFeed', promise: refreshModelsFromFeed(recentItems) })
-  if (toolNames.length > 0) phase1.push({ label: 'classifyToolNames', promise: classifyToolNames(toolNames) })
+  if (toolNames.length > 0) {
+    // Sequential, not two independent allSettled entries: saveToolMentions only
+    // links a tool if it already has a tech_radar row, and classifyToolNames is
+    // what creates that row (after its own Claude call). Run concurrently, the
+    // fast saveToolMentions SELECT almost always beats the slow classify call,
+    // so every brand-new tool's mention edge — toolMap/newItems are per-run and
+    // never reconstructed — would be silently and permanently dropped.
+    phase1.push({
+      label: 'classifyToolNames+saveToolMentions',
+      promise: classifyToolNames(toolNames).then(() => saveToolMentions(newItems, toolMap)),
+    })
+  }
   if (newItems.length > 0) {
     phase1.push({ label: 'updateStoryThreads', promise: updateStoryThreads(newItems, entityMap) })
     phase1.push({ label: 'saveEntityMentions', promise: saveEntityMentions(newItems, entityMap) })
@@ -353,6 +364,8 @@ export async function fetchIntelligencePhase2(): Promise<void> {
     { label: 'linkThreads', promise: linkThreads() },
     { label: 'backfillPredictionEvidence', promise: backfillPredictionEvidence() },
     { label: 'backfillEntities', promise: backfillEntities() },
+    { label: 'linkCoMentionedEntities', promise: linkCoMentionedEntities() },
+    { label: 'linkSupersededModels', promise: linkSupersededModels() },
     { label: 'seedRadarIfEmpty', promise: seedRadarIfEmpty() },
     { label: 'reclassifyStaleTools', promise: reclassifyStaleTools() },
     { label: 'pruneOldFeedItems', promise: pruneOldFeedItems() },

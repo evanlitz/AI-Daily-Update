@@ -7,7 +7,7 @@ export async function GET(
 ) {
   const { id } = await params
 
-  const [entityRes, feedItemsRes, storiesRes] = await Promise.all([
+  const [entityRes, feedItemsRes, storiesRes, relatedEntitiesRes] = await Promise.all([
     db.execute({ sql: `SELECT * FROM entities WHERE id = ?`, args: [id] }),
     db.execute({
       sql: `SELECT fi.id, fi.title, fi.url, fi.source, fi.hook, fi.published_at, fi.velocity_score
@@ -32,6 +32,23 @@ export async function GET(
             LIMIT 5`,
       args: [id],
     }),
+    // co_mentioned edges are written in one canonical direction only
+    // (linkCoMentionedEntities), so match symmetrically here — same pattern
+    // app/api/stories/[id]/related/route.ts uses for thread_relations.
+    db.execute({
+      sql: `SELECT
+              CASE WHEN ge.from_id = ? THEN ge.to_id ELSE ge.from_id END AS related_id,
+              ge.weight,
+              e.name, e.type
+            FROM graph_edges ge
+            JOIN entities e ON e.id = CASE WHEN ge.from_id = ? THEN ge.to_id ELSE ge.from_id END
+            WHERE ge.edge_type = 'co_mentioned'
+              AND ge.from_type = 'entity' AND ge.to_type = 'entity'
+              AND (ge.from_id = ? OR ge.to_id = ?)
+            ORDER BY ge.weight DESC
+            LIMIT 10`,
+      args: [id, id, id, id],
+    }),
   ])
 
   const entity = entityRes.rows[0] as any
@@ -41,5 +58,6 @@ export async function GET(
     entity: { ...entity, aliases: JSON.parse(entity.aliases ?? '[]') },
     feedItems: feedItemsRes.rows,
     relatedStories: storiesRes.rows,
+    relatedEntities: relatedEntitiesRes.rows,
   })
 }

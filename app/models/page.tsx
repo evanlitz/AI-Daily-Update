@@ -399,6 +399,12 @@ function BenchBar({ label, value, color, rgb, delay }: {
 
 // ── Model card ────────────────────────────────────────────────────────────────
 
+interface ModelLineage {
+  supersedes: { id: string; name: string; slug: string }[]
+  supersededBy: { id: string; name: string; slug: string }[]
+  introducedBy: { id: string; title: string; url: string; source: string; published_at: string | null } | null
+}
+
 function ModelCard({ model, compareMode, isSelected, onSelect, highlighted, enterDelay }: {
   model: AIModel; compareMode: boolean; isSelected: boolean
   onSelect: (id: string) => void; highlighted: boolean; enterDelay: number
@@ -407,6 +413,22 @@ function ModelCard({ model, compareMode, isSelected, onSelect, highlighted, ente
   const bench = topBench(model.benchmarks)
   const isOpen = model.input_cost_per_mtok === null && model.output_cost_per_mtok === null
   const allBenches = BENCH_ORDER.filter(k => model.benchmarks[k] !== undefined)
+
+  const [lineage, setLineage] = useState<ModelLineage | null>(null)
+  const [lineageLoading, setLineageLoading] = useState(false)
+  const [lineageOpen, setLineageOpen] = useState(false)
+
+  function toggleLineage(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (lineageOpen) { setLineageOpen(false); return }
+    setLineageOpen(true)
+    if (lineage || lineageLoading) return
+    setLineageLoading(true)
+    fetch(`/api/models/${model.slug}/lineage`)
+      .then(r => r.json())
+      .then(setLineage)
+      .finally(() => setLineageLoading(false))
+  }
 
   return (
     <div className="model-card relative flex flex-col rounded-2xl overflow-hidden"
@@ -509,6 +531,51 @@ function ModelCard({ model, compareMode, isSelected, onSelect, highlighted, ente
           <p style={{ color: '#9090b8', fontSize: 13, lineHeight: 1.7 }}>
             {truncate(model.notes, 120)}
           </p>
+        )}
+
+        <button
+          onClick={toggleLineage}
+          style={{
+            marginTop: 10, fontSize: 11, fontWeight: 700, color: 'var(--muted)',
+            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+            textDecoration: 'underline', textUnderlineOffset: 2,
+          }}
+        >
+          {lineageOpen ? 'Hide lineage' : 'Show lineage'}
+        </button>
+
+        {lineageOpen && (
+          <div onClick={e => e.stopPropagation()} style={{ marginTop: 8, fontSize: 12, lineHeight: 1.6 }}>
+            {lineageLoading ? (
+              <p style={{ color: 'var(--muted)' }}>Loading…</p>
+            ) : !lineage ? null : (
+              <>
+                {lineage.supersededBy.length > 0 && (
+                  <p style={{ color: '#f87171' }}>
+                    Superseded by {lineage.supersededBy.map(m => m.name).join(', ')}
+                  </p>
+                )}
+                {lineage.supersedes.length > 0 && (
+                  <p style={{ color: '#34d399' }}>
+                    Supersedes {lineage.supersedes.map(m => m.name).join(', ')}
+                  </p>
+                )}
+                {lineage.introducedBy && (
+                  <a
+                    href={lineage.introducedBy.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ display: 'block', color: 'var(--dim)', marginTop: 4 }}
+                  >
+                    Introduced in: {lineage.introducedBy.title}
+                  </a>
+                )}
+                {!lineage.supersededBy.length && !lineage.supersedes.length && !lineage.introducedBy && (
+                  <p style={{ color: 'var(--muted)' }}>No lineage data linked yet.</p>
+                )}
+              </>
+            )}
+          </div>
         )}
       </div>
     </div>

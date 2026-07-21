@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { relTime } from '@/lib/utils'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -74,6 +75,17 @@ interface RelatedThread {
   strength: number
   label: string | null
   shared_tags: string[]
+}
+
+interface CitingPrediction {
+  id: string
+  title: string
+  category: string
+  confidence: string
+  status: string
+  weight: number
+  label: string | null
+  updated_at: string
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -324,6 +336,7 @@ function StoryCard({
 function StoryDetailView({
   detail,
   relatedThreads,
+  citingPredictions,
   onBack,
   onResolve,
   onDelete,
@@ -332,6 +345,7 @@ function StoryDetailView({
 }: {
   detail: StoryDetail
   relatedThreads: RelatedThread[]
+  citingPredictions: CitingPrediction[]
   onBack: () => void
   onResolve: () => void
   onDelete: () => void
@@ -620,14 +634,18 @@ function StoryDetailView({
             {detail.topEntities.map(e => {
               const em = ENTITY_COLORS[e.type] ?? { color: '#3b82f6', rgb: '59,130,246' }
               return (
-                <span key={e.id} style={{
+                <Link key={e.id} href={`/entities/${e.id}`} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 7,
                   fontSize: 12, fontWeight: 700,
                   color: em.color,
                   background: `rgba(${em.rgb},0.1)`,
                   border: `1px solid rgba(${em.rgb},0.25)`,
                   borderRadius: 8, padding: '5px 11px',
-                }}>
+                  transition: 'background 0.15s ease',
+                }}
+                onMouseEnter={ev => { (ev.currentTarget as HTMLElement).style.background = `rgba(${em.rgb},0.18)` }}
+                onMouseLeave={ev => { (ev.currentTarget as HTMLElement).style.background = `rgba(${em.rgb},0.1)` }}
+                >
                   {e.name}
                   <span style={{
                     fontSize: 9, fontWeight: 900,
@@ -637,7 +655,7 @@ function StoryDetailView({
                   }}>
                     {e.item_count}
                   </span>
-                </span>
+                </Link>
               )
             })}
           </div>
@@ -721,6 +739,59 @@ function StoryDetailView({
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Predictions citing this thread */}
+      {citingPredictions.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+            <span style={{
+              fontSize: 10, fontWeight: 900, letterSpacing: '0.18em',
+              color: '#71717a', textTransform: 'uppercase', flexShrink: 0,
+            }}>
+              Predictions Citing This Thread
+            </span>
+            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.05)' }} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
+            {citingPredictions.map(p => (
+              <Link
+                key={p.id}
+                href="/predictions"
+                style={{
+                  display: 'flex', flexDirection: 'column', gap: 7,
+                  background: 'var(--surface)', border: '1px solid var(--border)',
+                  borderLeft: `3px solid #a78bfa`, borderRadius: 10, padding: '14px 16px',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(167,139,250,0.06)' }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{
+                    fontSize: 9, fontWeight: 900, letterSpacing: '0.13em',
+                    color: '#a78bfa', background: 'rgba(167,139,250,0.12)',
+                    border: '1px solid rgba(167,139,250,0.28)',
+                    borderRadius: 3, padding: '1px 6px', textTransform: 'uppercase', flexShrink: 0,
+                  }}>
+                    {p.confidence}
+                  </span>
+                  <span style={{ fontSize: 10, color: '#52525b', marginLeft: 'auto' }}>
+                    {relTime(p.updated_at)}
+                  </span>
+                </div>
+                <p style={{ fontSize: 13, fontWeight: 800, color: '#d4d4d8', lineHeight: 1.35 }}>
+                  {p.title}
+                </p>
+                {p.label && (
+                  <p style={{ fontSize: 11, color: '#71717a', lineHeight: 1.55, fontStyle: 'italic' }}>
+                    {p.label}
+                  </p>
+                )}
+              </Link>
+            ))}
           </div>
         </div>
       )}
@@ -1389,6 +1460,7 @@ export default function StoriesPage() {
   const [detail,          setDetail]          = useState<StoryDetail | null>(null)
   const [detailLoading,   setDetailLoading]   = useState(false)
   const [relatedThreads,  setRelatedThreads]  = useState<RelatedThread[]>([])
+  const [citingPredictions, setCitingPredictions] = useState<CitingPrediction[]>([])
   const [activeCategory,  setActiveCategory]  = useState<string>('all')
 
   const fetchThreads = useCallback(async () => {
@@ -1410,13 +1482,16 @@ export default function StoriesPage() {
     setSelectedId(id)
     setDetail(null)
     setRelatedThreads([])
+    setCitingPredictions([])
     setDetailLoading(true)
-    const [detailRes, relatedRes] = await Promise.all([
+    const [detailRes, relatedRes, predictionsRes] = await Promise.all([
       fetch(`/api/stories/${id}`),
       fetch(`/api/stories/${id}/related`),
+      fetch(`/api/stories/${id}/predictions`),
     ])
-    if (detailRes.ok)  setDetail(await detailRes.json())
-    if (relatedRes.ok) setRelatedThreads(await relatedRes.json())
+    if (detailRes.ok)      setDetail(await detailRes.json())
+    if (relatedRes.ok)     setRelatedThreads(await relatedRes.json())
+    if (predictionsRes.ok) setCitingPredictions(await predictionsRes.json())
     setDetailLoading(false)
   }
 
@@ -1424,6 +1499,7 @@ export default function StoriesPage() {
     setSelectedId(null)
     setDetail(null)
     setRelatedThreads([])
+    setCitingPredictions([])
   }
 
   async function handleResolve(id: string) {
@@ -1531,6 +1607,7 @@ export default function StoriesPage() {
             <StoryDetailView
               detail={detail}
               relatedThreads={relatedThreads}
+              citingPredictions={citingPredictions}
               onBack={goBack}
               onResolve={() => handleResolve(detail.id)}
               onDelete={() => handleDelete(detail.id)}

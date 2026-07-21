@@ -3,6 +3,7 @@ import db, { batchWithDiagnostics } from '../db'
 import { anthropic, MODEL, MODEL_FAST } from '../claude'
 import type { AIModel, FeedItem } from '../types'
 import { safeJSON } from '../utils'
+import { addEdge, removeEdgesFor } from '../graph'
 
 interface SeedModel {
   name: string
@@ -745,6 +746,7 @@ interface ExtractedModel {
   benchmarks: Record<string, number>
   highlights: string[]
   notes: string
+  source_idx: number | null
 }
 
 export async function refreshModelsFromFeed(items: FeedItem[]): Promise<void> {
@@ -763,8 +765,8 @@ export async function refreshModelsFromFeed(items: FeedItem[]): Promise<void> {
 
   if (candidates.length === 0 && previewNames.length === 0) return
 
-  const context = candidates.map(i =>
-    `SOURCE: ${i.source}\nHEADLINE: ${i.title}\nSNIPPET: ${(i.raw_content ?? i.summary ?? '').slice(0, 350)}`
+  const context = candidates.map((i, idx) =>
+    `${idx + 1}. SOURCE: ${i.source}\nHEADLINE: ${i.title}\nSNIPPET: ${(i.raw_content ?? i.summary ?? '').slice(0, 350)}`
   ).join('\n\n---\n\n')
 
   const previewHint = previewNames.length > 0
@@ -789,14 +791,15 @@ Rules:
 - release_date: ISO date string YYYY-MM-DD, approximate from article date if needed
 - lab: one of Anthropic, OpenAI, Google, Meta, Mistral, DeepSeek, xAI, or the actual company name
 - status: "preview" if announced but not yet generally available, "active" if released to the public; omit if unclear
-- family: model family name (e.g. "GPT-4", "Gemini 2.5", "Claude 3.5") — infer from the model name`,
+- family: model family name (e.g. "GPT-4", "Gemini 2.5", "Claude 3.5") — infer from the model name
+- source_idx: the number of the news item above (1-based) this model release was extracted from, or null if it wasn't tied to one specific item (e.g. enrichment for an already-known preview model)`,
           cache_control: { type: 'ephemeral' },
         },
       ],
       messages: [
         {
           role: 'user',
-          content: `Extract any AI model releases from these news items. Return ONLY a JSON array (empty array if nothing to extract):\n[{"name":"...","lab":"...","family":"...","release_date":"YYYY-MM-DD","context_window":null,"input_cost_per_mtok":null,"output_cost_per_mtok":null,"modalities":[],"benchmarks":{},"highlights":[],"notes":"..."}]\n\n${context}${previewHint}`,
+          content: `Extract any AI model releases from these news items. Return ONLY a JSON array (empty array if nothing to extract):\n[{"name":"...","lab":"...","family":"...","release_date":"YYYY-MM-DD","context_window":null,"input_cost_per_mtok":null,"output_cost_per_mtok":null,"modalities":[],"benchmarks":{},"highlights":[],"notes":"...","source_idx":1}]\n\n${context}${previewHint}`,
         },
       ],
     })
@@ -842,6 +845,20 @@ Rules:
           ],
         })
         upserted++
+
+        // feed_item_id above is always null (kept for backwards compatibility,
+        // never populated) — graph_edges is the real link now. ON CONFLICT means
+        // the row's actual id may be an existing one, not the crypto.randomUUID()
+        // just generated above, so resolve it by slug rather than assuming.
+        const sourceItem = typeof m.source_idx === 'number' ? candidates[m.source_idx - 1] : undefined
+        if (sourceItem) {
+          const { rows: idRows } = await db.execute({ sql: `SELECT id FROM ai_models WHERE slug = ?`, args: [slug] })
+          const modelId = (idRows[0] as any)?.id
+          if (modelId) {
+            await addEdge('ai_model', modelId, 'feed_item', sourceItem.id, 'introduced_by', { weight: 1 })
+              .catch(err => console.error('[models] addEdge introduced_by failed:', err))
+          }
+        }
       } catch {}
     }
 
@@ -922,27 +939,75 @@ Return ONLY a JSON array:
 
   let promoted = 0
   const stmts: { sql: string; args: unknown[] }[] = []
+  const slugsToDelete: string[] = []
 
   for (const { detectedSlug, canonicalSlug, isNewModel } of assignments) {
     if (!detectedSlug?.startsWith('detected-') || !canonicalSlug) continue
     if (!/^[a-z0-9-]+$/.test(canonicalSlug)) continue
 
     if (isNewModel && !knownSlugs.has(canonicalSlug)) {
-      // Rename detected-* slug to canonical
+      // Rename detected-* slug to canonical — the row's id is untouched, so any
+      // graph_edges referencing it by id stay valid across the rename.
       stmts.push({ sql: `UPDATE ai_models SET slug = ? WHERE slug = ?`, args: [canonicalSlug, detectedSlug] })
       promoted++
     } else {
       // Duplicate — a model with this canonical slug already exists; delete the detected stub
       stmts.push({ sql: `DELETE FROM ai_models WHERE slug = ?`, args: [detectedSlug] })
+      slugsToDelete.push(detectedSlug)
     }
+  }
+
+  // graph_edges has no FK to ai_models — resolve ids before the delete removes
+  // the only way to look them up, then clean up after the batch commits.
+  let idsToClean: string[] = []
+  if (slugsToDelete.length > 0) {
+    const placeholders = slugsToDelete.map(() => '?').join(',')
+    const { rows } = await db.execute({ sql: `SELECT id FROM ai_models WHERE slug IN (${placeholders})`, args: slugsToDelete })
+    idsToClean = (rows as any[]).map(r => r.id as string)
   }
 
   if (stmts.length > 0) {
     await db.batch(stmts as any)
     if (promoted > 0) console.log(`[models] promoted ${promoted} detected models to canonical slugs`)
   }
+  for (const id of idsToClean) await removeEdgesFor('ai_model', id)
 
   return promoted
+}
+
+// SQL-only, no new Claude spend — same "start free, upgrade later" call as
+// linkCoMentionedEntities(). "Superseded by X" notes text already exists for
+// most retired models (seed data + Claude-extracted notes); rather than parse
+// sentence boundaries (model names routinely contain periods, e.g. "Claude
+// Opus 4.8", which breaks a naive "up to the next '.'" capture), check which
+// OTHER known model name appears in this model's notes — sorted longest-first
+// so "GPT-4o" matches before the shorter "GPT-4" would. Heuristic, not
+// LLM-confirmed, hence the sub-1.0 weight; an LLM-confirm upgrade (mirroring
+// linkThreads()'s Jaccard+Claude-confirm pattern) is the natural next step if
+// this free version proves too noisy.
+const SUPERSEDES_WEIGHT = 0.6
+
+export async function linkSupersededModels(): Promise<void> {
+  // Target lookup needs every model's name regardless of whether IT has notes
+  // (the superseding model itself may have empty notes) — don't scope this
+  // query to notes-having rows, only the outer iteration below does that.
+  const { rows: allRows } = await db.execute(`SELECT id, name FROM ai_models`)
+  const byLengthDesc = [...(allRows as any[])].sort((a, b) => (b.name as string).length - (a.name as string).length)
+
+  const { rows: noteRows } = await db.execute(`SELECT id, notes FROM ai_models WHERE notes IS NOT NULL AND notes != ''`)
+  const models = (noteRows as any[]).filter(m => /supersed/i.test(m.notes ?? ''))
+  if (!models.length) return
+
+  let linked = 0
+  for (const m of models) {
+    const notesLower = (m.notes as string).toLowerCase()
+    const target = byLengthDesc.find(t => t.id !== m.id && notesLower.includes((t.name as string).toLowerCase()))
+    if (!target) continue
+    await addEdge('ai_model', target.id, 'ai_model', m.id, 'supersedes', { weight: SUPERSEDES_WEIGHT })
+      .catch(err => console.error('[models] addEdge supersedes failed:', err))
+    linked++
+  }
+  if (linked) console.log(`[models] linkSupersededModels: ${linked} supersedes edges linked`)
 }
 
 export async function getAllModels(): Promise<AIModel[]> {

@@ -4,6 +4,7 @@ import { anthropic, MODEL } from '../claude'
 import { recall, rememberEntity } from '../memory'
 import type { AIPrediction, EvidenceLink } from '../types'
 import { safeJSON } from '../utils'
+import { addEdge } from '../graph'
 
 // Distance below which a new candidate prediction is treated as a semantic
 // duplicate of an existing one (Voyage cosine distance, 0 = identical).
@@ -916,6 +917,7 @@ function sharedWords(a: Set<string>, b: Set<string>): string[] {
 }
 
 export interface StoryEventRef {
+  threadId: string
   threadTitle: string
   category: string
   eventText: string
@@ -1038,6 +1040,15 @@ Example: event "o3 scores 87% on ARC-AGI" → nudge=true for "AI near-human on n
         ? [JSON.stringify(evidence), newConfidence, now, now, pred.id]
         : [JSON.stringify(evidence), newConfidence, now, pred.id],
     })
+    // Real edge alongside the denormalized `evidence` blob above — this is what
+    // lets a story thread answer "which predictions cite me," which the JSON
+    // blob alone (written only onto the prediction, one-directional) can't do.
+    // weight reflects the judge's own nudge call: a nudge means "concretely
+    // strengthens confidence," not just "is relevant."
+    await addEdge('prediction', pred.id, 'story_thread', ev.threadId, 'evidence_for', {
+      weight: r.nudge ? 1.0 : 0.7,
+      label: ev.eventText.slice(0, 150),
+    }).catch(err => console.error('[predictions] addEdge evidence_for failed:', err))
     evidenceCount++
     if (doNudge && newConfidence !== pred.confidence) nudgeCount++
   }
@@ -1047,7 +1058,7 @@ Example: event "o3 scores 87% on ARC-AGI" → nudge=true for "AI near-human on n
 
 export async function backfillPredictionEvidence(): Promise<void> {
   const { rows } = await db.execute(`
-    SELECT se.update_text, st.title AS thread_title, st.category
+    SELECT se.update_text, st.id AS thread_id, st.title AS thread_title, st.category
     FROM story_events se
     JOIN story_threads st ON st.id = se.thread_id
     WHERE se.significance = 'high'
@@ -1056,6 +1067,7 @@ export async function backfillPredictionEvidence(): Promise<void> {
   `) as { rows: any[] }
   if (!rows.length) return
   const events: StoryEventRef[] = rows.map(r => ({
+    threadId: r.thread_id,
     threadTitle: r.thread_title,
     category: r.category,
     eventText: r.update_text,

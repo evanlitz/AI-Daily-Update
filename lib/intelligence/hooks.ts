@@ -113,6 +113,7 @@ export type ScreenResult = {
   items: FeedItem[]
   entityMap: Record<string, ExtractedEntity[]>
   toolNames: string[]
+  toolMap: Record<string, string[]>
 }
 
 // Normalize a tool name for deduplication (same key as radar.ts normalizeKey)
@@ -305,7 +306,7 @@ export async function screenPendingItems(): Promise<ScreenResult> {
     args: [],
   })
 
-  if (!rows.length) return { items: [], entityMap: {}, toolNames: [] }
+  if (!rows.length) return { items: [], entityMap: {}, toolNames: [], toolMap: {} }
 
   const { remaining: candidates, fastTracked } = await fastTrackDuplicates(rows as any[], tallies)
   if (fastTracked.length) console.log(`[hooks] fast-tracked ${fastTracked.length} near-duplicate item(s), skipping Claude`)
@@ -319,6 +320,7 @@ export async function screenPendingItems(): Promise<ScreenResult> {
   const BATCH = 30
   const keptRows: { item: any; hook?: string }[] = [...fastTracked.map(({ item, hook }) => ({ item, hook: hook ?? undefined }))]
   const entityMap: Record<string, ExtractedEntity[]> = {}
+  const toolMap: Record<string, string[]> = {}
   const toolsSeen = new Map<string, string>()
   const toDelete: string[] = []
   const toRetry: string[] = []
@@ -394,12 +396,15 @@ export async function screenPendingItems(): Promise<ScreenResult> {
           continue
         }
         if (Array.isArray(entry.tools)) {
+          const itemTools: string[] = []
           for (const t of entry.tools) {
             if (typeof t === 'string' && t.length > 1) {
               const key = normalizeToolKey(t)
               if (!toolsSeen.has(key)) toolsSeen.set(key, t)
+              itemTools.push(t)
             }
           }
+          if (itemTools.length) toolMap[item.id] = itemTools
         }
         keptRows.push({ item, hook: entry.hook ? entry.hook.slice(0, 120) : undefined })
         kept++
@@ -435,12 +440,16 @@ export async function screenPendingItems(): Promise<ScreenResult> {
     }
   }
 
-  // Propagate the rep's entity data to same-run cluster duplicates — they inherit
-  // the rep's relevance decision but were never sent to Claude, so entityMap has
-  // no entry for them. Without this, saveEntityMentions silently skips them.
+  // Propagate the rep's entity/tool data to same-run cluster duplicates — they
+  // inherit the rep's relevance decision but were never sent to Claude, so
+  // entityMap/toolMap have no entry for them. Without this, saveEntityMentions/
+  // saveToolMentions would silently skip them.
   for (const [repId, dups] of duplicatesByRep) {
     if (entityMap[repId]) {
       for (const d of dups) entityMap[d.id] = entityMap[repId]
+    }
+    if (toolMap[repId]) {
+      for (const d of dups) toolMap[d.id] = toolMap[repId]
     }
   }
 
@@ -497,5 +506,5 @@ export async function screenPendingItems(): Promise<ScreenResult> {
   }
 
   const items = keptRows.map(({ item }) => item as unknown as FeedItem)
-  return { items, entityMap, toolNames: [...toolsSeen.values()] }
+  return { items, entityMap, toolNames: [...toolsSeen.values()], toolMap }
 }

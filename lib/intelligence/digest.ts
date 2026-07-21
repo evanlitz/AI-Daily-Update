@@ -72,7 +72,33 @@ async function getStoryContext(): Promise<string> {
     const lines = (threads as any[]).map(t =>
       `- **${t.title}**: ${t.current_summary ?? ''}${t.update_text ? ` | Latest: ${t.update_text}` : ''} | Watch for: ${t.watch_for ?? '?'}`
     )
-    return `\n\nOngoing story threads you've been tracking:\n${lines.join('\n')}`
+
+    // Surface the labeled connections linkThreads() already confirmed between this
+    // week's active threads — without this, "THE TRAJECTORY" has to re-infer
+    // connections from a flat list instead of using ones already verified.
+    const threadIds = (threads as any[]).map(t => t.id)
+    let relationsBlock = ''
+    if (threadIds.length > 1) {
+      const placeholders = threadIds.map(() => '?').join(',')
+      const { rows: relations } = await db.execute({
+        sql: `SELECT tr.label, ta.title AS title_a, tb.title AS title_b
+              FROM thread_relations tr
+              JOIN story_threads ta ON ta.id = tr.thread_a_id
+              JOIN story_threads tb ON tb.id = tr.thread_b_id
+              WHERE tr.thread_a_id IN (${placeholders}) AND tr.thread_b_id IN (${placeholders})
+              ORDER BY tr.strength DESC
+              LIMIT 10`,
+        args: [...threadIds, ...threadIds],
+      })
+      const relationLines = (relations as any[])
+        .filter(r => r.label)
+        .map(r => `- "${r.title_a}" ↔ "${r.title_b}": ${r.label}`)
+      if (relationLines.length) {
+        relationsBlock = `\n\nKnown connections between these threads:\n${relationLines.join('\n')}`
+      }
+    }
+
+    return `\n\nOngoing story threads you've been tracking:\n${lines.join('\n')}${relationsBlock}`
   } catch { return '' }
 }
 

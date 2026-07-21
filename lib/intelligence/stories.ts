@@ -4,6 +4,7 @@ import { anthropic, MODEL, MODEL_FAST } from '../claude'
 import { getMondayISO, safeJSON } from '../utils'
 import { recall, rememberEntity } from '../memory'
 import { applyStoryEvidence } from './predictions'
+import { removeEdgesFor } from '../graph'
 
 function rememberThread(id: string, title: string, summary: string | null, watchFor: string | null): Promise<void> {
   return rememberEntity({
@@ -328,11 +329,11 @@ Rules:
   }))
 
   // Collect high-significance events for prediction evidence linking
-  const highSigEvents: { threadTitle: string; category: string; eventText: string }[] = []
+  const highSigEvents: { threadId: string; threadTitle: string; category: string; eventText: string }[] = []
   for (const upd of parsed.thread_updates ?? []) {
     if (upd.significance === 'high') {
       const t = typeof upd.thread_ref === 'number' ? threads[upd.thread_ref] : null
-      if (t) highSigEvents.push({ threadTitle: t.title, category: t.category, eventText: upd.update_text ?? '' })
+      if (t) highSigEvents.push({ threadId: t.id, threadTitle: t.title, category: t.category, eventText: upd.update_text ?? '' })
     }
   }
 
@@ -372,7 +373,7 @@ Rules:
     await rememberThread(id, nt.title, initSummary, initWatchFor)
     activeCount++
     if (nt.significance === 'high' && nt.title) {
-      highSigEvents.push({ threadTitle: nt.title, category: nt.category ?? 'market', eventText: nt.update_text ?? '' })
+      highSigEvents.push({ threadId: id, threadTitle: nt.title, category: nt.category ?? 'market', eventText: nt.update_text ?? '' })
     }
   }
 
@@ -540,7 +541,8 @@ export async function resolveStoryThread(id: string): Promise<void> {
 export async function deleteStoryThread(id: string): Promise<void> {
   await db.execute({ sql: `DELETE FROM story_events WHERE thread_id = ?`, args: [id] })
   await db.execute({ sql: `DELETE FROM story_threads WHERE id = ?`, args: [id] })
-  // memories has no FK to story_threads, so it won't ride the cascade the way
-  // story_events/thread_relations do — clean it up explicitly.
+  // memories and graph_edges both have no FK to story_threads, so neither rides
+  // the cascade the way story_events/thread_relations do — clean up explicitly.
   await db.execute({ sql: `DELETE FROM memories WHERE kind = 'story_thread' AND ref_id = ?`, args: [id] })
+  await removeEdgesFor('story_thread', id)
 }

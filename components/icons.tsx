@@ -36,3 +36,18 @@ export function ModelGlyph(p: { size?: number; style?: React.CSSProperties }) {
     </Icon>
   )
 }
+
+export function PersonGlyph(p: { size?: number; style?: React.CSSProperties }) {
+  return <Icon {...p}><circle cx="12" cy="8" r="4" strokeWidth="1.75" /><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" strokeWidth="1.75" /></Icon>
+}
+
+export function RadarGlyph(p: { size?: number; style?: React.CSSProperties }) {
+  return (
+    <Icon {...p}>
+      <circle cx="12" cy="12" r="9" strokeWidth="1.75" />
+      <circle cx="12" cy="12" r="5.5" strokeWidth="1.75" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <path d="M12 12L19 6" strokeWidth="1.75" />
+    </Icon>
+  )
+}

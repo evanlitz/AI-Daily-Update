@@ -540,6 +540,32 @@ try {
   }
 } catch {}
 
+// Generic edge registry for relationship types that have no existing home
+// (entity_mentions/thread_relations stay as-is — this is additive, not a
+// replacement). from_id/to_id can't carry a real FK since the target table
+// varies by from_type/to_type, so nothing here enforces referential integrity
+// automatically: any code path that hard-deletes a node-like row (feed_items,
+// story_threads, entities, ai_predictions, ai_models, tech_radar) must call
+// lib/graph.ts's removeEdgesFor() for that type, or the edge silently dangles
+// (entity_mentions already has this exact failure mode from pruneOldFeedItems()
+// not touching it — same tradeoff, just now named instead of accidental).
+try { await db.execute(`
+  CREATE TABLE IF NOT EXISTS graph_edges (
+    from_type  TEXT NOT NULL,
+    from_id    TEXT NOT NULL,
+    to_type    TEXT NOT NULL,
+    to_id      TEXT NOT NULL,
+    edge_type  TEXT NOT NULL,
+    weight     REAL NOT NULL DEFAULT 1.0,
+    label      TEXT,
+    metadata   TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (from_type, from_id, to_type, to_id, edge_type)
+  )
+`) } catch {}
+try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_graph_edges_to ON graph_edges (to_type, to_id, edge_type)`) } catch {}
+
 // db.batch() is all-or-nothing — if one statement is rejected (e.g. Turso's stricter
 // remote type validation vs local SQLite, or a PRIMARY KEY collision), the whole batch
 // fails with one generic error that doesn't say which row caused it. On failure, retry
