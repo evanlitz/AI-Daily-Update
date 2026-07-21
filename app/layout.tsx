@@ -4,7 +4,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { RepoGlyph, DatasetGlyph, PaperGlyph, ModelGlyph, PersonGlyph, RadarGlyph } from '@/components/icons'
+import { RepoGlyph, DatasetGlyph, PaperGlyph, ModelGlyph, PersonGlyph, RadarGlyph, GraphGlyph } from '@/components/icons'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
@@ -77,6 +77,11 @@ const NAV = [
     href: '/radar',
     label: 'Radar',
     icon: <RadarGlyph />,
+  },
+  {
+    href: '/graph',
+    label: 'Graph',
+    icon: <GraphGlyph />,
   },
   {
     href: '/predictions',
@@ -195,7 +200,7 @@ function Sidebar() {
 // bar's contents don't silently change if NAV gets reordered — Health is
 // deliberately included here even though it's last in NAV, since it's the
 // page actively used to triage alerts from a phone.
-const MOBILE_NAV_HREFS = ['/', '/feed', '/digest', '/stories', '/advisor', '/health']
+const MOBILE_NAV_HREFS = ['/', '/feed', '/digest', '/stories', '/graph', '/advisor', '/health']
 
 function MobileNav() {
   const pathname = usePathname()

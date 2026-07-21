@@ -51,3 +51,14 @@ export function RadarGlyph(p: { size?: number; style?: React.CSSProperties }) {
     </Icon>
   )
 }
+
+export function GraphGlyph(p: { size?: number; style?: React.CSSProperties }) {
+  return (
+    <Icon {...p}>
+      <circle cx="6" cy="6" r="2.5" strokeWidth="1.75" />
+      <circle cx="18" cy="6" r="2.5" strokeWidth="1.75" />
+      <circle cx="12" cy="18" r="2.5" strokeWidth="1.75" />
+      <path d="M8.2 7.3L11 16M15.8 7.3L13 16M8.5 6h7" strokeWidth="1.75" />
+    </Icon>
+  )
+}
