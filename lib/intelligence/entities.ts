@@ -275,3 +275,36 @@ export async function linkCoMentionedEntities(): Promise<void> {
   }
   console.log(`[entities] linkCoMentionedEntities: ${rows.length} entity pairs linked`)
 }
+
+const MIN_TOOL_ASSOCIATION = 3
+const TOOL_ASSOCIATION_WEIGHT_CAP = 10
+
+// Same full-table-scan, no-LLM pattern as linkCoMentionedEntities — an entity
+// and a tool are "associated" when they co-occur in the same feed_item at
+// least MIN_TOOL_ASSOCIATION times, joining entity_mentions against the
+// mentions edges radar.ts already writes (feed_item -> tech_radar). Full scan
+// every run auto-backfills historical data, same tradeoff already accepted
+// for co_mentioned — no separate backfill script needed.
+export async function linkEntityToolAssociations(): Promise<void> {
+  const { rows } = await db.execute({
+    sql: `SELECT em.entity_id AS entity_id, ge.to_id AS tool_id, COUNT(*) AS cnt
+          FROM entity_mentions em
+          JOIN graph_edges ge
+            ON ge.from_type = 'feed_item' AND ge.from_id = em.source_id AND ge.edge_type = 'mentions'
+          WHERE em.source_type = 'feed_item'
+          GROUP BY em.entity_id, ge.to_id
+          HAVING COUNT(*) >= ?`,
+    args: [MIN_TOOL_ASSOCIATION],
+  }) as { rows: any[] }
+
+  if (!rows.length) return
+
+  for (const row of rows) {
+    const weight = Math.min(Number(row.cnt) / TOOL_ASSOCIATION_WEIGHT_CAP, 1)
+    await addEdge('entity', row.entity_id as string, 'tech_radar', row.tool_id as string, 'associated_with', {
+      weight,
+      metadata: { count: Number(row.cnt) },
+    }).catch(err => console.error('[entities] addEdge associated_with failed:', err))
+  }
+  console.log(`[entities] linkEntityToolAssociations: ${rows.length} entity-tool pairs linked`)
+}

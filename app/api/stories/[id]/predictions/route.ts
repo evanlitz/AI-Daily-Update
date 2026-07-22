@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
+import { getNeighbors } from '@/lib/graph'
 
 export async function GET(
   _req: Request,
@@ -7,20 +8,21 @@ export async function GET(
 ) {
   const { id } = await params
 
-  const { rows } = await db.execute({
-    sql: `SELECT
-            ap.id, ap.title, ap.category, ap.confidence, ap.status,
-            ge.weight, ge.label, ge.updated_at
-          FROM graph_edges ge
-          JOIN ai_predictions ap ON ap.id = ge.from_id
-          WHERE ge.from_type = 'prediction'
-            AND ge.to_type   = 'story_thread'
-            AND ge.to_id     = ?
-            AND ge.edge_type = 'evidence_for'
-          ORDER BY ge.weight DESC, ge.updated_at DESC
-          LIMIT 10`,
-    args: [id],
-  })
+  const neighbors = await getNeighbors('story_thread', id, { edgeType: 'evidence_for', direction: 'in' })
+  if (!neighbors.length) return NextResponse.json([])
 
-  return NextResponse.json(rows)
+  const placeholders = neighbors.map(() => '?').join(',')
+  const { rows } = await db.execute({
+    sql: `SELECT id, title, category, confidence, status FROM ai_predictions WHERE id IN (${placeholders})`,
+    args: neighbors.map(n => n.id),
+  })
+  const byId = new Map((rows as any[]).map(r => [r.id, r]))
+
+  const result = neighbors
+    .filter(n => byId.has(n.id))
+    .sort((a, b) => b.weight - a.weight || b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, 10)
+    .map(n => ({ ...byId.get(n.id), weight: n.weight, label: n.label, updated_at: n.updatedAt }))
+
+  return NextResponse.json(result)
 }

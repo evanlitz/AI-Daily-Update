@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
+import { getNeighbors } from '@/lib/graph'
 
 export async function GET(
   _req: Request,
@@ -7,7 +8,7 @@ export async function GET(
 ) {
   const { id } = await params
 
-  const [entityRes, feedItemsRes, storiesRes, relatedEntitiesRes] = await Promise.all([
+  const [entityRes, feedItemsRes, storiesRes, coMentioned, associated] = await Promise.all([
     db.execute({ sql: `SELECT * FROM entities WHERE id = ?`, args: [id] }),
     db.execute({
       sql: `SELECT fi.id, fi.title, fi.url, fi.source, fi.hook, fi.published_at, fi.velocity_score
@@ -32,32 +33,53 @@ export async function GET(
             LIMIT 5`,
       args: [id],
     }),
-    // co_mentioned edges are written in one canonical direction only
-    // (linkCoMentionedEntities), so match symmetrically here — same pattern
-    // app/api/stories/[id]/related/route.ts uses for thread_relations.
-    db.execute({
-      sql: `SELECT
-              CASE WHEN ge.from_id = ? THEN ge.to_id ELSE ge.from_id END AS related_id,
-              ge.weight,
-              e.name, e.type
-            FROM graph_edges ge
-            JOIN entities e ON e.id = CASE WHEN ge.from_id = ? THEN ge.to_id ELSE ge.from_id END
-            WHERE ge.edge_type = 'co_mentioned'
-              AND ge.from_type = 'entity' AND ge.to_type = 'entity'
-              AND (ge.from_id = ? OR ge.to_id = ?)
-            ORDER BY ge.weight DESC
-            LIMIT 10`,
-      args: [id, id, id, id],
-    }),
+    getNeighbors('entity', id, { edgeType: 'co_mentioned' }),
+    getNeighbors('entity', id, { edgeType: 'associated_with', direction: 'out' }),
   ])
 
   const entity = entityRes.rows[0] as any
   if (!entity) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  const [relatedEntities, associatedTools] = await Promise.all([
+    hydrateEntities(coMentioned),
+    hydrateTools(associated),
+  ])
+
   return NextResponse.json({
     entity: { ...entity, aliases: JSON.parse(entity.aliases ?? '[]') },
     feedItems: feedItemsRes.rows,
     relatedStories: storiesRes.rows,
-    relatedEntities: relatedEntitiesRes.rows,
+    relatedEntities,
+    associatedTools,
   })
+}
+
+async function hydrateEntities(neighbors: Awaited<ReturnType<typeof getNeighbors>>) {
+  if (!neighbors.length) return []
+  const placeholders = neighbors.map(() => '?').join(',')
+  const { rows } = await db.execute({
+    sql: `SELECT id, name, type FROM entities WHERE id IN (${placeholders})`,
+    args: neighbors.map(n => n.id),
+  })
+  const byId = new Map((rows as any[]).map(r => [r.id, r]))
+  return neighbors
+    .filter(n => byId.has(n.id))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 10)
+    .map(n => ({ related_id: n.id, weight: n.weight, ...byId.get(n.id) }))
+}
+
+async function hydrateTools(neighbors: Awaited<ReturnType<typeof getNeighbors>>) {
+  if (!neighbors.length) return []
+  const placeholders = neighbors.map(() => '?').join(',')
+  const { rows } = await db.execute({
+    sql: `SELECT id, name, category, quadrant FROM tech_radar WHERE id IN (${placeholders})`,
+    args: neighbors.map(n => n.id),
+  })
+  const byId = new Map((rows as any[]).map(r => [r.id, r]))
+  return neighbors
+    .filter(n => byId.has(n.id))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 10)
+    .map(n => ({ tool_id: n.id, weight: n.weight, ...byId.get(n.id) }))
 }

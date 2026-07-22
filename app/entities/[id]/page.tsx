@@ -38,11 +38,20 @@ interface RelatedEntity {
   weight: number
 }
 
+interface AssociatedTool {
+  tool_id: string
+  name: string
+  category: string
+  quadrant: string
+  weight: number
+}
+
 interface EntityDetail {
   entity: Entity
   feedItems: FeedItem[]
   relatedStories: RelatedStory[]
   relatedEntities: RelatedEntity[]
+  associatedTools: AssociatedTool[]
 }
 
 const TYPE_META: Record<string, { color: string; rgb: string; label: string }> = {
@@ -91,7 +100,7 @@ export default function EntityDetailPage() {
     )
   }
 
-  const { entity, feedItems, relatedStories, relatedEntities } = data
+  const { entity, feedItems, relatedStories, relatedEntities, associatedTools } = data
   const meta = TYPE_META[entity.type] ?? DEFAULT_TYPE
 
   return (
@@ -124,7 +133,7 @@ export default function EntityDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-8" style={{ gridTemplateColumns: (relatedStories.length || relatedEntities.length) ? '1fr 340px' : '1fr' }}>
+      <div className="grid gap-8" style={{ gridTemplateColumns: (relatedStories.length || relatedEntities.length || associatedTools.length) ? '1fr 340px' : '1fr' }}>
         {/* Feed items */}
         <div>
           <h2 style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 12 }}>
@@ -161,9 +170,35 @@ export default function EntityDetailPage() {
           )}
         </div>
 
-        {/* Sidebar: related entities + related story threads */}
-        {(relatedEntities.length > 0 || relatedStories.length > 0) && (
+        {/* Sidebar: related entities + associated tools/models + related story threads */}
+        {(relatedEntities.length > 0 || relatedStories.length > 0 || associatedTools.length > 0) && (
           <div className="flex flex-col gap-8">
+            {associatedTools.length > 0 && (
+              <div>
+                <h2 style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 12 }}>
+                  Associated tools & models
+                </h2>
+                <div className="flex flex-col gap-2">
+                  {associatedTools.map(t => (
+                    <Link
+                      key={t.tool_id}
+                      href="/radar"
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                        background: 'var(--surface)', border: '1px solid var(--border)',
+                        borderLeft: '3px solid #22c55e', borderRadius: 8, padding: '10px 14px',
+                      }}
+                    >
+                      <span style={{ fontSize: 13.5, fontWeight: 600, color: '#e4e4e7' }}>{t.name}</span>
+                      <span style={{ fontSize: 10, color: '#22c55e', textTransform: 'uppercase', fontWeight: 700 }}>
+                        {t.quadrant}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {relatedEntities.length > 0 && (
               <div>
                 <h2 style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 12 }}>

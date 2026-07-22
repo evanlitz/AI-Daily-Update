@@ -21,6 +21,7 @@ export type EdgeType =
   | 'mentions'       // feed_item -> tech_radar (Phase 5)
   | 'introduced_by'  // ai_model -> feed_item (Phase 6)
   | 'supersedes'     // ai_model -> ai_model (Phase 6)
+  | 'associated_with' // entity -> tech_radar (Phase 7)
 
 export interface EdgeOpts {
   weight?: number   // normalized 0-1 confidence — always. Raw counts go in metadata, not weight.
@@ -34,6 +35,7 @@ export interface Neighbor {
   edgeType: string
   weight: number
   label: string | null
+  updatedAt: string
   direction: 'out' | 'in'
 }
 
@@ -88,22 +90,22 @@ export async function getNeighbors(
 
   if (direction === 'out' || direction === 'both') {
     const { rows } = await db.execute({
-      sql: `SELECT to_type, to_id, edge_type, weight, label FROM graph_edges
+      sql: `SELECT to_type, to_id, edge_type, weight, label, updated_at FROM graph_edges
             WHERE from_type = ? AND from_id = ?${opts.edgeType ? ' AND edge_type = ?' : ''}`,
       args: opts.edgeType ? [type, id, opts.edgeType] : [type, id],
     })
     for (const r of rows as any[]) {
-      results.push({ type: r.to_type, id: r.to_id, edgeType: r.edge_type, weight: r.weight, label: r.label ?? null, direction: 'out' })
+      results.push({ type: r.to_type, id: r.to_id, edgeType: r.edge_type, weight: r.weight, label: r.label ?? null, updatedAt: r.updated_at, direction: 'out' })
     }
   }
   if (direction === 'in' || direction === 'both') {
     const { rows } = await db.execute({
-      sql: `SELECT from_type, from_id, edge_type, weight, label FROM graph_edges
+      sql: `SELECT from_type, from_id, edge_type, weight, label, updated_at FROM graph_edges
             WHERE to_type = ? AND to_id = ?${opts.edgeType ? ' AND edge_type = ?' : ''}`,
       args: opts.edgeType ? [type, id, opts.edgeType] : [type, id],
     })
     for (const r of rows as any[]) {
-      results.push({ type: r.from_type, id: r.from_id, edgeType: r.edge_type, weight: r.weight, label: r.label ?? null, direction: 'in' })
+      results.push({ type: r.from_type, id: r.from_id, edgeType: r.edge_type, weight: r.weight, label: r.label ?? null, updatedAt: r.updated_at, direction: 'in' })
     }
   }
   return results

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
+import { getNeighbors } from '@/lib/graph'
 
 export async function GET(
   _req: Request,
@@ -11,36 +12,41 @@ export async function GET(
   const modelId = (modelRows[0] as any)?.id
   if (!modelId) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const [supersedesRes, supersededByRes, introducedByRes] = await Promise.all([
-    // This model supersedes X — this model is the `from` side of the edge.
-    db.execute({
-      sql: `SELECT am.id, am.name, am.slug
-            FROM graph_edges ge JOIN ai_models am ON am.id = ge.to_id
-            WHERE ge.edge_type = 'supersedes' AND ge.from_type = 'ai_model' AND ge.to_type = 'ai_model'
-              AND ge.from_id = ?`,
-      args: [modelId],
-    }),
-    // X supersedes this model — this model is the `to` side of the edge.
-    db.execute({
-      sql: `SELECT am.id, am.name, am.slug
-            FROM graph_edges ge JOIN ai_models am ON am.id = ge.from_id
-            WHERE ge.edge_type = 'supersedes' AND ge.from_type = 'ai_model' AND ge.to_type = 'ai_model'
-              AND ge.to_id = ?`,
-      args: [modelId],
-    }),
-    db.execute({
-      sql: `SELECT fi.id, fi.title, fi.url, fi.source, fi.published_at
-            FROM graph_edges ge JOIN feed_items fi ON fi.id = ge.to_id
-            WHERE ge.edge_type = 'introduced_by' AND ge.from_type = 'ai_model' AND ge.to_type = 'feed_item'
-              AND ge.from_id = ?
-            LIMIT 1`,
-      args: [modelId],
-    }),
+  const [supersedesOut, supersedesIn, introducedByOut] = await Promise.all([
+    getNeighbors('ai_model', modelId, { edgeType: 'supersedes', direction: 'out' }),
+    getNeighbors('ai_model', modelId, { edgeType: 'supersedes', direction: 'in' }),
+    getNeighbors('ai_model', modelId, { edgeType: 'introduced_by', direction: 'out' }),
+  ])
+
+  const [supersedes, supersededBy, introducedBy] = await Promise.all([
+    hydrateModels(supersedesOut),
+    hydrateModels(supersedesIn),
+    hydrateFeedItems(introducedByOut.slice(0, 1)),
   ])
 
   return NextResponse.json({
-    supersedes: supersedesRes.rows,
-    supersededBy: supersededByRes.rows,
-    introducedBy: introducedByRes.rows[0] ?? null,
+    supersedes,
+    supersededBy,
+    introducedBy: introducedBy[0] ?? null,
   })
+}
+
+async function hydrateModels(neighbors: Awaited<ReturnType<typeof getNeighbors>>) {
+  if (!neighbors.length) return []
+  const placeholders = neighbors.map(() => '?').join(',')
+  const { rows } = await db.execute({
+    sql: `SELECT id, name, slug FROM ai_models WHERE id IN (${placeholders})`,
+    args: neighbors.map(n => n.id),
+  })
+  return rows
+}
+
+async function hydrateFeedItems(neighbors: Awaited<ReturnType<typeof getNeighbors>>) {
+  if (!neighbors.length) return []
+  const placeholders = neighbors.map(() => '?').join(',')
+  const { rows } = await db.execute({
+    sql: `SELECT id, title, url, source, published_at FROM feed_items WHERE id IN (${placeholders})`,
+    args: neighbors.map(n => n.id),
+  })
+  return rows
 }
