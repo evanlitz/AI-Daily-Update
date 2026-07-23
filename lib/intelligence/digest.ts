@@ -347,9 +347,16 @@ export async function buildAndRunDigest(
   // under the route's maxDuration=300; no retries because a second attempt
   // can't fit in that budget — the daily cron with its weekly idempotency
   // check is the retry mechanism.
+  //
+  // Bumped to 5000 (2026-07-23): on busy weeks (18+ active story threads),
+  // 3800 wasn't enough to finish the prose sections AND the trailing
+  // {"highlights":...} JSON block, so the response got cut off mid-JSON and
+  // highlights came back empty. At the observed ~35-50 tok/s generation
+  // rate, 5000 tokens is ~100-145s — still comfortably inside the 240s
+  // per-call timeout.
   const response = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 3800,
+    max_tokens: 5000,
     system: [
       {
         type: 'text',
@@ -375,6 +382,14 @@ Ongoing story threads (and prior weeks' highlights) are your own past synthesis 
   }, { timeout: 240_000, maxRetries: 0 })
 
   const content = response.content[0].type === 'text' ? response.content[0].text : ''
+
+  // Visible signal if max_tokens is ever hit again (busier week than the
+  // 5000 budget above accounts for) instead of silently landing on empty
+  // highlights with no clue why — same "log it, don't guess later" instinct
+  // as the health dashboard's cron-failure tracking.
+  if (response.stop_reason === 'max_tokens') {
+    console.warn('[digest] response hit max_tokens — content likely truncated, highlights may be empty')
+  }
 
   let highlights: string[] = []
   let changes: DigestChange[] = []
