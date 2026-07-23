@@ -1,6 +1,7 @@
 import { getSourceStatuses, RETIRED_SOURCES, type SourceStatusEntry, type SourceStatus } from './sourceHealth'
 import { getRecentStats, type ClaudeUsageSummary } from './screening-stats'
 import { getRecentCronFailures, getFlaggedEvalScores, type CronFailureRow, type EvalFlagRow } from './health'
+import { getGraphHealth, type EdgeTypeHealth } from './graph'
 
 export interface SourceHealthRow extends SourceStatusEntry {
   accepted: number
@@ -20,16 +21,18 @@ export interface HealthDashboard {
   }
   cronFailures: CronFailureRow[]
   evalFlags: EvalFlagRow[]
+  graph: { totalEdges: number; byType: EdgeTypeHealth[] }
 }
 
 const SEVERITY: Record<SourceStatus, number> = { dead: 3, stale: 2, warn: 1, ok: 0 }
 
 export async function getHealthDashboard(): Promise<HealthDashboard> {
-  const [sourceReport, screening, cronFailures, evalFlags] = await Promise.all([
+  const [sourceReport, screening, cronFailures, evalFlags, graph] = await Promise.all([
     getSourceStatuses(),
     getRecentStats(14, { includeDaily: false }),
     getRecentCronFailures(24 * 7),
     getFlaggedEvalScores(),
+    getGraphHealth(),
   ])
 
   const statusBySource = new Map(sourceReport.sources.map(s => [s.source, s]))
@@ -81,5 +84,6 @@ export async function getHealthDashboard(): Promise<HealthDashboard> {
     },
     cronFailures,
     evalFlags,
+    graph,
   }
 }

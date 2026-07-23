@@ -144,6 +144,32 @@ export function parseEdgeMetadata(raw: string | null | undefined): Record<string
   return safeJSON(raw ?? '{}', {})
 }
 
+export interface EdgeTypeHealth {
+  edgeType: string
+  count: number
+  lastUpdated: string | null
+}
+
+// Per-edge-type count + freshness, read straight off graph_edges.updated_at —
+// no separate run-log needed since every producer (lib/pipeline.ts phase 2,
+// lib/intelligence/radar.ts, lib/intelligence/models.ts) already goes through
+// addEdge()'s ON CONFLICT...DO UPDATE, so updated_at reflects the last time
+// that edge type was actually touched. Deliberately no staleness threshold —
+// producers run on different real-world cadences (a new model release for
+// supersedes/introduced_by vs. every pipeline cycle for co_mentioned), so a
+// fixed "N hours = stale" cutoff would false-alarm on the sparser ones.
+export async function getGraphHealth(): Promise<{ totalEdges: number; byType: EdgeTypeHealth[] }> {
+  const { rows } = await db.execute(
+    `SELECT edge_type, COUNT(*) AS cnt, MAX(updated_at) AS last_updated FROM graph_edges GROUP BY edge_type ORDER BY edge_type ASC`
+  ) as { rows: any[] }
+  const byType = rows.map(r => ({
+    edgeType: r.edge_type as string,
+    count: Number(r.cnt),
+    lastUpdated: (r.last_updated as string | null) ?? null,
+  }))
+  return { totalEdges: byType.reduce((sum, r) => sum + r.count, 0), byType }
+}
+
 // Entities associated_with each tool, batched into 2 queries total regardless
 // of tool count — one IN-clause lookup over graph_edges, one over entities.
 // Shared by advisor-context.ts and predictions.ts, which previously each had

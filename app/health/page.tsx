@@ -309,6 +309,7 @@ export default function HealthPage() {
         <div className="health-stats-divider" style={{ width: 1, alignSelf: 'stretch', background: LINE }} />
         <StatChip label="Cron failures · 7d" value={data.cronFailures.length} color={data.cronFailures.length ? '#ef4444' : FAINT} />
         <StatChip label="Eval flags open" value={data.evalFlags.length} color={data.evalFlags.length ? '#eab308' : FAINT} />
+        <StatChip label="Graph edges" value={data.graph.totalEdges} color={FAINT} />
       </div>
 
       {/* Sources table */}
@@ -378,6 +379,37 @@ export default function HealthPage() {
                       <td style={{ padding: '13px 16px', color: INK, fontSize: 14.5, fontWeight: 700, textAlign: 'right', ...MONO }}>
                         {(u.inputTokens + u.outputTokens).toLocaleString()}
                       </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Graph edges */}
+      <div className="mb-10">
+        <SectionHeader label="Graph" sub="graph_edges by type · freshness is last write, not a fixed staleness cutoff (producers run on different cadences)" />
+        <div style={{ border: `1px solid rgba(59,130,246,0.35)`, borderRadius: 12, overflow: 'hidden' }}>
+          {data.graph.byType.length === 0 ? (
+            <div style={{ padding: '4px 16px' }}><EmptyRow text="No graph edges recorded yet." /></div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 480 }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${LINE}` }}>
+                    <Th>Edge type</Th>
+                    <Th align="right">Count</Th>
+                    <Th align="right">Last updated</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.graph.byType.map((row, i) => (
+                    <tr key={row.edgeType} style={{ borderBottom: i === data.graph.byType.length - 1 ? 'none' : `1px solid ${LINE}` }}>
+                      <td style={{ padding: '13px 16px', color: INK, fontSize: 15, fontWeight: 600 }}>{row.edgeType}</td>
+                      <td style={{ padding: '13px 16px', color: DIM, fontSize: 14, textAlign: 'right', ...MONO }}>{row.count.toLocaleString()}</td>
+                      <td style={{ padding: '13px 16px', color: DIM, fontSize: 14, textAlign: 'right' }}>{row.lastUpdated ? relTime(row.lastUpdated) : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
