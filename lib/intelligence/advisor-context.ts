@@ -1,7 +1,7 @@
 import db from '../db'
 import { recallFeedItems } from '../memory'
 import { getAllModels } from './models'
-import { getEntitiesForTools } from '../graph'
+import { getEntitiesForTools, getKnownRelationships, formatKnownRelationships } from '../graph'
 
 const PAPER_SOURCES = ['arxiv', 'paperswithcode', 'semanticscholar', 'huggingface']
 
@@ -16,6 +16,7 @@ export interface AdvisorSourceContext {
   // it, so consumers must fall back rather than assume presence — same pattern
   // predictions.ts's NewPredictionContext.entityContext uses.
   entities?: string
+  relationships?: string
 }
 
 // query: overrides the semantic-search text for the `trending` block. Trending
@@ -60,7 +61,13 @@ export async function gatherAdvisorContext(query?: string): Promise<AdvisorSourc
     getAllModels(),
   ])
 
-  const radarEntities = await getEntitiesForTools(radarRows as any[])
+  const [radarEntities, knownRelationships] = await Promise.all([
+    getEntitiesForTools(radarRows as any[]),
+    getKnownRelationships().catch(err => {
+      console.error('[advisor-context] getKnownRelationships failed:', err)
+      return []
+    }),
+  ])
 
   const trending = trendingItems.length
     ? trendingItems.map(i => `- ${i.title}`).join('\n')
@@ -89,5 +96,7 @@ export async function gatherAdvisorContext(query?: string): Promise<AdvisorSourc
     .filter((line): line is string => Boolean(line))
   const entities = entityLines.join('\n') || 'No tracked entity associations for these tools yet.'
 
-  return { trending, papers, repos, datasets, models: modelsText, radar, entities }
+  const relationships = knownRelationships.length ? formatKnownRelationships(knownRelationships) : undefined
+
+  return { trending, papers, repos, datasets, models: modelsText, radar, entities, relationships }
 }

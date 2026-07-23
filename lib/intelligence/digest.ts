@@ -8,6 +8,7 @@ import type { WeeklyDigest, DigestChange } from '../types'
 import { getMondayISO, sanitizeText } from '../utils'
 import { runLiveGroundednessCheck } from '../eval/live-check'
 import { getEntitiesForThreads } from './entities'
+import { getKnownRelationships, formatKnownRelationships } from '../graph'
 
 // Extract meaningful words from a title for overlap comparison
 function titleTokens(title: string): Set<string> {
@@ -74,8 +75,10 @@ async function getStoryContext(): Promise<string> {
     // Own fallback so a failure isolated to this join (e.g. malformed
     // feed_item_ids JSON) doesn't drop the entire story-thread section via
     // this function's outer catch — just the entity annotations on it.
-    const threadEntities = await getEntitiesForThreads((threads as any[]).map(t => t.id))
-      .catch(() => new Map<string, string[]>())
+    const [threadEntities, knownRelationships] = await Promise.all([
+      getEntitiesForThreads((threads as any[]).map(t => t.id)).catch(() => new Map<string, string[]>()),
+      getKnownRelationships().catch(() => []),
+    ])
     const lines = (threads as any[]).map(t => {
       const entities = threadEntities.get(t.id)
       return `- **${t.title}**: ${t.current_summary ?? ''}${t.update_text ? ` | Latest: ${t.update_text}` : ''} | Watch for: ${t.watch_for ?? '?'}${entities?.length ? ` | Key entities: ${entities.join(', ')}` : ''}`
@@ -106,7 +109,11 @@ async function getStoryContext(): Promise<string> {
       }
     }
 
-    return `\n\nOngoing story threads you've been tracking:\n${lines.join('\n')}${relationsBlock}`
+    const companyRelationshipsBlock = knownRelationships.length
+      ? `\n\nKnown relationships between companies:\n${formatKnownRelationships(knownRelationships)}`
+      : ''
+
+    return `\n\nOngoing story threads you've been tracking:\n${lines.join('\n')}${relationsBlock}${companyRelationshipsBlock}`
   } catch { return '' }
 }
 

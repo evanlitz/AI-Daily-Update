@@ -78,7 +78,7 @@ Rules:
 - If they describe a problem, design projects that solve that exact problem
 - Pick tools from the current AI landscape below when relevant
 - When a trending repo, dataset, or model below fits naturally, ground the idea in that specific named resource (and its link) instead of a generic placeholder
-- The context blocks below are more current and more trustworthy than your own training data on what's new in AI right now — treat them as the authoritative source for any SPECIFIC named tool, model, library, dataset, repo, paper, company, or named individual you put in tech_stack or description. Never invent a specific product name or organization, however standard or well-known, that isn't named there
+- The context blocks below are more current and more trustworthy than your own training data on what's new in AI right now — treat them as the authoritative source for any SPECIFIC named tool, model, library, dataset, repo, paper, company, or named individual you put in tech_stack or description. Never invent a specific product name or organization, however standard or well-known, that isn't named there. The same applies to any relationship between companies you reference — only state one listed in the known relationships below
 - General techniques, architecture, and engineering approach are yours to judge — deciding how the named resources above fit together into a real project, what steps make sense, and how to scope it is exactly the reasoning you're here to contribute, not something that needs to trace back to a context block
 - If the context doesn't support a strong idea for some angle, favor a simpler idea grounded in what is present over inventing a named resource to fill the gap
 - Scope each project to 1-20 hours of solo work
@@ -102,7 +102,10 @@ Currently recommended AI tools (adopt/trial):
 ${ctx.radar}
 
 Entities (companies/researchers) associated with those tools:
-${ctx.entities ?? 'No tracked entity associations for these tools yet.'}`
+${ctx.entities ?? 'No tracked entity associations for these tools yet.'}
+
+Known relationships between companies:
+${ctx.relationships ?? 'No tracked relationships yet.'}`
 
   const response = await anthropic.messages.create({
     model: MODEL, max_tokens: 2500,
@@ -150,7 +153,7 @@ export async function buildAndRunTrendingIdeas(
     context?.hoursPerWeek ? `Available ~${context.hoursPerWeek} hours per week — calibrate project scope accordingly.` : '',
   ].filter(Boolean).join(' ')
 
-  const systemText = `You are a senior developer mentoring a self-taught developer learning AI/ML. ${contextLines} Suggest realistic, achievable projects that: (1) can be built solo in 1-20 hours, (2) use current AI tools from the list below, (3) teach real skills, (4) produce a tangible shareable output — an API, demo app, or CLI tool a developer can show. The developer knows basic Python and JavaScript and is comfortable with APIs. When a trending repo, dataset, or model below fits naturally, ground the idea in that specific named resource (and its link) instead of a generic placeholder. The context blocks below are more current and more trustworthy than your own training data on what's new in AI right now — treat them as the authoritative source for any SPECIFIC named tool, model, library, dataset, repo, paper, company, or named individual you put in tech_stack or description; never invent a specific product name or organization, however standard or well-known, that isn't named there. General technique, architecture, and engineering approach are yours to judge — deciding how the named resources fit together into a real project is exactly the reasoning you're here to contribute. If the context doesn't support a strong idea for some angle, favor a simpler idea grounded in what is present over inventing a named resource to fill the gap.
+  const systemText = `You are a senior developer mentoring a self-taught developer learning AI/ML. ${contextLines} Suggest realistic, achievable projects that: (1) can be built solo in 1-20 hours, (2) use current AI tools from the list below, (3) teach real skills, (4) produce a tangible shareable output — an API, demo app, or CLI tool a developer can show. The developer knows basic Python and JavaScript and is comfortable with APIs. When a trending repo, dataset, or model below fits naturally, ground the idea in that specific named resource (and its link) instead of a generic placeholder. The context blocks below are more current and more trustworthy than your own training data on what's new in AI right now — treat them as the authoritative source for any SPECIFIC named tool, model, library, dataset, repo, paper, company, or named individual you put in tech_stack or description; never invent a specific product name or organization, however standard or well-known, that isn't named there. The same applies to any relationship between companies you reference (e.g. calling two companies competitors, or one an investor in another) — only state one listed in the known relationships below. General technique, architecture, and engineering approach are yours to judge — deciding how the named resources fit together into a real project is exactly the reasoning you're here to contribute. If the context doesn't support a strong idea for some angle, favor a simpler idea grounded in what is present over inventing a named resource to fill the gap.
 
 Recent research papers:
 ${ctx.papers}
@@ -168,7 +171,10 @@ Currently recommended AI tools (adopt/trial):
 ${ctx.radar}
 
 Entities (companies/researchers) associated with those tools:
-${ctx.entities ?? 'No tracked entity associations for these tools yet.'}`
+${ctx.entities ?? 'No tracked entity associations for these tools yet.'}
+
+Known relationships between companies:
+${ctx.relationships ?? 'No tracked relationships yet.'}`
 
   const response = await anthropic.messages.create({
     model: MODEL, max_tokens: 2500,

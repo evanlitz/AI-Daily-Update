@@ -4,7 +4,7 @@ import { anthropic, MODEL } from '../claude'
 import { recall, rememberEntity } from '../memory'
 import type { AIPrediction, EvidenceLink } from '../types'
 import { safeJSON } from '../utils'
-import { addEdge, getEntitiesForTools } from '../graph'
+import { addEdge, getEntitiesForTools, getKnownRelationships, formatKnownRelationships } from '../graph'
 import { getEntitiesForThreads } from './entities'
 
 // Distance below which a new candidate prediction is treated as a semantic
@@ -1113,6 +1113,7 @@ export interface NewPredictionContext {
   radarTools: any[]
   existingTitles: string[]
   entityContext?: string
+  relationshipContext?: string
 }
 
 function formatEntityContext(
@@ -1154,7 +1155,7 @@ export async function fetchNewPredictionCandidates(): Promise<NewPredictionConte
 
   // Optional, best-effort context — a failure here shouldn't take down
   // candidate generation, same defensive pattern digest.ts's context helpers use.
-  const [threadEntities, toolEntities] = await Promise.all([
+  const [threadEntities, toolEntities, knownRelationships] = await Promise.all([
     getEntitiesForThreads(threads.map(t => t.id)).catch(err => {
       console.error('[predictions] getEntitiesForThreads failed:', err)
       return new Map<string, string[]>()
@@ -1163,6 +1164,10 @@ export async function fetchNewPredictionCandidates(): Promise<NewPredictionConte
       console.error('[predictions] getEntitiesForTools failed:', err)
       return new Map<string, string[]>()
     }),
+    getKnownRelationships().catch(err => {
+      console.error('[predictions] getKnownRelationships failed:', err)
+      return []
+    }),
   ])
 
   return {
@@ -1170,11 +1175,12 @@ export async function fetchNewPredictionCandidates(): Promise<NewPredictionConte
     radarTools,
     existingTitles: existing.map(r => r.title),
     entityContext: formatEntityContext(threads, threadEntities, radarTools, toolEntities) || undefined,
+    relationshipContext: knownRelationships.length ? formatKnownRelationships(knownRelationships) : undefined,
   }
 }
 
 export async function buildAndRunNewPredictions(context: NewPredictionContext): Promise<any[]> {
-  const { threads, radarTools, existingTitles, entityContext } = context
+  const { threads, radarTools, existingTitles, entityContext, relationshipContext } = context
   if (!threads.length && !radarTools.length) return []
 
   const threadList = threads
@@ -1185,6 +1191,7 @@ export async function buildAndRunNewPredictions(context: NewPredictionContext): 
     .join('\n') || 'None.'
   const existingList = existingTitles.join(', ')
   const entityBlock = entityContext ? `\n\n${entityContext}` : ''
+  const relationshipBlock = relationshipContext ? `\n\nKnown relationships between companies:\n${relationshipContext}` : ''
 
   const systemPrompt = `You are a cautious AI forecasting analyst proposing NEW entries for a personal AI predictions timeline. You only propose a new prediction when there is a genuine, multi-month-or-longer forecast to make — a real forward uncertainty about whether/when something will happen. A single product announcement or news event is not a prediction; it already happened, there's nothing to forecast.
 
@@ -1192,9 +1199,9 @@ Be selective. Most runs should propose 0-2 predictions, not 3. Only propose some
 
 Always set confidence to "speculative" or "low" — these are fresh, unverified forecasts, not established trends.
 
-If you name a specific company, person, or organization in a rationale or description, only name one that appears in the entity context provided below — never invent a named entity, however well-known, that isn't listed there.`
+If you name a specific company, person, or organization in a rationale or description, only name one that appears in the entity context provided below — never invent a named entity, however well-known, that isn't listed there. The same applies to relationships between companies (e.g. "X, a competitor of Y") — only assert one listed in the known relationships below, never one you're inferring from general knowledge.`
 
-  const userPrompt = `Recent high-significance story threads:\n${threadList}\n\nTools/models currently in the "adopt" radar quadrant:\n${radarList}${entityBlock}\n\nAlready-tracked prediction titles (do not duplicate):\n${existingList}\n\nPropose 0-2 new predictions. Return ONLY a JSON array (empty array if nothing genuinely new is worth forecasting):\n[{"title":"...","category":"capability|safety|science|society|infrastructure","year_min":2026,"year_max":2028,"year_guess":2027,"month_guess":1-12,"date_guess":"Month Year","confidence":"speculative"|"low","description":"1-2 sentences","rationale":"2-3 sentences citing the specific thread/tool above that motivated this"}]`
+  const userPrompt = `Recent high-significance story threads:\n${threadList}\n\nTools/models currently in the "adopt" radar quadrant:\n${radarList}${entityBlock}${relationshipBlock}\n\nAlready-tracked prediction titles (do not duplicate):\n${existingList}\n\nPropose 0-2 new predictions. Return ONLY a JSON array (empty array if nothing genuinely new is worth forecasting):\n[{"title":"...","category":"capability|safety|science|society|infrastructure","year_min":2026,"year_max":2028,"year_guess":2027,"month_guess":1-12,"date_guess":"Month Year","confidence":"speculative"|"low","description":"1-2 sentences","rationale":"2-3 sentences citing the specific thread/tool above that motivated this"}]`
 
   const response = await anthropic.messages.create({
     model: MODEL,

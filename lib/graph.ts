@@ -172,6 +172,48 @@ export async function getGraphHealth(): Promise<{ totalEdges: number; byType: Ed
   return { totalEdges: byType.reduce((sum, r) => sum + r.count, 0), byType }
 }
 
+export interface KnownRelationship {
+  nameA: string
+  nameB: string
+  label: string
+}
+
+// Most-recently-classified typed entity relationships (competitor/partner/
+// investor/acquired/subsidiary — never 'none', filtered at the query level).
+// Global top-N rather than targeted to a specific set of entities already in
+// a caller's context — the dataset is small enough (tens of pairs) that a
+// stable "known relationships" block is simpler than plumbing entity ids
+// through from each caller's thread/tool lookups, and still gives Claude real
+// grounding to reference instead of guessing at industry relationships.
+export async function getKnownRelationships(limit = 20): Promise<KnownRelationship[]> {
+  const { rows } = await db.execute({
+    sql: `SELECT ea.name AS name_a, eb.name AS name_b, ge.label FROM graph_edges ge
+          JOIN entities ea ON ea.id = ge.from_id
+          JOIN entities eb ON eb.id = ge.to_id
+          WHERE ge.edge_type = 'related_to' AND ge.label != 'none'
+            AND ge.from_type = 'entity' AND ge.to_type = 'entity'
+          ORDER BY ge.updated_at DESC
+          LIMIT ?`,
+    args: [limit],
+  }) as { rows: any[] }
+  return rows.map(r => ({ nameA: r.name_a as string, nameB: r.name_b as string, label: r.label as string }))
+}
+
+// "acquired of"/"investor of" read as broken English — a small verb map beats
+// a generic "A — label of — B" template that only actually works for two of
+// the five labels.
+const RELATIONSHIP_VERB: Record<string, string> = {
+  competitor: 'competes with',
+  partner: 'partners with',
+  investor: 'has invested in',
+  acquired: 'acquired',
+  subsidiary: 'is a subsidiary of',
+}
+
+export function formatKnownRelationships(rels: KnownRelationship[]): string {
+  return rels.map(r => `${r.nameA} ${RELATIONSHIP_VERB[r.label] ?? r.label} ${r.nameB}`).join('\n')
+}
+
 // Entities associated_with each tool, batched into 2 queries total regardless
 // of tool count — one IN-clause lookup over graph_edges, one over entities.
 // Shared by advisor-context.ts and predictions.ts, which previously each had
