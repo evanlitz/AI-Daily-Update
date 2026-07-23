@@ -20,7 +20,7 @@ import { ensureAllModels, refreshModelsFromFeed, linkSupersededModels } from './
 import { screenPendingItems, generateHooks } from './intelligence/hooks'
 import { updateStoryThreads, linkThreads } from './intelligence/stories'
 import { backfillPredictionEvidence } from './intelligence/predictions'
-import { saveEntityMentions, backfillEntities, linkCoMentionedEntities, linkEntityToolAssociations, classifyEntityRelationships } from './intelligence/entities'
+import { saveEntityMentions, backfillEntities, linkCoMentionedEntities, linkEntityToolAssociations, classifyEntityRelationships, classifyEntityAffiliations } from './intelligence/entities'
 import { generateYoutubeSummaries } from './intelligence/youtube_summaries'
 import { embedFeedItems } from './memory'
 
@@ -367,6 +367,7 @@ export async function fetchIntelligencePhase2(): Promise<void> {
     { label: 'linkCoMentionedEntities', promise: linkCoMentionedEntities() },
     { label: 'linkEntityToolAssociations', promise: linkEntityToolAssociations() },
     { label: 'classifyEntityRelationships', promise: classifyEntityRelationships() },
+    { label: 'classifyEntityAffiliations', promise: classifyEntityAffiliations() },
     { label: 'linkSupersededModels', promise: linkSupersededModels() },
     { label: 'seedRadarIfEmpty', promise: seedRadarIfEmpty() },
     { label: 'reclassifyStaleTools', promise: reclassifyStaleTools() },

@@ -71,11 +71,13 @@ interface EntityDetail {
 }
 
 const RELATIONSHIP_META: Record<string, { color: string; verb: string }> = {
-  competitor: { color: '#f87171', verb: 'Competitor' },
-  partner:    { color: '#38bdf8', verb: 'Partner' },
-  investor:   { color: '#facc15', verb: 'Investor' },
-  acquired:   { color: '#c084fc', verb: 'Acquired' },
-  subsidiary: { color: '#fb923c', verb: 'Subsidiary' },
+  competitor:      { color: '#f87171', verb: 'Competitor' },
+  partner:         { color: '#38bdf8', verb: 'Partner' },
+  investor:        { color: '#facc15', verb: 'Investor' },
+  acquired:        { color: '#c084fc', verb: 'Acquired' },
+  subsidiary:      { color: '#fb923c', verb: 'Subsidiary' },
+  maker_of:        { color: '#a3e635', verb: 'Maker' },
+  affiliated_with: { color: '#94a3b8', verb: 'Affiliated' },
 }
 
 const TYPE_META: Record<string, { color: string; rgb: string; label: string }> = {

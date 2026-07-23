@@ -508,3 +508,128 @@ export async function classifyEntityRelationships(): Promise<void> {
   }
   console.log(`[entities] classifyEntityRelationships: ${classified} pair(s) classified`)
 }
+
+// company<->model ("maker_of") and company<->person ("affiliated_with") pairs
+// were deliberately excluded from classifyEntityRelationships() — sending
+// them through that company-only pass previously forced them into the wrong
+// corporate label ("Claude is a subsidiary of Anthropic"). Same edge type
+// (related_to), same batching/evidence pattern, but its own narrow label set
+// and — critically — a validation step after classification that discards
+// any label that doesn't actually match the pair's entity types, rather than
+// trusting Claude's output blindly like the pre-bugfix version did.
+const AFFILIATION_TIME_BUDGET_MS = 60_000
+const AFFILIATION_BATCH_SIZE = 20
+
+const AFFILIATION_SYSTEM = `You classify two specific kinds of relationships between AI-industry entities, based ONLY on the evidence snippets given for each pair.
+
+For a COMPANY + MODEL pair: label "maker_of" if the evidence shows that company created, released, or develops that model. Otherwise "none".
+
+For a COMPANY + PERSON pair: label "affiliated_with" if the evidence shows that person is meaningfully associated with that company (founder, CEO, executive, researcher, employee). Otherwise "none".
+
+CRITICAL: If the evidence doesn't clearly support the relationship, output "none" — never assert one from outside/training knowledge that the evidence itself doesn't show. "none" is the correct answer whenever the pair is just incidentally co-mentioned.`
+
+interface AffiliationCandidate {
+  companyId: string
+  otherId: string
+  companyName: string
+  otherName: string
+  otherType: 'model' | 'researcher'
+  evidence: string[]
+}
+
+async function classifyAffiliationBatch(pairs: AffiliationCandidate[]): Promise<void> {
+  if (!pairs.length) return
+
+  const input = pairs
+    .map((p, i) => `${i}. ${p.companyName} (company) / ${p.otherName} (${p.otherType})\nEvidence: ${p.evidence.length ? p.evidence.join(' | ') : '(none found — co-mentioned but no shared article title)'}`)
+    .join('\n\n')
+
+  const response = await anthropic.messages.create({
+    model: MODEL_FAST, max_tokens: 2000,
+    system: [{ type: 'text', text: AFFILIATION_SYSTEM, cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: `Classify these ${pairs.length} pairs. Return JSON array only, one entry per index, all indices covered:\n\n${input}\n\n[{"index":0,"label":"maker_of"|"affiliated_with"|"none"}]` }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
+  let classified: any[] = []
+  try { const m = text.match(/\[[\s\S]*\]/); if (m) classified = JSON.parse(m[0]) } catch { return }
+
+  const expectedLabel: Record<AffiliationCandidate['otherType'], string> = {
+    model: 'maker_of',
+    researcher: 'affiliated_with',
+  }
+
+  for (const item of classified) {
+    const pair = pairs[item.index]
+    if (!pair) continue
+    // Discard rather than trust: a label is only kept if it matches what this
+    // pair's own type-shape allows. Anything else (including a hallucinated
+    // label outside the two valid ones) collapses to 'none'.
+    const label = item.label === expectedLabel[pair.otherType] ? item.label : 'none'
+    await addEdge('entity', pair.companyId, 'entity', pair.otherId, 'related_to', {
+      label,
+      metadata: { evidence: pair.evidence },
+    }).catch(err => console.error('[entities] addEdge related_to (affiliation) failed:', err))
+  }
+}
+
+export async function classifyEntityAffiliations(): Promise<void> {
+  const { rows: candidateRows } = await db.execute(`
+    SELECT ge.from_id AS a, ge.to_id AS b, ea.type AS type_a, eb.type AS type_b
+    FROM graph_edges ge
+    JOIN entities ea ON ea.id = ge.from_id
+    JOIN entities eb ON eb.id = ge.to_id
+    WHERE ge.edge_type = 'co_mentioned'
+      AND (
+        (ea.type = 'company' AND eb.type IN ('model', 'researcher'))
+        OR (eb.type = 'company' AND ea.type IN ('model', 'researcher'))
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM graph_edges r
+        WHERE r.edge_type = 'related_to' AND r.from_type = 'entity' AND r.to_type = 'entity'
+          AND ((r.from_id = ge.from_id AND r.to_id = ge.to_id) OR (r.from_id = ge.to_id AND r.to_id = ge.from_id))
+      )
+    ORDER BY ge.weight DESC
+  `) as { rows: any[] }
+  if (!candidateRows.length) return
+
+  // Normalize so companyId/otherId is consistent regardless of which side
+  // co_mentioned happened to store as from/to (that ordering is just
+  // alphabetical by id, not type-aware).
+  const pairs = candidateRows.map(r => {
+    const aIsCompany = r.type_a === 'company'
+    return {
+      companyId: aIsCompany ? (r.a as string) : (r.b as string),
+      otherId: aIsCompany ? (r.b as string) : (r.a as string),
+      otherType: (aIsCompany ? r.type_b : r.type_a) as 'model' | 'researcher',
+    }
+  })
+
+  const ids = [...new Set(pairs.flatMap(p => [p.companyId, p.otherId]))]
+  const { rows: nameRows } = await db.execute({
+    sql: `SELECT id, name FROM entities WHERE id IN (${ids.map(() => '?').join(',')})`,
+    args: ids,
+  }) as { rows: any[] }
+  const nameById = new Map(nameRows.map(r => [r.id as string, r.name as string]))
+  const evidenceByPair = await gatherPairEvidence(pairs.map(p => ({ a: p.companyId, b: p.otherId })))
+
+  const enriched: AffiliationCandidate[] = pairs
+    .filter(p => nameById.has(p.companyId) && nameById.has(p.otherId))
+    .map(p => ({
+      companyId: p.companyId, otherId: p.otherId, otherType: p.otherType,
+      companyName: nameById.get(p.companyId)!, otherName: nameById.get(p.otherId)!,
+      evidence: evidenceByPair.get(pairKey(p.companyId, p.otherId)) ?? [],
+    }))
+
+  const loopStart = Date.now()
+  let classified = 0
+  for (let i = 0; i < enriched.length; i += AFFILIATION_BATCH_SIZE) {
+    if (Date.now() - loopStart > AFFILIATION_TIME_BUDGET_MS) {
+      console.warn(`[entities] classifyEntityAffiliations time budget hit — ${enriched.length - i} pair(s) left for next run`)
+      break
+    }
+    await classifyAffiliationBatch(enriched.slice(i, i + AFFILIATION_BATCH_SIZE))
+    classified += Math.min(AFFILIATION_BATCH_SIZE, enriched.length - i)
+  }
+  console.log(`[entities] classifyEntityAffiliations: ${classified} pair(s) classified`)
+}

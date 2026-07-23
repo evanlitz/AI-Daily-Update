@@ -178,23 +178,33 @@ export interface KnownRelationship {
   label: string
 }
 
-// Most-recently-classified typed entity relationships (competitor/partner/
-// investor/acquired/subsidiary — never 'none', filtered at the query level).
-// Global top-N rather than targeted to a specific set of entities already in
-// a caller's context — the dataset is small enough (tens of pairs) that a
-// stable "known relationships" block is simpler than plumbing entity ids
-// through from each caller's thread/tool lookups, and still gives Claude real
-// grounding to reference instead of guessing at industry relationships.
+// Most-recently-classified typed entity relationships. Global top-N rather
+// than targeted to a specific set of entities already in a caller's context —
+// the dataset is small enough (tens of pairs) that a stable "known
+// relationships" block is simpler than plumbing entity ids through from each
+// caller's thread/tool lookups, and still gives Claude real grounding to
+// reference instead of guessing at industry relationships.
+//
+// Explicitly scoped to the 5 corporate labels (not just "!= 'none'") — the
+// predictions/advisor/digest prompts that consume this call it a "Known
+// relationships between companies" block, and maker_of/affiliated_with
+// (company<->model, company<->person) would silently break that framing if
+// a future label got added here without a matching prompt update. Entity
+// pages read related_to directly via getNeighbors() and are unaffected by
+// this filter — they show every label, this is generation-context only.
+const CORPORATE_RELATIONSHIP_LABELS = ['competitor', 'partner', 'investor', 'acquired', 'subsidiary']
+
 export async function getKnownRelationships(limit = 20): Promise<KnownRelationship[]> {
+  const labelPlaceholders = CORPORATE_RELATIONSHIP_LABELS.map(() => '?').join(',')
   const { rows } = await db.execute({
     sql: `SELECT ea.name AS name_a, eb.name AS name_b, ge.label FROM graph_edges ge
           JOIN entities ea ON ea.id = ge.from_id
           JOIN entities eb ON eb.id = ge.to_id
-          WHERE ge.edge_type = 'related_to' AND ge.label != 'none'
+          WHERE ge.edge_type = 'related_to' AND ge.label IN (${labelPlaceholders})
             AND ge.from_type = 'entity' AND ge.to_type = 'entity'
           ORDER BY ge.updated_at DESC
           LIMIT ?`,
-    args: [limit],
+    args: [...CORPORATE_RELATIONSHIP_LABELS, limit],
   }) as { rows: any[] }
   return rows.map(r => ({ nameA: r.name_a as string, nameB: r.name_b as string, label: r.label as string }))
 }
