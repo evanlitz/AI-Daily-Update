@@ -36,6 +36,7 @@ yarn-error.log*
 # Claude / agent config files
 CLAUDE.md
 AGENTS.md
+.claude/GRAPH_ROADMAP.md
 
 # vercel
 .vercel
