@@ -240,6 +240,13 @@ export async function backfillEntities(): Promise<void> {
 
 const MIN_CO_MENTIONS = 3
 const CO_MENTION_WEIGHT_CAP = 10
+// Half-life for weighting individual co-mentions by age — a mention this old
+// counts as half of a fresh one. Applied to the SUM, not the HAVING threshold,
+// so a pair still needs MIN_CO_MENTIONS lifetime co-mentions to surface at all;
+// this only makes weight fade once it has. 90 days keeps genuinely durable
+// pairs (e.g. a lab and its flagship model, mentioned constantly) near the cap
+// while letting a one-off pairing from old news drift back down.
+const CO_MENTION_HALF_LIFE_DAYS = 90
 
 // SQL-only co-occurrence — entities mentioned in the same feed_item at least
 // MIN_CO_MENTIONS times. Deliberately not LLM-confirmed (unlike linkThreads()'s
@@ -250,7 +257,8 @@ const CO_MENTION_WEIGHT_CAP = 10
 // app/api/entities/[id]/route.ts), same pattern thread_relations already uses.
 export async function linkCoMentionedEntities(): Promise<void> {
   const { rows } = await db.execute({
-    sql: `SELECT em1.entity_id AS a, em2.entity_id AS b, COUNT(*) AS cnt
+    sql: `SELECT em1.entity_id AS a, em2.entity_id AS b, COUNT(*) AS cnt,
+                 SUM(pow(0.5, (julianday('now') - julianday(em1.created_at)) / ?)) AS decayed_cnt
           FROM entity_mentions em1
           JOIN entity_mentions em2
             ON em1.source_type = em2.source_type
@@ -259,18 +267,18 @@ export async function linkCoMentionedEntities(): Promise<void> {
           WHERE em1.source_type = 'feed_item'
           GROUP BY em1.entity_id, em2.entity_id
           HAVING COUNT(*) >= ?`,
-    args: [MIN_CO_MENTIONS],
+    args: [CO_MENTION_HALF_LIFE_DAYS, MIN_CO_MENTIONS],
   }) as { rows: any[] }
 
   if (!rows.length) return
 
   for (const row of rows) {
-    const weight = Math.min(Number(row.cnt) / CO_MENTION_WEIGHT_CAP, 1)
+    const weight = Math.min(Number(row.decayed_cnt) / CO_MENTION_WEIGHT_CAP, 1)
     // Guarded so one bad write doesn't abort the loop and drop every remaining
     // pair for this cycle — same convention as predictions.ts's evidence_for write.
     await addEdge('entity', row.a as string, 'entity', row.b as string, 'co_mentioned', {
       weight,
-      metadata: { count: Number(row.cnt) },
+      metadata: { count: Number(row.cnt), decayedCount: Number(row.decayed_cnt) },
     }).catch(err => console.error('[entities] addEdge co_mentioned failed:', err))
   }
   console.log(`[entities] linkCoMentionedEntities: ${rows.length} entity pairs linked`)
@@ -306,6 +314,9 @@ export async function getEntitiesForThreads(threadIds: string[]): Promise<Map<st
 
 const MIN_TOOL_ASSOCIATION = 3
 const TOOL_ASSOCIATION_WEIGHT_CAP = 10
+// Same reasoning as CO_MENTION_HALF_LIFE_DAYS — a tool an entity was tied to
+// this long ago counts for half as much as a fresh mention.
+const TOOL_ASSOCIATION_HALF_LIFE_DAYS = 90
 
 // Same full-table-scan, no-LLM pattern as linkCoMentionedEntities — an entity
 // and a tool are "associated" when they co-occur in the same feed_item at
@@ -315,23 +326,24 @@ const TOOL_ASSOCIATION_WEIGHT_CAP = 10
 // for co_mentioned — no separate backfill script needed.
 export async function linkEntityToolAssociations(): Promise<void> {
   const { rows } = await db.execute({
-    sql: `SELECT em.entity_id AS entity_id, ge.to_id AS tool_id, COUNT(*) AS cnt
+    sql: `SELECT em.entity_id AS entity_id, ge.to_id AS tool_id, COUNT(*) AS cnt,
+                 SUM(pow(0.5, (julianday('now') - julianday(em.created_at)) / ?)) AS decayed_cnt
           FROM entity_mentions em
           JOIN graph_edges ge
             ON ge.from_type = 'feed_item' AND ge.from_id = em.source_id AND ge.edge_type = 'mentions'
           WHERE em.source_type = 'feed_item'
           GROUP BY em.entity_id, ge.to_id
           HAVING COUNT(*) >= ?`,
-    args: [MIN_TOOL_ASSOCIATION],
+    args: [TOOL_ASSOCIATION_HALF_LIFE_DAYS, MIN_TOOL_ASSOCIATION],
   }) as { rows: any[] }
 
   if (!rows.length) return
 
   for (const row of rows) {
-    const weight = Math.min(Number(row.cnt) / TOOL_ASSOCIATION_WEIGHT_CAP, 1)
+    const weight = Math.min(Number(row.decayed_cnt) / TOOL_ASSOCIATION_WEIGHT_CAP, 1)
     await addEdge('entity', row.entity_id as string, 'tech_radar', row.tool_id as string, 'associated_with', {
       weight,
-      metadata: { count: Number(row.cnt) },
+      metadata: { count: Number(row.cnt), decayedCount: Number(row.decayed_cnt) },
     }).catch(err => console.error('[entities] addEdge associated_with failed:', err))
   }
   console.log(`[entities] linkEntityToolAssociations: ${rows.length} entity-tool pairs linked`)
