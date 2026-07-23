@@ -348,3 +348,163 @@ export async function linkEntityToolAssociations(): Promise<void> {
   }
   console.log(`[entities] linkEntityToolAssociations: ${rows.length} entity-tool pairs linked`)
 }
+
+const RELATIONSHIP_LABELS = new Set(['competitor', 'partner', 'investor', 'acquired', 'subsidiary', 'none'])
+const RELATIONSHIP_BATCH_SIZE = 20
+// Same budget-per-cycle pattern as radar.ts's classifyToolNames/reclassifyStaleTools —
+// a large backlog (e.g. the ~96 co_mentioned pairs that existed when this shipped)
+// drains over a few pipeline cycles instead of one giant prompt.
+const RELATIONSHIP_TIME_BUDGET_MS = 60_000
+
+function pairKey(a: string, b: string): string {
+  return `${a}|${b}`
+}
+
+// Up to 2 real article titles both entities of a pair were mentioned in — the
+// grounding evidence the classifier is told to rely on instead of training
+// knowledge. Small N (one candidate batch's worth of entities), so per-pair
+// intersection in JS is fine, same tradeoff getEntitiesForThreads() accepts.
+async function gatherPairEvidence(pairs: { a: string; b: string }[]): Promise<Map<string, string[]>> {
+  const evidenceByPair = new Map<string, string[]>()
+  const ids = [...new Set(pairs.flatMap(p => [p.a, p.b]))]
+  if (!ids.length) return evidenceByPair
+
+  const placeholders = ids.map(() => '?').join(',')
+  const { rows } = await db.execute({
+    sql: `SELECT em.entity_id, em.source_id, fi.title
+          FROM entity_mentions em
+          JOIN feed_items fi ON fi.id = em.source_id
+          WHERE em.source_type = 'feed_item' AND em.entity_id IN (${placeholders})`,
+    args: ids,
+  }) as { rows: any[] }
+
+  const byEntity = new Map<string, Map<string, string>>()
+  for (const row of rows) {
+    const m = byEntity.get(row.entity_id) ?? new Map<string, string>()
+    m.set(row.source_id, row.title)
+    byEntity.set(row.entity_id, m)
+  }
+
+  for (const { a, b } of pairs) {
+    const ma = byEntity.get(a), mb = byEntity.get(b)
+    if (!ma || !mb) continue
+    const titles: string[] = []
+    for (const [sourceId, title] of ma) {
+      if (mb.has(sourceId)) titles.push(title)
+      if (titles.length >= 2) break
+    }
+    if (titles.length) evidenceByPair.set(pairKey(a, b), titles)
+  }
+  return evidenceByPair
+}
+
+const RELATIONSHIP_SYSTEM = `You classify the relationship between pairs of AI-industry entities (companies, people, models) for a knowledge graph, based ONLY on the evidence snippets given for each pair.
+
+Labels — pick exactly one per pair:
+- competitor: rival companies/products in the same market
+- partner: collaboration, integration, or alliance
+- investor: one has invested in / funds the other
+- acquired: one has acquired / owns the other
+- subsidiary: one is a division or subsidiary of the other
+- none: no clear relationship in the evidence — just an incidental co-mention (e.g. both appeared in the same roundup). This is the correct answer most of the time.
+
+For competitor/partner (symmetric), "from" can be either side. For investor/acquired/subsidiary (directional), "from" must be the subject (the investor, the acquirer, the parent) and "to" the object.
+
+CRITICAL: If the evidence doesn't clearly support a specific relationship, output "none" — never assert a relationship from outside/training knowledge that the evidence itself doesn't show.`
+
+async function classifyRelationshipBatch(
+  pairs: { a: string; b: string; nameA: string; nameB: string; evidence: string[] }[]
+): Promise<void> {
+  if (!pairs.length) return
+
+  const input = pairs
+    .map((p, i) => `${i}. ${p.nameA} (a) / ${p.nameB} (b)\nEvidence: ${p.evidence.length ? p.evidence.join(' | ') : '(none found — co-mentioned but no shared article title)'}`)
+    .join('\n\n')
+
+  const response = await anthropic.messages.create({
+    model: MODEL_FAST, max_tokens: 2000,
+    system: [{ type: 'text', text: RELATIONSHIP_SYSTEM, cache_control: { type: 'ephemeral' } }],
+    messages: [{ role: 'user', content: `Classify these ${pairs.length} entity pairs. Return JSON array only, one entry per index, all indices covered:\n\n${input}\n\n[{"index":0,"label":"competitor|partner|investor|acquired|subsidiary|none","from":"a"|"b"}]` }],
+  })
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : '[]'
+  let classified: any[] = []
+  try { const m = text.match(/\[[\s\S]*\]/); if (m) classified = JSON.parse(m[0]) } catch { return }
+
+  for (const item of classified) {
+    const pair = pairs[item.index]
+    if (!pair) continue
+    const label = RELATIONSHIP_LABELS.has(item.label) ? item.label : 'none'
+    const [fromId, toId] = item.from === 'b' ? [pair.b, pair.a] : [pair.a, pair.b]
+    // Written even for 'none' — the edge's existence is what keeps this pair
+    // out of the candidate query next cycle, same role co_mentioned's own row
+    // plays for backfillEntities(). Readers filter label='none' out.
+    await addEdge('entity', fromId, 'entity', toId, 'related_to', {
+      label,
+      metadata: { evidence: pair.evidence },
+    }).catch(err => console.error('[entities] addEdge related_to failed:', err))
+  }
+}
+
+// Only classifies co_mentioned pairs that don't already have a related_to
+// row in either direction — bounds the Claude spend to the delta of newly
+// co_mentioned pairs each cycle, not a full rescan. Deliberately built on top
+// of linkCoMentionedEntities() rather than replacing it, per that function's
+// own comment about validating the free signal before spending a Claude
+// budget on a semantic upgrade.
+//
+// Restricted to company<->company pairs (ea.type='company' AND eb.type=
+// 'company') — the label set (competitor/partner/investor/acquired/
+// subsidiary) is inherently a corporate-relationship vocabulary. Verified
+// against prod data that without this filter, company-vs-model and
+// company-vs-person pairs (e.g. Anthropic/Claude, DeepMind/Demis Hassabis)
+// get force-fit into the nearest-sounding label — "Claude is a subsidiary of
+// Anthropic" is simply wrong, not a matter of confidence. "Maker of"/
+// "affiliated with" relationships are a different, separate feature to add
+// later with their own label set, not squeezed into this one.
+export async function classifyEntityRelationships(): Promise<void> {
+  const { rows: candidateRows } = await db.execute(`
+    SELECT ge.from_id AS a, ge.to_id AS b
+    FROM graph_edges ge
+    JOIN entities ea ON ea.id = ge.from_id
+    JOIN entities eb ON eb.id = ge.to_id
+    WHERE ge.edge_type = 'co_mentioned'
+      AND ea.type = 'company' AND eb.type = 'company'
+      AND NOT EXISTS (
+        SELECT 1 FROM graph_edges r
+        WHERE r.edge_type = 'related_to' AND r.from_type = 'entity' AND r.to_type = 'entity'
+          AND ((r.from_id = ge.from_id AND r.to_id = ge.to_id) OR (r.from_id = ge.to_id AND r.to_id = ge.from_id))
+      )
+    ORDER BY ge.weight DESC
+  `) as { rows: any[] }
+  if (!candidateRows.length) return
+
+  const pairs = candidateRows.map(r => ({ a: r.a as string, b: r.b as string }))
+  const ids = [...new Set(pairs.flatMap(p => [p.a, p.b]))]
+  const { rows: nameRows } = await db.execute({
+    sql: `SELECT id, name FROM entities WHERE id IN (${ids.map(() => '?').join(',')})`,
+    args: ids,
+  }) as { rows: any[] }
+  const nameById = new Map(nameRows.map(r => [r.id as string, r.name as string]))
+  const evidenceByPair = await gatherPairEvidence(pairs)
+
+  const enriched = pairs
+    .filter(p => nameById.has(p.a) && nameById.has(p.b))
+    .map(p => ({
+      a: p.a, b: p.b,
+      nameA: nameById.get(p.a)!, nameB: nameById.get(p.b)!,
+      evidence: evidenceByPair.get(pairKey(p.a, p.b)) ?? [],
+    }))
+
+  const loopStart = Date.now()
+  let classified = 0
+  for (let i = 0; i < enriched.length; i += RELATIONSHIP_BATCH_SIZE) {
+    if (Date.now() - loopStart > RELATIONSHIP_TIME_BUDGET_MS) {
+      console.warn(`[entities] classifyEntityRelationships time budget hit — ${enriched.length - i} pair(s) left for next run`)
+      break
+    }
+    await classifyRelationshipBatch(enriched.slice(i, i + RELATIONSHIP_BATCH_SIZE))
+    classified += Math.min(RELATIONSHIP_BATCH_SIZE, enriched.length - i)
+  }
+  console.log(`[entities] classifyEntityRelationships: ${classified} pair(s) classified`)
+}

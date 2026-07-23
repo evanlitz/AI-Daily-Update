@@ -8,7 +8,7 @@ export async function GET(
 ) {
   const { id } = await params
 
-  const [entityRes, feedItemsRes, storiesRes, coMentioned, associated, traversed] = await Promise.all([
+  const [entityRes, feedItemsRes, storiesRes, coMentioned, associated, traversed, related] = await Promise.all([
     db.execute({ sql: `SELECT * FROM entities WHERE id = ?`, args: [id] }),
     db.execute({
       sql: `SELECT fi.id, fi.title, fi.url, fi.source, fi.hook, fi.published_at, fi.velocity_score
@@ -36,6 +36,7 @@ export async function GET(
     getNeighbors('entity', id, { edgeType: 'co_mentioned' }),
     getNeighbors('entity', id, { edgeType: 'associated_with', direction: 'out' }),
     traverse('entity', id, 2),
+    getNeighbors('entity', id, { edgeType: 'related_to' }),
   ])
 
   const entity = entityRes.rows[0] as any
@@ -46,10 +47,11 @@ export async function GET(
   // associated_with, both depth 1) — this is genuinely "2 hops or nothing."
   const twoHopEntityIds = traversed.filter(n => n.type === 'entity' && n.depth === 2).map(n => n.id)
 
-  const [relatedEntities, associatedTools, extendedNetwork] = await Promise.all([
+  const [relatedEntities, associatedTools, extendedNetwork, relationships] = await Promise.all([
     hydrateEntities(coMentioned),
     hydrateTools(associated),
     hydrateEntityIds(twoHopEntityIds),
+    hydrateRelationships(related),
   ])
 
   return NextResponse.json({
@@ -59,6 +61,7 @@ export async function GET(
     relatedEntities,
     associatedTools,
     extendedNetwork,
+    relationships,
   })
 }
 
@@ -103,4 +106,22 @@ async function hydrateEntityIds(ids: string[]) {
     args: ids,
   })
   return (rows as any[]).map(r => ({ related_id: r.id, name: r.name, type: r.type }))
+}
+
+// classifyEntityRelationships() writes a related_to edge even for label='none'
+// (so the pair doesn't get re-sent to Claude every cycle) — filter those out
+// here rather than at write time, same "store everything, filter at read"
+// approach the rest of this route already takes.
+async function hydrateRelationships(neighbors: Awaited<ReturnType<typeof getNeighbors>>) {
+  const typed = neighbors.filter(n => n.label && n.label !== 'none')
+  if (!typed.length) return []
+  const placeholders = typed.map(() => '?').join(',')
+  const { rows } = await db.execute({
+    sql: `SELECT id, name, type FROM entities WHERE id IN (${placeholders})`,
+    args: typed.map(n => n.id),
+  })
+  const byId = new Map((rows as any[]).map(r => [r.id, r]))
+  return typed
+    .filter(n => byId.has(n.id))
+    .map(n => ({ related_id: n.id, label: n.label, direction: n.direction, ...byId.get(n.id) }))
 }

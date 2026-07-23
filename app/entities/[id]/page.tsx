@@ -52,6 +52,14 @@ interface ExtendedEntity {
   type: string
 }
 
+interface Relationship {
+  related_id: string
+  name: string
+  type: string
+  label: string
+  direction: 'out' | 'in'
+}
+
 interface EntityDetail {
   entity: Entity
   feedItems: FeedItem[]
@@ -59,6 +67,15 @@ interface EntityDetail {
   relatedEntities: RelatedEntity[]
   associatedTools: AssociatedTool[]
   extendedNetwork: ExtendedEntity[]
+  relationships: Relationship[]
+}
+
+const RELATIONSHIP_META: Record<string, { color: string; verb: string }> = {
+  competitor: { color: '#f87171', verb: 'Competitor' },
+  partner:    { color: '#38bdf8', verb: 'Partner' },
+  investor:   { color: '#facc15', verb: 'Investor' },
+  acquired:   { color: '#c084fc', verb: 'Acquired' },
+  subsidiary: { color: '#fb923c', verb: 'Subsidiary' },
 }
 
 const TYPE_META: Record<string, { color: string; rgb: string; label: string }> = {
@@ -107,7 +124,7 @@ export default function EntityDetailPage() {
     )
   }
 
-  const { entity, feedItems, relatedStories, relatedEntities, associatedTools, extendedNetwork } = data
+  const { entity, feedItems, relatedStories, relatedEntities, associatedTools, extendedNetwork, relationships } = data
   const meta = TYPE_META[entity.type] ?? DEFAULT_TYPE
 
   return (
@@ -140,7 +157,7 @@ export default function EntityDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-8" style={{ gridTemplateColumns: (relatedStories.length || relatedEntities.length || associatedTools.length || extendedNetwork.length) ? '1fr 340px' : '1fr' }}>
+      <div className="grid gap-8" style={{ gridTemplateColumns: (relatedStories.length || relatedEntities.length || associatedTools.length || extendedNetwork.length || relationships.length) ? '1fr 340px' : '1fr' }}>
         {/* Feed items */}
         <div>
           <h2 style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 12 }}>
@@ -178,8 +195,37 @@ export default function EntityDetailPage() {
         </div>
 
         {/* Sidebar: related entities + associated tools/models + related story threads */}
-        {(relatedEntities.length > 0 || relatedStories.length > 0 || associatedTools.length > 0 || extendedNetwork.length > 0) && (
+        {(relatedEntities.length > 0 || relatedStories.length > 0 || associatedTools.length > 0 || extendedNetwork.length > 0 || relationships.length > 0) && (
           <div className="flex flex-col gap-8">
+            {relationships.length > 0 && (
+              <div>
+                <h2 style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 12 }}>
+                  Relationships
+                </h2>
+                <div className="flex flex-col gap-2">
+                  {relationships.map(r => {
+                    const rm = RELATIONSHIP_META[r.label] ?? { color: '#71717a', verb: r.label }
+                    return (
+                      <Link
+                        key={r.related_id}
+                        href={`/entities/${r.related_id}`}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                          background: 'var(--surface)', border: '1px solid var(--border)',
+                          borderLeft: `3px solid ${rm.color}`, borderRadius: 8, padding: '10px 14px',
+                        }}
+                      >
+                        <span style={{ fontSize: 13.5, fontWeight: 600, color: '#e4e4e7' }}>{r.name}</span>
+                        <span style={{ fontSize: 10, color: rm.color, textTransform: 'uppercase', fontWeight: 700 }}>
+                          {rm.verb}
+                        </span>
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {associatedTools.length > 0 && (
               <div>
                 <h2 style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 12 }}>

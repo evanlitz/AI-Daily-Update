@@ -22,6 +22,8 @@ export type EdgeType =
   | 'introduced_by'  // ai_model -> feed_item (Phase 6)
   | 'supersedes'     // ai_model -> ai_model (Phase 6)
   | 'associated_with' // entity -> tech_radar (Phase 7)
+  | 'related_to'      // entity <-> entity, typed relationship — kind lives in
+                       // `label` (competitor|partner|investor|acquired|subsidiary|none) (Phase 8)
 
 export interface EdgeOpts {
   weight?: number   // normalized 0-1 confidence — always. Raw counts go in metadata, not weight.
