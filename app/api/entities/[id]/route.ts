@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
-import { getNeighbors } from '@/lib/graph'
+import { getNeighbors, traverse } from '@/lib/graph'
 
 export async function GET(
   _req: Request,
@@ -8,7 +8,7 @@ export async function GET(
 ) {
   const { id } = await params
 
-  const [entityRes, feedItemsRes, storiesRes, coMentioned, associated] = await Promise.all([
+  const [entityRes, feedItemsRes, storiesRes, coMentioned, associated, traversed] = await Promise.all([
     db.execute({ sql: `SELECT * FROM entities WHERE id = ?`, args: [id] }),
     db.execute({
       sql: `SELECT fi.id, fi.title, fi.url, fi.source, fi.hook, fi.published_at, fi.velocity_score
@@ -35,14 +35,21 @@ export async function GET(
     }),
     getNeighbors('entity', id, { edgeType: 'co_mentioned' }),
     getNeighbors('entity', id, { edgeType: 'associated_with', direction: 'out' }),
+    traverse('entity', id, 2),
   ])
 
   const entity = entityRes.rows[0] as any
   if (!entity) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const [relatedEntities, associatedTools] = await Promise.all([
+  // traverse() dedupes each node to its minimum depth, so filtering to
+  // depth === 2 already excludes anything reachable directly (co_mentioned or
+  // associated_with, both depth 1) — this is genuinely "2 hops or nothing."
+  const twoHopEntityIds = traversed.filter(n => n.type === 'entity' && n.depth === 2).map(n => n.id)
+
+  const [relatedEntities, associatedTools, extendedNetwork] = await Promise.all([
     hydrateEntities(coMentioned),
     hydrateTools(associated),
+    hydrateEntityIds(twoHopEntityIds),
   ])
 
   return NextResponse.json({
@@ -51,6 +58,7 @@ export async function GET(
     relatedStories: storiesRes.rows,
     relatedEntities,
     associatedTools,
+    extendedNetwork,
   })
 }
 
@@ -82,4 +90,17 @@ async function hydrateTools(neighbors: Awaited<ReturnType<typeof getNeighbors>>)
     .sort((a, b) => b.weight - a.weight)
     .slice(0, 10)
     .map(n => ({ tool_id: n.id, weight: n.weight, ...byId.get(n.id) }))
+}
+
+// traverse() gives ids/depth only, no weight to sort by (it's a plain BFS,
+// not edge-weighted) — cap at 10 and let mention_count stand in as the
+// relevance signal instead.
+async function hydrateEntityIds(ids: string[]) {
+  if (!ids.length) return []
+  const placeholders = ids.map(() => '?').join(',')
+  const { rows } = await db.execute({
+    sql: `SELECT id, name, type, mention_count FROM entities WHERE id IN (${placeholders}) ORDER BY mention_count DESC LIMIT 10`,
+    args: ids,
+  })
+  return (rows as any[]).map(r => ({ related_id: r.id, name: r.name, type: r.type }))
 }

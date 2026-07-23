@@ -46,12 +46,19 @@ interface AssociatedTool {
   weight: number
 }
 
+interface ExtendedEntity {
+  related_id: string
+  name: string
+  type: string
+}
+
 interface EntityDetail {
   entity: Entity
   feedItems: FeedItem[]
   relatedStories: RelatedStory[]
   relatedEntities: RelatedEntity[]
   associatedTools: AssociatedTool[]
+  extendedNetwork: ExtendedEntity[]
 }
 
 const TYPE_META: Record<string, { color: string; rgb: string; label: string }> = {
@@ -100,7 +107,7 @@ export default function EntityDetailPage() {
     )
   }
 
-  const { entity, feedItems, relatedStories, relatedEntities, associatedTools } = data
+  const { entity, feedItems, relatedStories, relatedEntities, associatedTools, extendedNetwork } = data
   const meta = TYPE_META[entity.type] ?? DEFAULT_TYPE
 
   return (
@@ -133,7 +140,7 @@ export default function EntityDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-8" style={{ gridTemplateColumns: (relatedStories.length || relatedEntities.length || associatedTools.length) ? '1fr 340px' : '1fr' }}>
+      <div className="grid gap-8" style={{ gridTemplateColumns: (relatedStories.length || relatedEntities.length || associatedTools.length || extendedNetwork.length) ? '1fr 340px' : '1fr' }}>
         {/* Feed items */}
         <div>
           <h2 style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 12 }}>
@@ -171,7 +178,7 @@ export default function EntityDetailPage() {
         </div>
 
         {/* Sidebar: related entities + associated tools/models + related story threads */}
-        {(relatedEntities.length > 0 || relatedStories.length > 0 || associatedTools.length > 0) && (
+        {(relatedEntities.length > 0 || relatedStories.length > 0 || associatedTools.length > 0 || extendedNetwork.length > 0) && (
           <div className="flex flex-col gap-8">
             {associatedTools.length > 0 && (
               <div>
@@ -249,6 +256,38 @@ export default function EntityDetailPage() {
                       </p>
                     </Link>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {extendedNetwork.length > 0 && (
+              <div>
+                <h2 style={{ fontSize: 13, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--muted)', marginBottom: 4 }}>
+                  Also worth knowing
+                </h2>
+                <p style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.5 }}>
+                  Two hops out — connected through a shared tool or entity, not directly.
+                </p>
+                <div className="flex flex-col gap-2">
+                  {extendedNetwork.map(re => {
+                    const rm = TYPE_META[re.type] ?? DEFAULT_TYPE
+                    return (
+                      <Link
+                        key={re.related_id}
+                        href={`/entities/${re.related_id}`}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                          background: 'var(--surface)', border: '1px dashed var(--border)',
+                          borderLeft: `3px dashed ${rm.color}`, borderRadius: 8, padding: '10px 14px',
+                        }}
+                      >
+                        <span style={{ fontSize: 13.5, fontWeight: 600, color: '#e4e4e7' }}>{re.name}</span>
+                        <span style={{ fontSize: 10, color: rm.color, textTransform: 'uppercase', fontWeight: 700 }}>
+                          {rm.label}
+                        </span>
+                      </Link>
+                    )
+                  })}
                 </div>
               </div>
             )}
