@@ -1,6 +1,7 @@
 import db from '../db'
 import { recallFeedItems } from '../memory'
 import { getAllModels } from './models'
+import { getEntitiesForTools } from '../graph'
 
 const PAPER_SOURCES = ['arxiv', 'paperswithcode', 'semanticscholar', 'huggingface']
 
@@ -11,6 +12,10 @@ export interface AdvisorSourceContext {
   datasets: string
   models: string
   radar: string
+  // Optional: golden-set fixtures captured before this field existed won't have
+  // it, so consumers must fall back rather than assume presence — same pattern
+  // predictions.ts's NewPredictionContext.entityContext uses.
+  entities?: string
 }
 
 // query: overrides the semantic-search text for the `trending` block. Trending
@@ -51,9 +56,11 @@ export async function gatherAdvisorContext(query?: string): Promise<AdvisorSourc
       sql: `SELECT * FROM datasets WHERE fetched_at >= ? ORDER BY likes DESC LIMIT 6`,
       args: [day30],
     }),
-    db.execute(`SELECT name, category, quadrant FROM tech_radar WHERE quadrant IN ('adopt', 'trial') ORDER BY quadrant ASC, name ASC`),
+    db.execute(`SELECT id, name, category, quadrant FROM tech_radar WHERE quadrant IN ('adopt', 'trial') ORDER BY quadrant ASC, name ASC`),
     getAllModels(),
   ])
+
+  const radarEntities = await getEntitiesForTools(radarRows as any[])
 
   const trending = trendingItems.length
     ? trendingItems.map(i => `- ${i.title}`).join('\n')
@@ -77,5 +84,10 @@ export async function gatherAdvisorContext(query?: string): Promise<AdvisorSourc
 
   const radar = (radarRows as any[]).map(r => `- ${r.name} (${r.category}, ${r.quadrant})`).join('\n') || 'No radar data available.'
 
-  return { trending, papers, repos, datasets, models: modelsText, radar }
+  const entityLines = (radarRows as any[])
+    .map(r => (radarEntities.get(r.id)?.length ? `- ${r.name}: ${radarEntities.get(r.id)!.join(', ')}` : null))
+    .filter((line): line is string => Boolean(line))
+  const entities = entityLines.join('\n') || 'No tracked entity associations for these tools yet.'
+
+  return { trending, papers, repos, datasets, models: modelsText, radar, entities }
 }

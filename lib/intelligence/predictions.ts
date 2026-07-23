@@ -4,7 +4,8 @@ import { anthropic, MODEL } from '../claude'
 import { recall, rememberEntity } from '../memory'
 import type { AIPrediction, EvidenceLink } from '../types'
 import { safeJSON } from '../utils'
-import { addEdge } from '../graph'
+import { addEdge, getEntitiesForTools } from '../graph'
+import { getEntitiesForThreads } from './entities'
 
 // Distance below which a new candidate prediction is treated as a semantic
 // duplicate of an existing one (Voyage cosine distance, 0 = identical).
@@ -1111,6 +1112,28 @@ export interface NewPredictionContext {
   threads: any[]
   radarTools: any[]
   existingTitles: string[]
+  entityContext?: string
+}
+
+function formatEntityContext(
+  threads: any[],
+  threadEntities: Map<string, string[]>,
+  radarTools: any[],
+  toolEntities: Map<string, string[]>
+): string {
+  const threadBlock = threads
+    .map(t => (threadEntities.get(t.id)?.length ? `${t.title}: ${threadEntities.get(t.id)!.join(', ')}` : null))
+    .filter((line): line is string => Boolean(line))
+  const toolLines = radarTools
+    .map(t => (toolEntities.get(t.id)?.length ? `${t.name}: ${toolEntities.get(t.id)!.join(', ')}` : null))
+    .filter((line): line is string => Boolean(line))
+
+  if (!threadBlock.length && !toolLines.length) return ''
+
+  const parts: string[] = []
+  if (threadBlock.length) parts.push(`Key entities per story thread:\n${threadBlock.join('\n')}`)
+  if (toolLines.length) parts.push(`Entities associated with each tool:\n${toolLines.join('\n')}`)
+  return parts.join('\n\n')
 }
 
 export async function fetchNewPredictionCandidates(): Promise<NewPredictionContext> {
@@ -1118,26 +1141,40 @@ export async function fetchNewPredictionCandidates(): Promise<NewPredictionConte
 
   const [{ rows: threads }, { rows: radarTools }, { rows: existing }] = await Promise.all([
     db.execute({
-      sql: `SELECT st.title, st.category, st.current_summary, st.watch_for
+      sql: `SELECT st.id, st.title, st.category, st.current_summary, st.watch_for
             FROM story_threads st
             JOIN story_events se ON se.thread_id = st.id
             WHERE st.status = 'active' AND se.significance = 'high' AND se.created_at >= ?
             GROUP BY st.id ORDER BY st.last_updated DESC LIMIT 10`,
       args: [cutoff],
     }),
-    db.execute(`SELECT name, category, rationale FROM tech_radar WHERE quadrant = 'adopt' ORDER BY name ASC LIMIT 15`),
+    db.execute(`SELECT id, name, category, rationale FROM tech_radar WHERE quadrant = 'adopt' ORDER BY name ASC LIMIT 15`),
     db.execute(`SELECT title FROM ai_predictions`),
   ]) as [{ rows: any[] }, { rows: any[] }, { rows: any[] }]
+
+  // Optional, best-effort context — a failure here shouldn't take down
+  // candidate generation, same defensive pattern digest.ts's context helpers use.
+  const [threadEntities, toolEntities] = await Promise.all([
+    getEntitiesForThreads(threads.map(t => t.id)).catch(err => {
+      console.error('[predictions] getEntitiesForThreads failed:', err)
+      return new Map<string, string[]>()
+    }),
+    getEntitiesForTools(radarTools).catch(err => {
+      console.error('[predictions] getEntitiesForTools failed:', err)
+      return new Map<string, string[]>()
+    }),
+  ])
 
   return {
     threads,
     radarTools,
     existingTitles: existing.map(r => r.title),
+    entityContext: formatEntityContext(threads, threadEntities, radarTools, toolEntities) || undefined,
   }
 }
 
 export async function buildAndRunNewPredictions(context: NewPredictionContext): Promise<any[]> {
-  const { threads, radarTools, existingTitles } = context
+  const { threads, radarTools, existingTitles, entityContext } = context
   if (!threads.length && !radarTools.length) return []
 
   const threadList = threads
@@ -1147,14 +1184,17 @@ export async function buildAndRunNewPredictions(context: NewPredictionContext): 
     .map(r => `- ${r.name} (${r.category}): ${r.rationale ?? ''}`)
     .join('\n') || 'None.'
   const existingList = existingTitles.join(', ')
+  const entityBlock = entityContext ? `\n\n${entityContext}` : ''
 
   const systemPrompt = `You are a cautious AI forecasting analyst proposing NEW entries for a personal AI predictions timeline. You only propose a new prediction when there is a genuine, multi-month-or-longer forecast to make — a real forward uncertainty about whether/when something will happen. A single product announcement or news event is not a prediction; it already happened, there's nothing to forecast.
 
 Be selective. Most runs should propose 0-2 predictions, not 3. Only propose something if it's clearly NOT a near-duplicate of an existing tracked prediction (titles below) — if something is already covered, don't repeat it under a slightly different title.
 
-Always set confidence to "speculative" or "low" — these are fresh, unverified forecasts, not established trends.`
+Always set confidence to "speculative" or "low" — these are fresh, unverified forecasts, not established trends.
 
-  const userPrompt = `Recent high-significance story threads:\n${threadList}\n\nTools/models currently in the "adopt" radar quadrant:\n${radarList}\n\nAlready-tracked prediction titles (do not duplicate):\n${existingList}\n\nPropose 0-2 new predictions. Return ONLY a JSON array (empty array if nothing genuinely new is worth forecasting):\n[{"title":"...","category":"capability|safety|science|society|infrastructure","year_min":2026,"year_max":2028,"year_guess":2027,"month_guess":1-12,"date_guess":"Month Year","confidence":"speculative"|"low","description":"1-2 sentences","rationale":"2-3 sentences citing the specific thread/tool above that motivated this"}]`
+If you name a specific company, person, or organization in a rationale or description, only name one that appears in the entity context provided below — never invent a named entity, however well-known, that isn't listed there.`
+
+  const userPrompt = `Recent high-significance story threads:\n${threadList}\n\nTools/models currently in the "adopt" radar quadrant:\n${radarList}${entityBlock}\n\nAlready-tracked prediction titles (do not duplicate):\n${existingList}\n\nPropose 0-2 new predictions. Return ONLY a JSON array (empty array if nothing genuinely new is worth forecasting):\n[{"title":"...","category":"capability|safety|science|society|infrastructure","year_min":2026,"year_max":2028,"year_guess":2027,"month_guess":1-12,"date_guess":"Month Year","confidence":"speculative"|"low","description":"1-2 sentences","rationale":"2-3 sentences citing the specific thread/tool above that motivated this"}]`
 
   const response = await anthropic.messages.create({
     model: MODEL,

@@ -7,6 +7,7 @@ import type { RecallResult } from '../memory'
 import type { WeeklyDigest, DigestChange } from '../types'
 import { getMondayISO, sanitizeText } from '../utils'
 import { runLiveGroundednessCheck } from '../eval/live-check'
+import { getEntitiesForThreads } from './entities'
 
 // Extract meaningful words from a title for overlap comparison
 function titleTokens(title: string): Set<string> {
@@ -69,9 +70,16 @@ async function getStoryContext(): Promise<string> {
        LIMIT 12`
     )
     if (!(threads as any[]).length) return ''
-    const lines = (threads as any[]).map(t =>
-      `- **${t.title}**: ${t.current_summary ?? ''}${t.update_text ? ` | Latest: ${t.update_text}` : ''} | Watch for: ${t.watch_for ?? '?'}`
-    )
+
+    // Own fallback so a failure isolated to this join (e.g. malformed
+    // feed_item_ids JSON) doesn't drop the entire story-thread section via
+    // this function's outer catch — just the entity annotations on it.
+    const threadEntities = await getEntitiesForThreads((threads as any[]).map(t => t.id))
+      .catch(() => new Map<string, string[]>())
+    const lines = (threads as any[]).map(t => {
+      const entities = threadEntities.get(t.id)
+      return `- **${t.title}**: ${t.current_summary ?? ''}${t.update_text ? ` | Latest: ${t.update_text}` : ''} | Watch for: ${t.watch_for ?? '?'}${entities?.length ? ` | Key entities: ${entities.join(', ')}` : ''}`
+    })
 
     // Surface the labeled connections linkThreads() already confirmed between this
     // week's active threads — without this, "THE TRAJECTORY" has to re-infer

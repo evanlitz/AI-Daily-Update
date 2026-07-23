@@ -143,3 +143,43 @@ export async function traverse(type: NodeType, id: string, maxDepth: 2 | 3 = 2):
 export function parseEdgeMetadata(raw: string | null | undefined): Record<string, unknown> {
   return safeJSON(raw ?? '{}', {})
 }
+
+// Entities associated_with each tool, batched into 2 queries total regardless
+// of tool count — one IN-clause lookup over graph_edges, one over entities.
+// Shared by advisor-context.ts and predictions.ts, which previously each had
+// their own copy that called getNeighbors() once per tool (an unbounded N+1
+// fan-out of Turso round-trips for advisor's uncapped adopt+trial tool list).
+export async function getEntitiesForTools(tools: { id: string; name: string }[]): Promise<Map<string, string[]>> {
+  const byTool = new Map<string, string[]>()
+  if (!tools.length) return byTool
+
+  const toolPlaceholders = tools.map(() => '?').join(',')
+  const { rows } = await db.execute({
+    sql: `SELECT from_id AS entity_id, to_id AS tool_id, weight FROM graph_edges
+          WHERE edge_type = 'associated_with' AND from_type = 'entity' AND to_type = 'tech_radar'
+            AND to_id IN (${toolPlaceholders})`,
+    args: tools.map(t => t.id),
+  }) as { rows: any[] }
+  if (!rows.length) return byTool
+
+  const entityIds = [...new Set(rows.map(r => r.entity_id))]
+  const entityPlaceholders = entityIds.map(() => '?').join(',')
+  const { rows: entityRows } = await db.execute({
+    sql: `SELECT id, name FROM entities WHERE id IN (${entityPlaceholders})`,
+    args: entityIds,
+  }) as { rows: any[] }
+  const nameById = new Map(entityRows.map(r => [r.id, r.name as string]))
+
+  const byToolRaw = new Map<string, { name: string; weight: number }[]>()
+  for (const row of rows) {
+    const name = nameById.get(row.entity_id)
+    if (!name) continue
+    const list = byToolRaw.get(row.tool_id) ?? []
+    list.push({ name, weight: row.weight })
+    byToolRaw.set(row.tool_id, list)
+  }
+  for (const [toolId, list] of byToolRaw) {
+    byTool.set(toolId, list.sort((a, b) => b.weight - a.weight).slice(0, 3).map(x => x.name))
+  }
+  return byTool
+}

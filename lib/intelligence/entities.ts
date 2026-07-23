@@ -276,6 +276,34 @@ export async function linkCoMentionedEntities(): Promise<void> {
   console.log(`[entities] linkCoMentionedEntities: ${rows.length} entity pairs linked`)
 }
 
+// Top entities mentioned in a thread's feed items, batched across all thread
+// ids in one query. Shared by digest.ts and predictions.ts, which previously
+// each had their own byte-for-byte copy of this query.
+export async function getEntitiesForThreads(threadIds: string[]): Promise<Map<string, string[]>> {
+  const byThread = new Map<string, string[]>()
+  if (!threadIds.length) return byThread
+
+  const placeholders = threadIds.map(() => '?').join(',')
+  const { rows } = await db.execute({
+    sql: `SELECT se.thread_id, e.name, COUNT(DISTINCT em.source_id) AS item_count
+          FROM story_events se
+          JOIN json_each(se.feed_item_ids) j ON 1=1
+          JOIN entity_mentions em ON em.source_id = j.value AND em.source_type = 'feed_item'
+          JOIN entities e ON e.id = em.entity_id
+          WHERE se.thread_id IN (${placeholders})
+          GROUP BY se.thread_id, e.id
+          ORDER BY item_count DESC`,
+    args: threadIds,
+  }) as { rows: any[] }
+
+  for (const row of rows) {
+    const list = byThread.get(row.thread_id) ?? []
+    if (list.length < 3) list.push(row.name)
+    byThread.set(row.thread_id, list)
+  }
+  return byThread
+}
+
 const MIN_TOOL_ASSOCIATION = 3
 const TOOL_ASSOCIATION_WEIGHT_CAP = 10
 
