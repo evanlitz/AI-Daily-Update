@@ -28,11 +28,19 @@ export async function GET() {
   ])
 
   const edges: RawEdge[] = [
-    ...(edgesRes.rows as any[]).map(r => ({
-      fromType: r.from_type as string, fromId: r.from_id as string,
-      toType: r.to_type as string, toId: r.to_id as string,
-      edgeType: r.edge_type as string, weight: (r.weight as number) ?? 1, label: (r.label as string) ?? null,
-    })),
+    ...(edgesRes.rows as any[])
+      // related_to rows are written even when label='none' (see entities.ts) so a
+      // classified pair doesn't get re-sent to Claude next cycle — that's a "no
+      // relationship" marker, not an edge to draw. Same filter app/api/entities/[id]
+      // route already applies at read time; here it's the difference between a
+      // real competitor/partner line and a false-looking connection between two
+      // companies that were explicitly checked and found unrelated.
+      .filter(r => r.edge_type !== 'related_to' || (r.label && r.label !== 'none'))
+      .map(r => ({
+        fromType: r.from_type as string, fromId: r.from_id as string,
+        toType: r.to_type as string, toId: r.to_id as string,
+        edgeType: r.edge_type as string, weight: (r.weight as number) ?? 1, label: (r.label as string) ?? null,
+      })),
     ...(mentionsRes.rows as any[]).map(r => ({
       fromType: 'entity', fromId: r.entity_id as string,
       toType: 'feed_item', toId: r.source_id as string,

@@ -49,11 +49,26 @@ const EDGE_META: Record<string, { label: string; color: string; dash: number[] |
   mentions: { label: 'Mentions', color: '#22c55e', dash: [2, 3] },
   introduced_by: { label: 'Introduced by', color: '#06b6d4', dash: null },
   supersedes: { label: 'Supersedes', color: '#06b6d4', dash: [6, 3] },
+  related_to: { label: 'Relationship (competitor/partner/…)', color: '#f87171', dash: null },
+  associated_with: { label: 'Tool association', color: '#a78bfa', dash: [3, 2] },
   entity_mention: { label: 'Entity mention (high volume)', color: '#71717a', dash: [1, 4] },
   thread_relation: { label: 'Thread relation', color: '#f97316', dash: [4, 4] },
 }
 
 const EDGE_TYPES = Object.keys(EDGE_META)
+
+// related_to's real color comes from its label (competitor/partner/etc), not a
+// single fixed edge-type color — same palette as app/entities/[id]/page.tsx's
+// RELATIONSHIP_META so a "competitor" edge reads the same red on both pages.
+const RELATIONSHIP_COLOR: Record<string, string> = {
+  competitor: '#f87171',
+  partner: '#38bdf8',
+  investor: '#facc15',
+  acquired: '#c084fc',
+  subsidiary: '#fb923c',
+  maker_of: '#a3e635',
+  affiliated_with: '#94a3b8',
+}
 
 const SELECTED_COLOR = '#ef4444'
 const DIMMED_COLOR = 'rgba(113,113,122,0.15)'
@@ -281,7 +296,7 @@ export default function GraphPage() {
                 if (selected?.id === n.id) return SELECTED_COLOR
                 return NODE_META[n.type]?.color ?? '#71717a'
               }}
-              linkColor={(l: GLink) => EDGE_META[l.edgeType]?.color ?? 'rgba(255,255,255,0.15)'}
+              linkColor={(l: GLink) => (l.edgeType === 'related_to' && l.label ? RELATIONSHIP_COLOR[l.label] : undefined) ?? EDGE_META[l.edgeType]?.color ?? 'rgba(255,255,255,0.15)'}
               linkWidth={(l: GLink) => 0.5 + Math.min(l.weight, 3) * 0.8}
               linkLineDash={(l: GLink) => EDGE_META[l.edgeType]?.dash ?? null}
               linkDirectionalArrowLength={3}

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
+import { removeEdgesFor } from '@/lib/graph'
 
 export async function GET() {
   const { rows } = await db.execute(`SELECT * FROM tech_radar ORDER BY name ASC`)
@@ -18,5 +19,6 @@ export async function DELETE(req: Request) {
   const { id } = await req.json()
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
   await db.execute({ sql: `DELETE FROM tech_radar WHERE id = ?`, args: [id] })
+  await removeEdgesFor('tech_radar', id)
   return NextResponse.json({ ok: true })
 }
