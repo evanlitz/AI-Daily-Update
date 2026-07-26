@@ -96,13 +96,14 @@ async function hydrateTools(neighbors: Awaited<ReturnType<typeof getNeighbors>>)
 }
 
 // traverse() gives ids/depth only, no weight to sort by (it's a plain BFS,
-// not edge-weighted) — cap at 10 and let mention_count stand in as the
-// relevance signal instead.
+// not edge-weighted) — cap at 10 and let decayed mention_score stand in as
+// the relevance signal instead (raw mention_count would let an entity that
+// was hot a year ago permanently crowd out one that's actually active now).
 async function hydrateEntityIds(ids: string[]) {
   if (!ids.length) return []
   const placeholders = ids.map(() => '?').join(',')
   const { rows } = await db.execute({
-    sql: `SELECT id, name, type, mention_count FROM entities WHERE id IN (${placeholders}) ORDER BY mention_count DESC LIMIT 10`,
+    sql: `SELECT id, name, type FROM entities WHERE id IN (${placeholders}) ORDER BY mention_score DESC LIMIT 10`,
     args: ids,
   })
   return (rows as any[]).map(r => ({ related_id: r.id, name: r.name, type: r.type }))

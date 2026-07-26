@@ -376,6 +376,33 @@ export async function linkEntityToolAssociations(): Promise<void> {
   console.log(`[entities] linkEntityToolAssociations: ${rows.length} entity-tool pairs linked`)
 }
 
+// Identity crosswalk between the noisy NER-extracted entity graph and the
+// curated ai_models registry (lib/intelligence/models.ts — lab, release_date,
+// family, benchmarks, its own supersedes lineage). The two have never been
+// connected: every relationship feature below runs entirely on the entity
+// layer and has had to infer facts (e.g. who makes a model) from co-mention
+// text even when the registry already has the verified answer. Exact match
+// only (name or any alias, case-insensitive) — deliberately no fuzzy
+// matching here, given what fuzzy matching already did to this same table.
+export async function linkEntitiesToModels(): Promise<void> {
+  const { rows: models } = await db.execute(`SELECT id, name FROM ai_models`) as { rows: any[] }
+  if (!models.length) return
+  const modelByName = new Map(models.map(m => [(m.name as string).toLowerCase(), m]))
+
+  const { rows: entities } = await db.execute(`SELECT id, name, aliases FROM entities WHERE type = 'model'`) as { rows: any[] }
+
+  let linked = 0
+  for (const e of entities) {
+    const names: string[] = [e.name as string, ...JSON.parse(e.aliases ?? '[]')]
+    const match = names.map(n => modelByName.get(n.toLowerCase())).find(Boolean)
+    if (!match) continue
+    await addEdge('entity', e.id as string, 'ai_model', match.id as string, 'same_as', { weight: 1 })
+      .catch(err => console.error('[entities] addEdge same_as failed:', err))
+    linked++
+  }
+  if (linked) console.log(`[entities] linkEntitiesToModels: ${linked} entity<->ai_model link(s)`)
+}
+
 const RELATIONSHIP_LABELS = new Set(['competitor', 'partner', 'investor', 'acquired', 'subsidiary', 'none'])
 const RELATIONSHIP_BATCH_SIZE = 20
 // Same budget-per-cycle pattern as radar.ts's classifyToolNames/reclassifyStaleTools —
@@ -638,9 +665,48 @@ export async function classifyEntityAffiliations(): Promise<void> {
     args: ids,
   }) as { rows: any[] }
   const nameById = new Map(nameRows.map(r => [r.id as string, r.name as string]))
-  const evidenceByPair = await gatherPairEvidence(pairs.map(p => ({ a: p.companyId, b: p.otherId })))
 
-  const enriched: AffiliationCandidate[] = pairs
+  // Grounded short-circuit: if the model side already has a same_as link to
+  // the curated ai_models registry (linkEntitiesToModels), its `lab` field is
+  // a verified fact, not a guess from co-occurrence text — skip the Claude
+  // call entirely for that pair and write maker_of straight from the
+  // registry. Falls through to the LLM classification below for every pair
+  // that isn't grounded (unmatched models, all researcher pairs).
+  const modelOtherIds = pairs.filter(p => p.otherType === 'model').map(p => p.otherId)
+  const labByOtherId = new Map<string, string>()
+  if (modelOtherIds.length) {
+    const { rows: sameAsRows } = await db.execute({
+      sql: `SELECT ge.from_id AS entity_id, am.lab AS lab FROM graph_edges ge
+            JOIN ai_models am ON am.id = ge.to_id
+            WHERE ge.edge_type = 'same_as' AND ge.from_type = 'entity' AND ge.to_type = 'ai_model'
+              AND ge.from_id IN (${modelOtherIds.map(() => '?').join(',')})`,
+      args: modelOtherIds,
+    }) as { rows: any[] }
+    for (const r of sameAsRows) labByOtherId.set(r.entity_id as string, r.lab as string)
+  }
+
+  const grounded: { companyId: string; otherId: string; lab: string }[] = []
+  const ungrounded: typeof pairs = []
+  for (const p of pairs) {
+    const lab = labByOtherId.get(p.otherId)
+    const companyName = nameById.get(p.companyId)
+    const matches = lab && companyName && (
+      companyName.toLowerCase().includes(lab.toLowerCase()) || lab.toLowerCase().includes(companyName.toLowerCase())
+    )
+    if (matches) grounded.push({ companyId: p.companyId, otherId: p.otherId, lab: lab! })
+    else ungrounded.push(p)
+  }
+  for (const g of grounded) {
+    await addEdge('entity', g.companyId, 'entity', g.otherId, 'related_to', {
+      label: 'maker_of',
+      metadata: { source: 'ai_models_registry', lab: g.lab },
+    }).catch(err => console.error('[entities] addEdge related_to (grounded maker_of) failed:', err))
+  }
+  if (grounded.length) console.log(`[entities] classifyEntityAffiliations: ${grounded.length} pair(s) grounded directly from ai_models registry, no Claude call`)
+
+  const evidenceByPair = await gatherPairEvidence(ungrounded.map(p => ({ a: p.companyId, b: p.otherId })))
+
+  const enriched: AffiliationCandidate[] = ungrounded
     .filter(p => nameById.has(p.companyId) && nameById.has(p.otherId))
     .map(p => ({
       companyId: p.companyId, otherId: p.otherId, otherType: p.otherType,

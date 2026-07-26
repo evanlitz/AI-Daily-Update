@@ -540,6 +540,14 @@ try {
   }
 } catch {}
 
+// mention_count is a raw lifetime counter, displayed to users as-is ("47 total
+// mentions") — left untouched. mention_score is a separate, decay-aware
+// ranking signal (same split feed_items already has between raw counts and
+// velocity_score), recomputed each pipeline cycle by updateEntitySalience()
+// in lib/intelligence/velocity.ts, so entity ranking finally matches the
+// recency-awareness co_mentioned/associated_with edge weights already have.
+try { await db.execute(`ALTER TABLE entities ADD COLUMN mention_score REAL NOT NULL DEFAULT 0`) } catch {}
+
 // Generic edge registry for relationship types that have no existing home
 // (entity_mentions/thread_relations stay as-is — this is additive, not a
 // replacement). from_id/to_id can't carry a real FK since the target table

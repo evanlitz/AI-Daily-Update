@@ -24,6 +24,8 @@ export type EdgeType =
   | 'associated_with' // entity -> tech_radar (Phase 7)
   | 'related_to'      // entity <-> entity, typed relationship — kind lives in
                        // `label` (competitor|partner|investor|acquired|subsidiary|none) (Phase 8)
+  | 'same_as'         // entity(type=model) -> ai_model, identity crosswalk between the
+                       // NER-extracted entity graph and the curated model registry (Phase 9)
 
 export interface EdgeOpts {
   weight?: number   // normalized 0-1 confidence — always. Raw counts go in metadata, not weight.

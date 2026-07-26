@@ -87,3 +87,24 @@ export async function updateAccelerationScores(): Promise<void> {
   const rising = updates.filter(u => u.score >= 1.5).length
   console.log(`[velocity] acceleration updated · ${updates.length} threads · ${rising} rising`)
 }
+
+// Same 90-day half-life already applied to co_mentioned/associated_with edge
+// weights (lib/intelligence/entities.ts) — an entity mentioned constantly a
+// year ago shouldn't permanently outrank one surging this week just because
+// mention_count is a raw lifetime sum. One UPDATE with a correlated subquery
+// (entity_mentions is keyed by entity_id first in its PK, so this is an
+// indexed per-row lookup, not a cross join) rather than pulling rows into JS —
+// this is a pure SQL aggregate, unlike velocity's keyword scoring above.
+const MENTION_SALIENCE_HALF_LIFE_DAYS = 90
+
+export async function updateEntitySalience(): Promise<void> {
+  await db.execute({
+    sql: `UPDATE entities SET mention_score = COALESCE((
+            SELECT SUM(pow(0.5, (julianday('now') - julianday(em.created_at)) / ?))
+            FROM entity_mentions em
+            WHERE em.entity_id = entities.id AND em.source_type = 'feed_item'
+          ), 0)`,
+    args: [MENTION_SALIENCE_HALF_LIFE_DAYS],
+  })
+  console.log('[entities] updateEntitySalience: recomputed decayed mention scores')
+}

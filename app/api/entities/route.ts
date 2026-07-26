@@ -15,8 +15,8 @@ export async function GET(req: NextRequest) {
             COALESCE(SUM(CASE WHEN em.created_at >= ? AND em.created_at < ? THEN 1 ELSE 0 END), 0)    AS last_week
           FROM entities e
           LEFT JOIN entity_mentions em ON em.entity_id = e.id
-          GROUP BY e.id, e.name, e.type, e.mention_count, e.first_seen
-          ORDER BY e.mention_count DESC
+          GROUP BY e.id, e.name, e.type, e.mention_count, e.first_seen, e.mention_score
+          ORDER BY e.mention_score DESC
           LIMIT 150`,
     args: [cut7, cut14, cut7],
   })
