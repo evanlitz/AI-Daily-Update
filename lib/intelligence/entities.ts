@@ -26,6 +26,22 @@ function levenshtein(a: string, b: string): number {
   return dp[m][n]
 }
 
+// Version/release tokens ("4.7", "V4", "R1", "3.5") read as edit-distance-1-or-2
+// typos to plain Levenshtein — "Claude Opus 4.7" vs "4.8" is distance 1, so the
+// fuzzy matcher below was merging genuinely distinct model releases as aliases
+// of each other (confirmed live: Opus 4.6/4.7/4.8 and DeepSeek-V4/R1 had all
+// been merged into one entity). If either name contains a version-like token,
+// require both names' token sets to match exactly before allowing a fuzzy
+// merge — biased deliberately toward false negatives (two real aliases stay
+// split) over false positives (two real releases get fused into one, silently
+// corrupting mention_count and every edge derived from it).
+function versionTokensMismatch(a: string, b: string): boolean {
+  const tokenize = (s: string) => (s.match(/[a-z]?\d+(?:\.\d+)*/gi) ?? []).map(t => t.toLowerCase())
+  const ta = tokenize(a), tb = tokenize(b)
+  if (!ta.length || !tb.length) return false
+  return ta.sort().join(',') !== tb.sort().join(',')
+}
+
 export async function saveEntityMentions(
   items: FeedItem[],
   entityMap: Record<string, ExtractedEntity[]>
@@ -34,12 +50,16 @@ export async function saveEntityMentions(
 
   // Load all existing entities once for in-memory dedup
   const { rows: existingRows } = await db.execute(
-    `SELECT id, name, aliases FROM entities`
+    `SELECT id, name, type, aliases FROM entities`
   ) as { rows: any[] }
 
-  // Build lookup: normalized form → entity id
+  // Build lookup: normalized form → entity id, plus entity id → type (for the
+  // fuzzy-match type guard below — a candidate can't merge into an entity of a
+  // different type no matter how close the name).
   const nameToId = new Map<string, string>()
+  const typeById = new Map<string, string>()
   for (const e of existingRows) {
+    typeById.set(e.id, e.type)
     nameToId.set(e.name.toLowerCase().trim(), e.id)
     for (const alias of JSON.parse(e.aliases ?? '[]') as string[]) {
       nameToId.set(alias.toLowerCase().trim(), e.id)
@@ -73,13 +93,19 @@ export async function saveEntityMentions(
       let entityId = nameToId.get(key)
 
       if (!entityId && key.length >= 5) {
-        // Fuzzy-match only against existing keys of similar length (Levenshtein <= 2)
+        // Fuzzy-match only against existing keys of similar length (Levenshtein <= 2),
+        // gated by: same type, and no conflicting version token (see
+        // versionTokensMismatch — "4.7" vs "4.8" is edit-distance 1 but must
+        // never merge).
         for (let len = key.length - 2; len <= key.length + 2; len++) {
           const bucket = byLength.get(len)
           if (!bucket) continue
           for (const existingKey of bucket) {
             if (levenshtein(key, existingKey) <= 2) {
-              entityId = nameToId.get(existingKey)
+              const candidateId = nameToId.get(existingKey)!
+              if (typeById.get(candidateId) !== type) continue
+              if (versionTokensMismatch(key, existingKey)) continue
+              entityId = candidateId
               break
             }
           }
@@ -102,7 +128,8 @@ export async function saveEntityMentions(
         entityId = crypto.randomUUID()
         newEntities.push({ id: entityId, name, type })
         nameToId.set(key, entityId)
-        existingRows.push({ id: entityId, name, aliases: '[]' })
+        typeById.set(entityId, type)
+        existingRows.push({ id: entityId, name, type, aliases: '[]' })
         const bucket = byLength.get(key.length) ?? []
         bucket.push(key)
         byLength.set(key.length, bucket)
