@@ -36,17 +36,40 @@ function isBusyError(err: unknown): boolean {
   return /SQLITE_BUSY|database is locked/i.test(msg)
 }
 
-async function withBusyRetry<T>(fn: () => Promise<T>): Promise<T> {
-  const ATTEMPTS = 5
-  for (let i = 0; i < ATTEMPTS; i++) {
-    try {
-      return await fn()
-    } catch (err) {
-      if (!isBusyError(err) || i === ATTEMPTS - 1) throw err
-      await new Promise(r => setTimeout(r, 200 * (i + 1)))
-    }
-  }
-  throw new Error('unreachable')
+class DbTimeoutError extends Error {}
+
+function isTimeoutError(err: unknown): boolean {
+  return err instanceof DbTimeoutError
+}
+
+// Whether a statement is safe to re-issue after a *timeout*. SQLITE_BUSY means the
+// statement was rejected outright and never applied, so retrying it is safe for
+// anything. A timeout is different: withDbTimeout races the request, it doesn't
+// cancel it (see below), so a timed-out write may still land server-side. Most
+// writes here are genuinely non-idempotent — memories, story_events, claude_usage,
+// benchmark_snapshots and eval_scores all INSERT with a freshly generated UUID, so
+// a blind retry would duplicate rows (and, for memories, pollute semantic recall
+// with a double-weighted vector). So: timeouts retry reads only.
+//
+// Deliberately conservative — anything not obviously a pure read is treated as a
+// write. A false negative just costs one lost retry; a false positive duplicates
+// data. PRAGMA is excluded because some pragmas mutate.
+const WRITE_VERB = /\b(INSERT|UPDATE|DELETE|REPLACE|DROP|ALTER|CREATE|VACUUM)\b/
+
+function isReadOnlySql(sql: string): boolean {
+  // Strip leading line/block comments so a commented query still classifies.
+  const s = sql.replace(/^\s*(?:--[^\n]*\n|\/\*[\s\S]*?\*\/)*\s*/, '').toUpperCase()
+  if (!(s.startsWith('SELECT') || s.startsWith('WITH') || s.startsWith('EXPLAIN'))) return false
+  // A CTE can wrap a write (`WITH x AS (...) DELETE FROM ...`), so scan the body
+  // too. Column names like `updated_at`/`update_text` don't trip \bUPDATE\b —
+  // the trailing `_`/letter is a word character, so the boundary doesn't match.
+  return !WRITE_VERB.test(s)
+}
+
+function sqlOf(stmt: unknown): string {
+  if (typeof stmt === 'string') return stmt
+  if (stmt && typeof stmt === 'object' && 'sql' in stmt) return String((stmt as { sql: unknown }).sql ?? '')
+  return ''
 }
 
 // Turso/libsql has no built-in per-request timeout, and none of this codebase's
@@ -61,9 +84,27 @@ async function withBusyRetry<T>(fn: () => Promise<T>): Promise<T> {
 // race-with-cleanup shape as lib/memory.ts's embed() timeout — avoids touching
 // transport internals entirely. This bounds how long we wait, not the live request
 // itself (same "race, not cancellation" limitation as runCronJob's own deadline).
-const DB_QUERY_TIMEOUT_MS = 20_000
+// A read gets a tight per-attempt budget and is re-issued if it trips. 7s is ~70x
+// the slowest read measured against prod (95ms, the vector_top_k recall path; the
+// 2/3-hop graph traversals and the prune scan all land under 40ms), so a trip is
+// a transient Turso stall, not a query that legitimately needs longer.
+const DB_READ_ATTEMPT_TIMEOUT_MS = 7_000
+// Writes get one shot at the old budget: they can't be safely re-issued after a
+// timeout (see isReadOnlySql), so a tighter bound would only convert slow-but-
+// working writes into hard failures. Unchanged behaviour for writes is the point.
+const DB_WRITE_TIMEOUT_MS = 20_000
+const DB_MAX_ATTEMPTS = 5
+// Hard ceiling on the whole retry sequence regardless of how attempts are spent,
+// so one pathological query can't eat a meaningful slice of runCronJob's 280s
+// budget (fetch-intel already runs ~200s on a busy day). Worst realistic read:
+// 3 x 7s + ~1.2s backoff ≈ 22s, i.e. roughly the old single-shot 20s.
+const DB_OVERALL_DEADLINE_MS = 25_000
+// Floor on a clamped attempt — a sliver of leftover budget is very unlikely to
+// succeed when the DB is already stalling, and issuing it just burns the tail of
+// the ceiling on a doomed request.
+const DB_MIN_ATTEMPT_MS = 500
 
-function withDbTimeout<T>(call: Promise<T>): Promise<T> {
+function withDbTimeout<T>(call: Promise<T>, ms: number): Promise<T> {
   // Attaches a handler to the real call so a rejection arriving after the
   // timeout already won the race below doesn't surface as an unhandled rejection.
   call.catch(() => {})
@@ -71,15 +112,66 @@ function withDbTimeout<T>(call: Promise<T>): Promise<T> {
   return Promise.race([
     call,
     new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`Turso query exceeded ${DB_QUERY_TIMEOUT_MS}ms`)), DB_QUERY_TIMEOUT_MS)
+      timer = setTimeout(() => reject(new DbTimeoutError(`Turso query exceeded ${ms}ms`)), ms)
     }),
   ]).finally(() => clearTimeout(timer))
 }
 
+// One unified loop for both transient failure classes. Previously the timeout sat
+// *outside* the busy-retry (`withDbTimeout(withBusyRetry(...))`), which meant a
+// timeout propagated to the caller with zero retries and all 5 busy attempts plus
+// their backoff had to fit inside one 20s budget. A single latency blip on any one
+// of the hundreds of queries in a cron run therefore failed the entire run — the
+// direct cause of the [youtube-known-urls] and phase-2 failures in early Aug,
+// where the offending queries measured 27-40ms when re-run by hand.
+async function runWithRetry<T>(fn: () => Promise<T>, readOnly: boolean): Promise<T> {
+  const perAttempt = readOnly ? DB_READ_ATTEMPT_TIMEOUT_MS : DB_WRITE_TIMEOUT_MS
+  const startedAt = Date.now()
+  let lastErr: unknown
+
+  for (let i = 0; i < DB_MAX_ATTEMPTS; i++) {
+    // Clamp each attempt to whatever is left of the overall ceiling rather than
+    // asking up front whether a *full* perAttempt would still fit. Reserving the
+    // full budget looks equivalent but isn't: SQLITE_BUSY surfaces after the
+    // engine's lock wait, not instantly, so for writes (perAttempt 20s, ceiling
+    // 25s) the reservation reduced to "only retry if under 5s elapsed" and a busy
+    // error arriving at 5s got zero retries — strictly worse than the code this
+    // replaced, which retried until its outer 20s budget tripped. The ceiling is
+    // what has to be enforced; the per-attempt figure is only a cap.
+    const budget = Math.min(perAttempt, DB_OVERALL_DEADLINE_MS - (Date.now() - startedAt))
+    if (budget < DB_MIN_ATTEMPT_MS) break
+    try {
+      return await withDbTimeout(fn(), budget)
+    } catch (err) {
+      lastErr = err
+      // SQLITE_BUSY is always safe to re-issue (the statement never applied);
+      // a timeout only for reads, where a duplicate execution is harmless.
+      const retryable = isBusyError(err) || (isTimeoutError(err) && readOnly)
+      if (!retryable || i === DB_MAX_ATTEMPTS - 1) throw err
+      const backoff = 200 * (i + 1)
+      const remaining = DB_OVERALL_DEADLINE_MS - (Date.now() - startedAt) - backoff
+      const detail = err instanceof Error ? err.message : String(err)
+      if (remaining < DB_MIN_ATTEMPT_MS) {
+        // Logged explicitly: a deadline-suppressed retry used to be silent, which
+        // made "why did this only try once?" invisible in the Vercel logs.
+        console.warn(`[db] giving up after ${detail} — ${Math.max(0, remaining)}ms left of the ${DB_OVERALL_DEADLINE_MS}ms ceiling`)
+        throw err
+      }
+      console.warn(`[db] retrying after ${detail} (attempt ${i + 2}/${DB_MAX_ATTEMPTS})`)
+      await new Promise(r => setTimeout(r, backoff))
+    }
+  }
+  throw lastErr ?? new Error('Turso retry loop exited without result')
+}
+
 const rawExecute = db.execute.bind(db)
 const rawBatch = db.batch.bind(db)
-db.execute = ((...args: Parameters<typeof rawExecute>) => withDbTimeout(withBusyRetry(() => rawExecute(...args)))) as typeof db.execute
-db.batch = ((...args: Parameters<typeof rawBatch>) => withDbTimeout(withBusyRetry(() => rawBatch(...args)))) as typeof db.batch
+db.execute = ((...args: Parameters<typeof rawExecute>) =>
+  runWithRetry(() => rawExecute(...args), isReadOnlySql(sqlOf(args[0])))) as typeof db.execute
+// A batch is only retryable if every statement in it is a read — one write
+// anywhere makes the whole batch unsafe to re-issue.
+db.batch = ((...args: Parameters<typeof rawBatch>) =>
+  runWithRetry(() => rawBatch(...args), (args[0] as unknown[]).every(s => isReadOnlySql(sqlOf(s))))) as typeof db.batch
 
 // Helper: run multiple statements at startup
 async function exec(sql: string) {

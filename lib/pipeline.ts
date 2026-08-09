@@ -236,8 +236,15 @@ async function pruneOldRejectedItemsLog(): Promise<void> {
 export async function fetchIngest(): Promise<number> {
   console.log('[pipeline] starting ingest...')
 
+  // GLOB, not LIKE: LIKE is case-insensitive by default, so SQLite can't use
+  // idx_feed_items_source for a prefix match and plans a full SCAN of every
+  // feed_items row — ~15MB of embedding blobs on the page reads to return 76
+  // urls. GLOB is case-sensitive and plans SEARCH ... USING INDEX. Channel
+  // slugs are lowercased at ingest (lib/sources/youtube.ts), so the match set
+  // is identical. This is the first query of the run and has timed out twice
+  // under transient Turso latency; an index seek is far less exposed.
   const { rows: ytRows } = await step('youtube-known-urls', () => db.execute(
-    `SELECT url FROM feed_items WHERE source LIKE 'youtube:%'`
+    `SELECT url FROM feed_items WHERE source GLOB 'youtube:*'`
   ))
   const knownYoutubeUrls = new Set((ytRows as any[]).map(r => r.url as string))
 
