@@ -3,6 +3,12 @@
 import { useState, useEffect, useRef } from 'react'
 import type { ProjectIdea } from '@/lib/types'
 import { RefineChat } from './RefineChat'
+import {
+  DEFAULT_ADVISOR_PROFILE,
+  loadAdvisorProfile,
+  saveAdvisorProfile,
+  type AdvisorLevel,
+} from '@/lib/advisor-profile'
 
 // ── Shared constants ──────────────────────────────────────────────────────────
 
@@ -129,24 +135,16 @@ export function CustomAdvisor() {
   const [loading,   setLoading]   = useState(false)
   const [input,     setInput]     = useState('')
   const [error,     setError]     = useState('')
-  const [level,     setLevel]     = useState<'beginner' | 'intermediate' | 'advanced'>('beginner')
-  const [hours,     setHours]     = useState(5)
+  const [level,     setLevel]     = useState<AdvisorLevel>(DEFAULT_ADVISOR_PROFILE.level)
+  const [hours,     setHours]     = useState(DEFAULT_ADVISOR_PROFILE.hoursPerWeek)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
-    const saved = localStorage.getItem('advisor-profile')
-    if (saved) try {
-      const p = JSON.parse(saved)
-      if (p.level)       setLevel(p.level)
-      if (p.hoursPerWeek) setHours(p.hoursPerWeek)
-    } catch {}
+    const p = loadAdvisorProfile()
+    setLevel(p.level)
+    setHours(p.hoursPerWeek)
     textareaRef.current?.focus()
   }, [])
-
-  function saveProfile(next: { level: typeof level; hoursPerWeek: number }) {
-    const existing = (() => { try { return JSON.parse(localStorage.getItem('advisor-profile') ?? '{}') } catch { return {} } })()
-    localStorage.setItem('advisor-profile', JSON.stringify({ ...existing, ...next }))
-  }
 
   async function generate() {
     const trimmed = input.trim()
@@ -235,7 +233,7 @@ export function CustomAdvisor() {
               {(['beginner', 'intermediate', 'advanced'] as const).map(lvl => {
                 const active = level === lvl
                 return (
-                  <button key={lvl} onClick={() => { setLevel(lvl); saveProfile({ level: lvl, hoursPerWeek: hours }) }} style={{
+                  <button key={lvl} onClick={() => setLevel(saveAdvisorProfile({ level: lvl }).level)} style={{
                     fontSize: 11, fontWeight: 700, padding: '5px 10px', borderRadius: 6,
                     background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
                     color: active ? '#60a5fa' : '#52525b',
@@ -252,7 +250,7 @@ export function CustomAdvisor() {
             <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: '#52525b', textTransform: 'uppercase' }}>Hrs/wk</span>
             <input
               type="number" min={1} max={40} value={hours}
-              onChange={e => { const v = Math.max(1, Math.min(40, parseInt(e.target.value) || 5)); setHours(v); saveProfile({ level, hoursPerWeek: v }) }}
+              onChange={e => setHours(saveAdvisorProfile({ hoursPerWeek: parseInt(e.target.value) || 5 }).hoursPerWeek)}
               style={{
                 width: 52, background: 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.1)',

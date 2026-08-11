@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react'
 import type { ProjectIdea } from '@/lib/types'
 import { RefineChat } from './RefineChat'
-
-interface AdvisorProfile {
-  level: 'beginner' | 'intermediate' | 'advanced'
-  interests: string[]
-  hoursPerWeek: number
-}
+import {
+  DEFAULT_ADVISOR_PROFILE,
+  loadAdvisorProfile,
+  saveAdvisorProfile,
+  type AdvisorProfile,
+} from '@/lib/advisor-profile'
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -152,21 +152,20 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
   const [activeIdx, setActiveIdx] = useState(0)
   const [checked,   setChecked]   = useState<Record<string, boolean>>({})
   const [loading,   setLoading]   = useState(false)
-  const [profile,   setProfile]   = useState<AdvisorProfile>({ level: 'beginner', interests: [], hoursPerWeek: 5 })
+  const [profile,   setProfile]   = useState<AdvisorProfile>(DEFAULT_ADVISOR_PROFILE)
 
+  // Read after mount, not during render — the server has no localStorage and a
+  // first client render that disagreed with the SSR output would fail hydration.
   useEffect(() => {
-    const saved = localStorage.getItem('advisor-profile')
-    if (saved) try { setProfile(JSON.parse(saved)) } catch {}
+    setProfile(loadAdvisorProfile())
   }, [])
 
-  function saveProfile(next: AdvisorProfile) {
-    setProfile(next)
-    localStorage.setItem('advisor-profile', JSON.stringify(next))
+  function saveProfile(patch: Partial<AdvisorProfile>) {
+    setProfile(saveAdvisorProfile(patch))
   }
 
   function toggleInterest(t: string) {
     saveProfile({
-      ...profile,
       interests: profile.interests.includes(t) ? profile.interests.filter(i => i !== t) : [...profile.interests, t],
     })
   }
@@ -228,7 +227,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
               {(['beginner', 'intermediate', 'advanced'] as const).map(lvl => {
                 const active = profile.level === lvl
                 return (
-                  <button key={lvl} onClick={() => saveProfile({ ...profile, level: lvl })} style={{
+                  <button key={lvl} onClick={() => saveProfile({ level: lvl })} style={{
                     flex: 1, fontSize: 11, fontWeight: 700, padding: '6px 4px', borderRadius: 6,
                     background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
                     color: active ? '#60a5fa' : '#52525b',
@@ -268,7 +267,7 @@ export function ProjectAdvisor({ initialIdeas }: { initialIdeas: ProjectIdea[] }
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input
                 type="number" min={1} max={40} value={profile.hoursPerWeek}
-                onChange={e => saveProfile({ ...profile, hoursPerWeek: Math.max(1, Math.min(40, parseInt(e.target.value) || 5)) })}
+                onChange={e => saveProfile({ hoursPerWeek: parseInt(e.target.value) || 5 })}
                 style={{
                   width: 60, background: 'rgba(255,255,255,0.04)',
                   border: '1px solid rgba(255,255,255,0.1)',
