@@ -25,7 +25,7 @@ const FLIP_HALF = 410
 function parseSections(md: string): Array<{ title: string; body: string }> {
   return md
     .split(/^(?=## )/m)
-    .filter(p => p.trim())
+    .filter(p => p.startsWith('## '))
     .map(part => ({
       title: part.match(/^## (.+)/)?.[1]?.trim() ?? '',
       body:  part
