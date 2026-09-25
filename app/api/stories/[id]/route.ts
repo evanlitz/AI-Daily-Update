@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { deleteStoryThread } from '@/lib/intelligence/stories'
 import db from '@/lib/db'
+import { invalidateContentRoutes } from '@/lib/cache'
 
 const STOP = new Set(['with','that','this','from','have','been','will','more','over','into','about','when','what','where','which','their','there'])
 
@@ -75,11 +76,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     sql: `UPDATE story_threads SET watch_for = ? WHERE id = ?`,
     args: [watch_for.trim(), id],
   })
+  invalidateContentRoutes()
   return NextResponse.json({ ok: true })
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   await deleteStoryThread(id)
+  invalidateContentRoutes()
   return NextResponse.json({ ok: true })
 }

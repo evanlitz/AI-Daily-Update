@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { updateStoryThreads } from '@/lib/intelligence/stories'
 import { checkCooldown } from '@/lib/rateLimiter'
+import { invalidateContentRoutes } from '@/lib/cache'
 
 export async function POST() {
   const { ok, retryAfterMs } = checkCooldown('stories-generate', 5 * 60 * 1000)
@@ -16,6 +17,7 @@ export async function POST() {
     const { rows: threads } = await db.execute(
       `SELECT COUNT(*) as c FROM story_threads WHERE status = 'active'`
     )
+    invalidateContentRoutes()
     return NextResponse.json({ ok: true, active: (threads[0] as any).c })
   } catch (err) {
     console.error('[stories/generate]', err)

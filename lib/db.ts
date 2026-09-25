@@ -609,6 +609,45 @@ try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_rejected_items_log_reject
 // partial index — only the NULL rows — stays tiny regardless of table size.
 try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_feed_items_embedding_null ON feed_items (fetched_at) WHERE embedding IS NULL`) } catch {}
 
+// entity_mentions' PK is (entity_id, source_type, source_id), which only serves
+// lookups leading with entity_id ("what was this entity mentioned in?"). The
+// reverse direction — "which entities are in this source?" — has no usable
+// prefix, so linkCoMentionedEntities()'s self-join planned as `SEARCH em2 USING
+// AUTOMATIC PARTIAL COVERING INDEX`: SQLite building a throwaway index over the
+// table on every execution.
+//
+// All four columns are in the index deliberately, and the order matters. Indexing
+// only (source_type, source_id) measured 3.5x SLOWER than the automatic index it
+// replaced (0.88s -> 3.15s on a seeded 82k-row copy) — it serves the join but not
+// the SELECT, so all ~82k probes fell back to a rowid fetch into the table. The
+// automatic index SQLite builds is covering, so a narrower "real" index is a
+// downgrade, not an upgrade. Adding entity_id and created_at makes this covering
+// too: 0.67s, and the plan reads `SEARCH em1 USING COVERING INDEX` with no table
+// access at all. Turso bills rows read, so eliminating the table fetches is the
+// point, not the wall-clock. Same index serves the reverse lookups in
+// app/api/stories/[id] and app/api/graph.
+try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_entity_mentions_source ON entity_mentions (source_type, source_id, entity_id, created_at)`) } catch {}
+
+// Two sort orders are used against feed_items and both needed an index; each had
+// none, so every query scanned the whole table into a temp b-tree to return 40-400
+// rows. With these the plan becomes `SCAN feed_items USING INDEX ...`, terminating
+// at the LIMIT instead of reading the table.
+//
+// velocity_score: app/embed and /api/feed's velocity branch.
+// published_at:   app/feed (the page itself), /api/feed's default + tag + paginated
+//                 branches, and app/api/stories/[id]. This is the higher-traffic of
+//                 the two — /api/feed reads searchParams so it cannot be cached, and
+//                 its `LIMIT ? OFFSET ?` pagination repeated the full scan per page.
+//
+// Not a composite with `screened`, even though /api/feed filters on it: a
+// (screened, velocity_score) index can't serve app/embed's unfiltered sort, since
+// screened would be the leading column. Measured identical on a seeded copy anyway
+// — rejected items are hard-deleted (see hooks.ts), so unscreened rows are only
+// ever the current window and there is almost nothing for a leading equality to
+// skip. Worth revisiting only if unscreened volume ever grows.
+try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_feed_items_velocity ON feed_items (velocity_score DESC)`) } catch {}
+try { await db.execute(`CREATE INDEX IF NOT EXISTS idx_feed_items_published_at ON feed_items (published_at DESC)`) } catch {}
+
 // The DiskANN vector index at its default settings stores ~68 uncompressed
 // float32 copies of neighbor vectors per graph node — ~140KB of index per 2KB
 // embedding. On production that made feed_items_vec_idx_shadow 579MB of a

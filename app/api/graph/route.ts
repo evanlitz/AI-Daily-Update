@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
+import { withCachedFallback } from '@/lib/cache'
+
+// Must be a literal: Next 16 statically analyses segment config exports and
+// rejects an imported constant. Keep in sync with REVALIDATE_SECONDS in lib/cache.ts.
+export const revalidate = 900
 
 type RawEdge = {
   fromType: string
@@ -21,6 +26,11 @@ const TABLE_META: Record<string, { table: string; labelCol: string; extra?: stri
 }
 
 export async function GET() {
+  const payload = await withCachedFallback('GET /api/graph', buildGraph, { nodes: [], edges: [] })
+  return NextResponse.json(payload)
+}
+
+async function buildGraph() {
   const [edgesRes, mentionsRes, relationsRes] = await Promise.all([
     db.execute(`SELECT from_type, from_id, to_type, to_id, edge_type, weight, label FROM graph_edges`),
     db.execute(`SELECT entity_id, source_id FROM entity_mentions WHERE source_type = 'feed_item'`),
@@ -97,5 +107,5 @@ export async function GET() {
     }))
     .filter(e => nodes.has(e.source) && nodes.has(e.target))
 
-  return NextResponse.json({ nodes: [...nodes.values()], edges: outEdges })
+  return { nodes: [...nodes.values()], edges: outEdges }
 }

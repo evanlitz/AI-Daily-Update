@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import db from '@/lib/db'
 import { generateProjectIdeas } from '@/lib/intelligence/advisor'
 import { checkCooldown } from '@/lib/rateLimiter'
+import { invalidateContentRoutes } from '@/lib/cache'
 
 export const maxDuration = 60
 
@@ -34,6 +35,10 @@ export async function POST(req: Request) {
   if (!ok) return NextResponse.json({ error: 'Rate limited' }, { status: 429, headers: { 'Retry-After': String(Math.ceil(retryAfterMs / 1000)) } })
   let context: any = undefined
   try { context = await req.json() } catch {}
-  try { return NextResponse.json(await generateProjectIdeas(context)) }
+  try {
+    const ideas = await generateProjectIdeas(context)
+    invalidateContentRoutes()
+    return NextResponse.json(ideas)
+  }
   catch (err) { console.error('[advisor POST]', err); return NextResponse.json({ error: 'Failed' }, { status: 500 }) }
 }

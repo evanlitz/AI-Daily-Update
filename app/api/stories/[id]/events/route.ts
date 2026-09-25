@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import db from '@/lib/db'
 import { getMondayISO } from '@/lib/utils'
+import { invalidateContentRoutes } from '@/lib/cache'
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -25,5 +26,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     sql: `UPDATE story_threads SET last_updated = ? WHERE id = ?`,
     args: [now, id],
   })
+  invalidateContentRoutes()
   return NextResponse.json({ ok: true })
 }

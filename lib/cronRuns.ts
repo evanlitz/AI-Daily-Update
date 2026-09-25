@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import db from './db'
+import { invalidateContentRoutes } from './cache'
 
 export async function startCronRun(path: string): Promise<string> {
   const id = crypto.randomUUID()
@@ -69,6 +70,12 @@ export async function runCronJob(
       return Response.json({ ok: false, error: msg }, { status: 500 })
     }
     await finishCronRun(runId, 'success')
+    // The pages and read-only routes are cached now (see lib/cache.ts) rather than
+    // force-dynamic, so a successful write is what has to publish it. Purging here
+    // instead of in each cron route means any future route using this wrapper gets
+    // it for free, and it only fires on success — a failed run has nothing new to
+    // publish and should leave the last good cache entry serving.
+    invalidateContentRoutes()
     return Response.json({ ok: true, ...(result.value ?? {}) })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)

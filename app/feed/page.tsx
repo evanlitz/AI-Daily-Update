@@ -1,8 +1,11 @@
 import { TrendFeed } from '@/components/TrendFeed'
 import db from '@/lib/db'
 import type { FeedItem } from '@/lib/types'
+import { withCachedFallback } from '@/lib/cache'
 
-export const dynamic = 'force-dynamic'
+// Must be a literal: Next 16 statically analyses segment config exports and
+// rejects an imported constant. Keep in sync with REVALIDATE_SECONDS in lib/cache.ts.
+export const revalidate = 900
 
 function interleave(items: FeedItem[], limit: number): FeedItem[] {
   const bySource: Record<string, FeedItem[]> = {}
@@ -26,15 +29,17 @@ function interleave(items: FeedItem[], limit: number): FeedItem[] {
   return result
 }
 
+// The fallback is build-only on purpose: at runtime a throw lets ISR keep serving
+// the last good page, whereas returning [] would cache an empty feed for 900s.
 async function getFeed(): Promise<FeedItem[]> {
-  try {
+  return withCachedFallback('/feed getFeed', async () => {
     const { rows } = await db.execute({
       sql: `SELECT * FROM feed_items ORDER BY published_at DESC LIMIT 400`,
       args: [],
     })
     const parsed = (rows as any[]).map(i => ({ ...i, topic_tags: JSON.parse(i.topic_tags ?? '[]') }))
     return interleave(parsed, 40)
-  } catch { return [] }
+  }, [])
 }
 
 export default async function FeedPage() {

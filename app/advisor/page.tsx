@@ -1,11 +1,16 @@
 import { AdvisorTabs } from '@/components/AdvisorTabs'
 import db from '@/lib/db'
 import type { ProjectIdea } from '@/lib/types'
+import { withCachedFallback } from '@/lib/cache'
 
-export const dynamic = 'force-dynamic'
+// Must be a literal: Next 16 statically analyses segment config exports and
+// rejects an imported constant. Keep in sync with REVALIDATE_SECONDS in lib/cache.ts.
+export const revalidate = 900
 
+// Build-only fallback — see lib/cache.ts: a runtime throw must reach ISR so the
+// previous good render keeps serving instead of caching an empty advisor for 900s.
 async function getIdeas(): Promise<ProjectIdea[]> {
-  try {
+  return withCachedFallback('/advisor getIdeas', async () => {
     const { rows } = await db.execute({
       sql: `SELECT * FROM project_ideas ORDER BY created_at DESC LIMIT 3`,
       args: [],
@@ -16,7 +21,7 @@ async function getIdeas(): Promise<ProjectIdea[]> {
       starter_checklist: JSON.parse(r.starter_checklist ?? '[]'),
       tech_stack: JSON.parse(r.tech_stack ?? '[]'),
     }))
-  } catch { return [] }
+  }, [])
 }
 
 export default async function AdvisorPage() {
