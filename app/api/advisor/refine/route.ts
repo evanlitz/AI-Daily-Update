@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { refineProjectIdea } from '@/lib/intelligence/advisor'
 import { checkCooldown } from '@/lib/rateLimiter'
+import { invalidateContentRoutes } from '@/lib/cache'
 
 export const maxDuration = 60
 
@@ -16,7 +17,9 @@ export async function POST(req: Request) {
   if (!ok) return NextResponse.json({ error: 'Too many requests' }, { status: 429, headers: { 'Retry-After': String(Math.ceil(retryAfterMs / 1000)) } })
 
   try {
-    return NextResponse.json(await refineProjectIdea(ideaId, message))
+    const refined = await refineProjectIdea(ideaId, message)
+    invalidateContentRoutes()
+    return NextResponse.json(refined)
   } catch (err) {
     console.error('[advisor/refine]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })

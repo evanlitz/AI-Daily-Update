@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { refreshPredictionAnalysis, checkPredictionResolution, generateNewPredictions } from '@/lib/intelligence/predictions'
 import { startCronRun, finishCronRun } from '@/lib/cronRuns'
+import { invalidateContentRoutes } from '@/lib/cache'
 
 export const maxDuration = 180
 
@@ -36,5 +37,6 @@ export async function GET(req: Request) {
   }
 
   await finishCronRun(runId, 'success')
+  invalidateContentRoutes()
   return NextResponse.json({ ok: true })
 }

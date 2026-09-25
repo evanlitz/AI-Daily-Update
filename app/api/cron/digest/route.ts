@@ -3,6 +3,7 @@ import db from '@/lib/db'
 import { generateWeeklyDigest } from '@/lib/intelligence/digest'
 import { getMondayISO } from '@/lib/utils'
 import { startCronRun, finishCronRun } from '@/lib/cronRuns'
+import { invalidateContentRoutes } from '@/lib/cache'
 
 export const maxDuration = 300
 
@@ -25,6 +26,7 @@ export async function GET(req: Request) {
   try {
     const digest = await generateWeeklyDigest()
     await finishCronRun(runId, 'success')
+    invalidateContentRoutes()
     return NextResponse.json({ ok: true, weekStart: digest.week_start })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { generateCustomProjectIdeas } from '@/lib/intelligence/advisor'
+import { invalidateContentRoutes } from '@/lib/cache'
 
 export const maxDuration = 60
 
@@ -15,6 +16,7 @@ export async function POST(req: Request) {
       level: body.level,
       hoursPerWeek: body.hoursPerWeek,
     })
+    invalidateContentRoutes()
     return NextResponse.json(ideas)
   } catch (err) {
     console.error('[advisor/custom]', err)

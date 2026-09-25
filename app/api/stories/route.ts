@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
+import { withCachedFallback } from '@/lib/cache'
+
+// Must be a literal: Next 16 statically analyses segment config exports and
+// rejects an imported constant. Keep in sync with REVALIDATE_SECONDS in lib/cache.ts.
+export const revalidate = 900
 
 export async function GET() {
+  const rows = await withCachedFallback('GET /api/stories', async () => {
   const { rows } = await db.execute(`
     WITH latest AS (
       SELECT thread_id, update_text, significance, week,
@@ -20,5 +26,7 @@ export async function GET() {
     GROUP BY st.id
     ORDER BY st.is_pinned DESC, st.last_updated DESC
   `)
+    return rows
+  }, [] as any[])
   return NextResponse.json(rows)
 }

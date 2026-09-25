@@ -5,7 +5,9 @@ import { getLatestBrief } from '@/lib/intelligence/brief'
 import { BriefAudio } from '@/components/BriefAudio'
 import { CollapsibleAbout } from '@/components/CollapsibleAbout'
 
-export const dynamic = 'force-dynamic'
+// Must be a literal: Next 16 statically analyses segment config exports and
+// rejects an imported constant. Keep in sync with REVALIDATE_SECONDS in lib/cache.ts.
+export const revalidate = 900
 
 // ── Page directory ────────────────────────────────────────────────────────────
 
@@ -124,7 +126,40 @@ const CONF_COLOR: Record<string, string> = {
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
 
-async function getHomeData() {
+// Shape returned when the DB is unreachable. This page is prerendered now (see
+// `revalidate` above) rather than force-dynamic, which moves the first render to
+// build time — so an unhandled DB error here fails the whole build instead of
+// returning a recoverable 500 for one request. app/feed, app/advisor and app/embed
+// already each swallow their own query errors for this reason; this is the same
+// contract. An empty render self-heals on the next revalidate or cron purge.
+const EMPTY_HOME_DATA = {
+  feedToday: 0,
+  trending: [] as any[],
+  stories: [] as any[],
+  digest: null as any,
+  highlights: [] as string[],
+  modelCount: 0,
+  lastFetch: null as string | null,
+  freshnessColor: '#ef4444',
+  predEvidence: [] as any[],
+  totalStories: 0,
+  totalPreds: 0,
+}
+
+async function getHomeData(): Promise<typeof EMPTY_HOME_DATA> {
+  // Build only — see withCachedFallback in lib/cache.ts for why a runtime error must
+  // propagate instead: Next re-serves the last good cached page and retries in
+  // seconds, whereas swallowing it caches this empty state for the full 900s.
+  if (process.env.NEXT_PHASE !== 'phase-production-build') return loadHomeData()
+  try {
+    return await loadHomeData()
+  } catch (err) {
+    console.error('[home] getHomeData failed during build, prerendering empty state:', err)
+    return EMPTY_HOME_DATA
+  }
+}
+
+async function loadHomeData() {
   const since24h = new Date(Date.now() - 24 * 3600_000).toISOString()
   const since6h  = new Date(Date.now() -  6 * 3600_000).toISOString()
 
@@ -301,7 +336,17 @@ function SectionHeader({ label, href, linkLabel, large }: { label: string; href?
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function HomePage() {
-  const [data, brief] = await Promise.all([getHomeData(), getLatestBrief()])
+  // getHomeData self-guards for the build; the brief is guarded the same way and for
+  // the same reason — at runtime it must throw so ISR keeps the last good page.
+  const [data, brief] = await Promise.all([
+    getHomeData(),
+    process.env.NEXT_PHASE === 'phase-production-build'
+      ? getLatestBrief().catch(err => {
+          console.error('[home] getLatestBrief failed during build:', err)
+          return null
+        })
+      : getLatestBrief(),
+  ])
   const {
     feedToday, trending, stories, digest, highlights,
     modelCount, lastFetch, freshnessColor,

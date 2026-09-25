@@ -5,6 +5,7 @@ import { anthropic, MODEL } from '../claude'
 import { safeJSON } from '../utils'
 import { runLiveGroundednessCheck } from '../eval/live-check'
 import { startCronRun, finishCronRun } from '../cronRuns'
+import { invalidateContentRoutes } from '../cache'
 
 export interface DailyBrief {
   id: string
@@ -269,6 +270,7 @@ export async function runDailyBriefJob(): Promise<BriefJobResult> {
       return { ok: true, skipped: result.skipped }
     }
     await finishCronRun(runId, 'success')
+    invalidateContentRoutes()
     return { ok: true, date: result.brief.date }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)

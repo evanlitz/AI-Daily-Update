@@ -8,16 +8,28 @@ export async function GET(req: NextRequest) {
   const cut7  = new Date(now - 7  * 24 * 3600_000).toISOString()
   const cut14 = new Date(now - 14 * 24 * 3600_000).toISOString()
 
+  // The LIMIT has to be applied *before* the mention join, not after. Written the
+  // obvious way (join everything, GROUP BY, ORDER BY, LIMIT 150) SQLite aggregates
+  // every entity's full mention history and sorts the whole set before discarding
+  // all but 150 rows — the plan was `SCAN e` + a per-entity probe into
+  // entity_mentions. Latency hid it; Turso's rows-read billing did not. Narrowing
+  // to the top 150 in a CTE first makes the join touch 150 entities' mentions
+  // instead of every entity's, for byte-identical output.
   const { rows } = await db.execute({
-    sql: `SELECT
-            e.id, e.name, e.type, e.mention_count, e.first_seen,
+    sql: `WITH top AS (
+            SELECT id, name, type, mention_count, first_seen, mention_score
+            FROM entities
+            ORDER BY mention_score DESC
+            LIMIT 150
+          )
+          SELECT
+            t.id, t.name, t.type, t.mention_count, t.first_seen,
             COALESCE(SUM(CASE WHEN em.created_at >= ? THEN 1 ELSE 0 END), 0)                          AS this_week,
             COALESCE(SUM(CASE WHEN em.created_at >= ? AND em.created_at < ? THEN 1 ELSE 0 END), 0)    AS last_week
-          FROM entities e
-          LEFT JOIN entity_mentions em ON em.entity_id = e.id
-          GROUP BY e.id, e.name, e.type, e.mention_count, e.first_seen, e.mention_score
-          ORDER BY e.mention_score DESC
-          LIMIT 150`,
+          FROM top t
+          LEFT JOIN entity_mentions em ON em.entity_id = t.id
+          GROUP BY t.id, t.name, t.type, t.mention_count, t.first_seen, t.mention_score
+          ORDER BY t.mention_score DESC`,
     args: [cut7, cut14, cut7],
   })
 
