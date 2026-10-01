@@ -2,6 +2,7 @@ import Parser from 'rss-parser'
 import he from 'he'
 import crypto from 'crypto'
 import type { FeedItem } from '../types'
+import { extractPageContent } from '../extract-content'
 
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36'
 
@@ -33,17 +34,23 @@ function stripTrackingParams(rawUrl: string): string {
 
 const FEEDS = [
   // ── Official AI Lab Blogs ────────────────────────────────────────────────────
-  // anthropic, cohere, meta-ai dropped — confirmed dead with no free fix available:
-  // anthropic.com no longer publishes a public RSS feed at all (checked /rss.xml,
-  // /news/rss.xml, /feed.xml, and the /news page itself for an alternate link — none
-  // exist). cohere.com/blog/rss 307-redirects to the plain HTML blog page, which has
-  // no <link rel="alternate" type="application/rss+xml"> either — they've dropped RSS.
-  // ai.meta.com/blog/rss/ returns 400 from every header combination tried (UA, Accept) —
-  // looks like bot mitigation at their edge, not a URL issue, same dead end as Reddit's
-  // anonymous API crackdown earlier this session.
   { url: 'https://openai.com/blog/rss.xml',                              source: 'rss:openai',              tags: ['models', 'industry'] },
   { url: 'https://deepmind.google/blog/rss.xml',                         source: 'rss:deepmind',            tags: ['research', 'models'] },
   { url: 'https://mistral.ai/rss.xml',                                   source: 'rss:mistral',             tags: ['models', 'industry'] },
+  { url: 'https://thinkingmachines.ai/blog/index.xml',                   source: 'rss:thinking-machines',   tags: ['research', 'models'] },
+
+  // ── Scraped Lab Feeds ────────────────────────────────────────────────────────
+  // anthropic.com and ai.meta.com publish no usable RSS (anthropic has none; meta's
+  // /blog/rss/ 400s at their edge) and Qwen has none either, so these come from
+  // third-party scrapers rebuilt on GitHub Actions. The Turing Institute repo
+  // (alan-turing-institute/ai-rss-feeds) fails its build on near-empty output
+  // rather than publishing a silently empty feed; AI RSS Network
+  // (yuanxianh/rss-feeds) rebuilds hourly. Both Anthropic feeds list oldest-first
+  // and carry no description — fetchFeed sorts and backfills page content for that.
+  { url: 'https://raw.githubusercontent.com/alan-turing-institute/ai-rss-feeds/main/feeds/anthropic-news.xml',     source: 'rss:anthropic-news',     tags: ['models', 'industry'] },
+  { url: 'https://raw.githubusercontent.com/alan-turing-institute/ai-rss-feeds/main/feeds/anthropic-research.xml', source: 'rss:anthropic-research', tags: ['research'] },
+  { url: 'https://yuanxianh.github.io/rss-feeds/meta_ai_research.xml',   source: 'rss:meta-ai-research',    tags: ['research'] },
+  { url: 'https://yuanxianh.github.io/rss-feeds/qwen_research.xml',      source: 'rss:qwen',                tags: ['models', 'research'] },
 
   // ── Big Tech AI Blogs ────────────────────────────────────────────────────────
   // rss:google-ai (blog.google's broader "innovation and AI" category) dropped:
@@ -153,10 +160,16 @@ async function fetchFeed(feed: typeof FEEDS[number]): Promise<FeedItem[]> {
     const now = new Date().toISOString()
     const cutoff = Date.now() - CUTOFF_DAYS * 24 * 60 * 60 * 1000
 
-    const items = (result.items ?? [])
+    // Sort newest-first before the cap: some feeds (e.g. the scraped Anthropic ones)
+    // list oldest-first, so slicing first would keep only years-old items and the
+    // date filter below would then drop all of them. isoDate is ISO-8601, so string
+    // order is date order; undated items sort last.
+    const items = [...(result.items ?? [])]
+      .sort((a: any, b: any) => (b.isoDate ?? '').localeCompare(a.isoDate ?? ''))
       .slice(0, 20) // cap at 20 per feed before date filtering
       .map((item: any) => {
-        const rawContent = item['content:encoded'] ?? item.content ?? item.contentSnippet ?? ''
+        // summary: Atom feeds (e.g. simon-willison) carry their text in <summary>.
+        const rawContent = item['content:encoded'] ?? item.content ?? item.contentSnippet ?? item.summary ?? ''
         const url = stripTrackingParams(item.link ?? '')
         const pubDate = item.isoDate ?? (item.pubDate ? new Date(item.pubDate).toISOString() : null)
         return {
@@ -175,7 +188,15 @@ async function fetchFeed(feed: typeof FEEDS[number]): Promise<FeedItem[]> {
       // Drop items older than cutoff (but keep items with no date)
       .filter(item => !item.published_at || new Date(item.published_at).getTime() > cutoff)
 
-    return items as FeedItem[]
+    // Title-only feeds (hf-blog, tldr-ai, the scraped Anthropic ones) would otherwise
+    // be screened on the headline alone — same page-content backfill as hackernews.ts.
+    const enriched = await Promise.all(items.map(async item => {
+      if (item.raw_content || !item.url) return item
+      const content = await extractPageContent(item.url)
+      return content ? { ...item, raw_content: content.slice(0, 1500) } : item
+    }))
+
+    return enriched as FeedItem[]
   } catch (err) {
     console.error(`[rss:${feed.source}] fetch failed:`, err)
     return []
