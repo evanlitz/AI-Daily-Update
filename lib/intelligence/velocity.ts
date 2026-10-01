@@ -92,9 +92,14 @@ export async function updateAccelerationScores(): Promise<void> {
 // weights (lib/intelligence/entities.ts) — an entity mentioned constantly a
 // year ago shouldn't permanently outrank one surging this week just because
 // mention_count is a raw lifetime sum. One UPDATE with a correlated subquery
-// (entity_mentions is keyed by entity_id first in its PK, so this is an
-// indexed per-row lookup, not a cross join) rather than pulling rows into JS —
-// this is a pure SQL aggregate, unlike velocity's keyword scoring above.
+// rather than pulling rows into JS — this is a pure SQL aggregate, unlike
+// velocity's keyword scoring above.
+//
+// The unary + on source_type is load-bearing. Without it the planner picks the
+// covering idx_entity_mentions_source (source_type, ...) over the entity_id-first
+// PK — source_type has one value in practice, so every entity's subquery scanned
+// all of entity_mentions: 55.5M rows read per call (4,788 x 11,602) measured on
+// prod 2026-10-01, vs 21k with the hint. Same output either way.
 const MENTION_SALIENCE_HALF_LIFE_DAYS = 90
 
 export async function updateEntitySalience(): Promise<void> {
@@ -102,7 +107,7 @@ export async function updateEntitySalience(): Promise<void> {
     sql: `UPDATE entities SET mention_score = COALESCE((
             SELECT SUM(pow(0.5, (julianday('now') - julianday(em.created_at)) / ?))
             FROM entity_mentions em
-            WHERE em.entity_id = entities.id AND em.source_type = 'feed_item'
+            WHERE em.entity_id = entities.id AND +em.source_type = 'feed_item'
           ), 0)`,
     args: [MENTION_SALIENCE_HALF_LIFE_DAYS],
   })
