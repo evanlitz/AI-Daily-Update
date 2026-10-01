@@ -8,7 +8,6 @@ import { fetchHuggingFace } from './sources/huggingface'
 import { fetchDatasets } from './sources/datasets'
 import { fetchKaggleDatasets } from './sources/kaggle'
 import { fetchYoutube, YOUTUBE_SOURCE_NAMES } from './sources/youtube'
-import { fetchPapersWithCode } from './sources/paperswithcode'
 import { fetchSemanticScholar } from './sources/semanticscholar'
 import { fetchGithubReleases } from './sources/github_releases'
 import { fetchHFModels } from './sources/hf_models'
@@ -151,7 +150,7 @@ async function filterNewItems(items: FeedItem[]): Promise<FeedItem[]> {
 // Sources whose fetcher always returns items tagged with one fixed `source`
 // string (multi-source fetchers like rss/youtube supply their own names above).
 const SINGLE_FEED_SOURCE_NAMES = [
-  'arxiv', 'hn', 'github', 'huggingface', 'paperswithcode', 'hf-models',
+  'arxiv', 'hn', 'github', 'huggingface', 'hf-models',
   'semanticscholar', 'github-releases',
 ]
 
@@ -251,12 +250,11 @@ export async function fetchIngest(): Promise<number> {
   const SOURCE_TIMEOUT_MS = 20000
   const withFallback = <T>(label: string, p: Promise<T[]>) => withTimeout(label, p, SOURCE_TIMEOUT_MS, [] as T[])
 
-  const [arxiv, hn, rss, github, huggingface, githubTop, hfDatasets, kaggleDatasets, pwc, hfModels, youtube, semanticScholar, ghReleases] = await step('fetch-sources', () => Promise.all([
+  const [arxiv, hn, rss, github, huggingface, githubTop, hfDatasets, kaggleDatasets, hfModels, youtube, semanticScholar, ghReleases] = await step('fetch-sources', () => Promise.all([
     withFallback('arxiv', fetchArxiv()), withFallback('hackernews', fetchHackerNews()),
     withFallback('rss', fetchRSS()), withFallback('github', fetchGithubTrending()),
     withFallback('huggingface', fetchHuggingFace()), withFallback('github-top', fetchGithubTop()),
     withFallback('hf-datasets', fetchDatasets()), withFallback('kaggle', fetchKaggleDatasets()),
-    withFallback('paperswithcode', fetchPapersWithCode()),
     withFallback('hf-models', fetchHFModels()), withFallback('youtube', fetchYoutube(knownYoutubeUrls)),
     withFallback('semanticscholar', fetchSemanticScholar()), withFallback('github-releases', fetchGithubReleases()),
   ]))
@@ -266,7 +264,7 @@ export async function fetchIngest(): Promise<number> {
   const seenDatasets = new Set(cappedHfDatasets.map(d => d.full_name))
   for (const d of cap('kaggle', kaggleDatasets, 300)) { if (!seenDatasets.has(d.full_name)) { seenDatasets.add(d.full_name); allDatasets.push(d) } }
 
-  const allFeedItems = [...arxiv, ...hn, ...rss, ...github, ...huggingface, ...pwc, ...hfModels, ...youtube, ...semanticScholar, ...ghReleases]
+  const allFeedItems = [...arxiv, ...hn, ...rss, ...github, ...huggingface, ...hfModels, ...youtube, ...semanticScholar, ...ghReleases]
 
   const sourceCounts = new Map<string, number>(ALL_SOURCE_NAMES.map(name => [name, 0]))
   for (const item of allFeedItems) {

@@ -3,7 +3,7 @@ import { recallFeedItems } from '../memory'
 import { getAllModels } from './models'
 import { getEntitiesForTools, getKnownRelationships, formatKnownRelationships } from '../graph'
 
-const PAPER_SOURCES = ['arxiv', 'paperswithcode', 'semanticscholar', 'huggingface']
+const PAPER_SOURCES = ['arxiv', 'semanticscholar', 'huggingface']
 
 export interface AdvisorSourceContext {
   trending: string
