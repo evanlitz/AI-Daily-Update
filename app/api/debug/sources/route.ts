@@ -7,7 +7,6 @@ import { fetchHuggingFace } from '@/lib/sources/huggingface'
 import { fetchDatasets } from '@/lib/sources/datasets'
 import { fetchKaggleDatasets } from '@/lib/sources/kaggle'
 import { fetchYoutube } from '@/lib/sources/youtube'
-import { fetchPapersWithCode } from '@/lib/sources/paperswithcode'
 import { fetchSemanticScholar } from '@/lib/sources/semanticscholar'
 import { fetchGithubReleases } from '@/lib/sources/github_releases'
 import { fetchHFModels } from '@/lib/sources/hf_models'
@@ -36,7 +35,6 @@ const CHECKS: { source: string; run: () => Promise<unknown[]> }[] = [
   { source: 'datasets', run: fetchDatasets },
   { source: 'kaggle', run: fetchKaggleDatasets },
   { source: 'youtube', run: () => fetchYoutube(new Set()) },
-  { source: 'paperswithcode', run: fetchPapersWithCode },
   { source: 'semanticscholar', run: fetchSemanticScholar },
   { source: 'github_releases', run: fetchGithubReleases },
   { source: 'hf_models', run: fetchHFModels },

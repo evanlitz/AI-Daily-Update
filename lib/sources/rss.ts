@@ -61,11 +61,14 @@ const FEEDS = [
   { url: 'https://importai.substack.com/feed',                           source: 'rss:import-ai',           tags: ['industry'] },
   { url: 'https://www.interconnects.ai/feed',                            source: 'rss:interconnects',       tags: ['research'] },
   { url: 'https://sebastianraschka.com/rss_feed.xml',                    source: 'rss:raschka',             tags: ['research'] },
-  { url: 'https://thegradient.pub/rss/',                                 source: 'rss:the-gradient',        tags: ['research'] },
+  // rss:the-gradient dropped: dormant — newest post 224 days old as of 2026-10-01,
+  // zero items fetched in source_runs history.
   { url: 'https://newsletter.theaiedge.io/feed',                         source: 'rss:ai-edge',             tags: ['research', 'tools'] },
   { url: 'https://www.latent.space/feed',                                source: 'rss:latent-space',        tags: ['research', 'tools'] },
   { url: 'https://tldr.tech/api/rss/ai',                                 source: 'rss:tldr-ai',             tags: ['industry', 'tools'] },
-  { url: 'https://simonwillison.net/atom/everything/',                   source: 'rss:simon-willison',      tags: ['tools'] },
+  // /atom/entries/ (long-form posts only) instead of /atom/everything/: the full
+  // feed's blogmarks/quotes ran ~60 items per 2 weeks at a 15% accept rate.
+  { url: 'https://simonwillison.net/atom/entries/',                      source: 'rss:simon-willison',      tags: ['tools'] },
   { url: 'https://huggingface.co/blog/feed.xml',                         source: 'rss:huggingface-blog',    tags: ['tools', 'models'] },
   { url: 'https://www.oneusefulthing.org/feed',                          source: 'rss:one-useful-thing',    tags: ['industry'] },
   { url: 'https://thezvi.substack.com/feed',                             source: 'rss:zvi',                 tags: ['industry', 'research'] },
@@ -78,15 +81,15 @@ const FEEDS = [
 
   // ── Academic / Research Labs ─────────────────────────────────────────────────
   { url: 'https://bair.berkeley.edu/blog/feed.xml',                      source: 'rss:bair',                tags: ['research'] },
-  // Stanford HAI: policy and governance angle — the only institute-level AI policy source.
-  { url: 'https://hai.stanford.edu/news/rss.xml',                        source: 'rss:stanford-hai',        tags: ['industry'] },
+  // rss:stanford-hai dropped: hai.stanford.edu/news/rss.xml now serves the HTML
+  // site (Next.js rewrite), no feed exists anymore.
   { url: 'https://news.mit.edu/rss/topic/artificial-intelligence2',      source: 'rss:mit-news',            tags: ['research'] },
 
   // ── Global AI Coverage ───────────────────────────────────────────────────────
-  // ChinaTalk: US-China tech policy plus direct coverage of Chinese labs (DeepSeek,
-  // Qwen, Zhipu, MiniMax, etc.) — none of the labs themselves publish English RSS,
-  // so this newsletter is the only feed-based route to that half of the frontier.
-  { url: 'https://chinatalk.media/feed',                                 source: 'rss:chinatalk',           tags: ['industry', 'research'] },
+  // Recode China AI: direct coverage of Chinese labs (DeepSeek, Qwen, Zhipu, MiniMax,
+  // etc.) — none of the labs themselves publish English RSS. Replaced rss:chinatalk,
+  // which hit a 9% accept rate over 128 items: mostly general US-China policy, not AI.
+  { url: 'https://recodechinaai.substack.com/feed',                      source: 'rss:recode-china-ai',     tags: ['industry', 'research'] },
 
   // ── Model Labs / Infra ───────────────────────────────────────────────────────
   { url: 'https://www.together.ai/blog/rss.xml',                         source: 'rss:together-ai',         tags: ['models', 'infrastructure'] },
@@ -106,10 +109,12 @@ const FEEDS = [
   // SemiAnalysis: the most-cited chips/compute/datacenter deep-dive newsletter in AI —
   // GPU supply, training cluster economics, export-control fallout. Complements IEEE
   // Spectrum's engineering angle with the compute-economics angle.
-  { url: 'https://www.semianalysis.com/feed',                            source: 'rss:semianalysis',        tags: ['infrastructure', 'industry'] },
+  // www.semianalysis.com/feed 301s to a stale feed — the newsletter moved to its own subdomain.
+  { url: 'https://newsletter.semianalysis.com/feed',                     source: 'rss:semianalysis',        tags: ['infrastructure', 'industry'] },
   { url: 'https://techcrunch.com/category/artificial-intelligence/feed/', source: 'rss:techcrunch-ai',      tags: ['industry'] },
-  { url: 'https://www.technologyreview.com/feed/',                        source: 'rss:mit-tech-review',    tags: ['research'] },
-  { url: 'https://venturebeat.com/category/ai/feed',                      source: 'rss:venturebeat-ai',     tags: ['industry'] },
+  // AI topic feed, not the whole-site /feed/ (17% accept rate over 219 items).
+  { url: 'https://www.technologyreview.com/topic/artificial-intelligence/feed', source: 'rss:mit-tech-review', tags: ['research'] },
+  // rss:venturebeat-ai dropped: persistent HTTP 429 to datacenter IPs, last item 2026-09-03.
   { url: 'https://www.marktechpost.com/feed/',                            source: 'rss:marktechpost',       tags: ['research', 'industry'] },
   // rss:techcrunch-venture dropped: 8.1% accept rate over 99 screened items, the
   // lowest of any RSS source — general VC/funding news rarely touches AI, and

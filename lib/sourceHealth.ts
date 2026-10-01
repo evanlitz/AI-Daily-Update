@@ -10,6 +10,13 @@ export const RETIRED_SOURCES = new Set([
   'rss:google-ai',
   'rss:techcrunch-venture',
   'rss:the-verge',
+  'rss:the-gradient',
+  'rss:stanford-hai',
+  'rss:chinatalk',
+  'rss:venturebeat-ai',
+  'paperswithcode',
+  'youtube:lex-fridman',
+  'youtube:cognitive-revolution',
 ])
 
 // benchmark-sync runs every 10 days — use a wider staleness window for it
