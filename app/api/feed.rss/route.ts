@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   const { rows } = await db.execute(
     `SELECT id, title, url, summary, source, published_at, fetched_at, topic_tags, velocity_score
      FROM feed_items
-     WHERE screened = 1
+     WHERE +screened = 1 -- + keeps idx_feed_items_fetched_at in play, see app/api/feed/route.ts
      ORDER BY fetched_at DESC
      LIMIT 100`
   )

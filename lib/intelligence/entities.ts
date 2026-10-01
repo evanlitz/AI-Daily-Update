@@ -314,6 +314,12 @@ export async function linkCoMentionedEntities(): Promise<void> {
 // Top entities mentioned in a thread's feed items, batched across all thread
 // ids in one query. Shared by digest.ts and predictions.ts, which previously
 // each had their own byte-for-byte copy of this query.
+//
+// CROSS JOIN pins the join order (story_events -> json_each -> entity_mentions)
+// so j.value is known when entity_mentions is probed and the (source_type,
+// source_id) index applies. With plain JOINs the planner put json_each last and
+// scanned entity_mentions on source_type alone: 11M rows read for 20 threads on
+// prod 2026-10-01, vs 4.1k with this order. Same output either way.
 export async function getEntitiesForThreads(threadIds: string[]): Promise<Map<string, string[]>> {
   const byThread = new Map<string, string[]>()
   if (!threadIds.length) return byThread
@@ -322,8 +328,8 @@ export async function getEntitiesForThreads(threadIds: string[]): Promise<Map<st
   const { rows } = await db.execute({
     sql: `SELECT se.thread_id, e.name, COUNT(DISTINCT em.source_id) AS item_count
           FROM story_events se
-          JOIN json_each(se.feed_item_ids) j ON 1=1
-          JOIN entity_mentions em ON em.source_id = j.value AND em.source_type = 'feed_item'
+          CROSS JOIN json_each(se.feed_item_ids) j
+          CROSS JOIN entity_mentions em ON em.source_type = 'feed_item' AND em.source_id = j.value
           JOIN entities e ON e.id = em.entity_id
           WHERE se.thread_id IN (${placeholders})
           GROUP BY se.thread_id, e.id

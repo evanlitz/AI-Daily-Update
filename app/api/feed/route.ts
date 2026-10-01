@@ -118,9 +118,12 @@ export async function GET(req: NextRequest) {
 
   const { affinityBoost, hasAffinity } = await loadAffinity()
 
+  // +screened stops the planner choosing idx_feed_items_screened (nearly every row
+  // matches) over the published_at/velocity_score indexes the ORDER BYs need —
+  // otherwise every request scans ~15k rows to return 40 (measured 2026-10-01).
   const tagCondStr = tagList.length > 0
-    ? ` WHERE screened = 1 AND (${tagList.map(() => `topic_tags LIKE ?`).join(' OR ')})`
-    : ` WHERE screened = 1`
+    ? ` WHERE +screened = 1 AND (${tagList.map(() => `topic_tags LIKE ?`).join(' OR ')})`
+    : ` WHERE +screened = 1`
 
   // ── Velocity sort: blend velocity (60%) + affinity (40%) ─────────────────
   if (sort === 'velocity') {
